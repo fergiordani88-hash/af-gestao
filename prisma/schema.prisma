@@ -1,0 +1,373 @@
+// AF Gestão & Consultoria — Banco de Dados
+// Provider: PostgreSQL | ORM: Prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────────
+// USUÁRIOS & AUTENTICAÇÃO
+// ─────────────────────────────────────────────
+model User {
+  id        String   @id @default(cuid())
+  name      String
+  email     String   @unique
+  password  String
+  role      UserRole @default(CONSULTOR)
+  avatar    String?
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  clients       Client[]      @relation("ResponsibleConsultant")
+  diagnosticsPJ DiagnosticoPJ[]
+  diagnosticsAgro DiagnosticoAgro[]
+  actionPlans   ActionPlan[]
+}
+
+enum UserRole {
+  ADMIN
+  CONSULTOR
+  CLIENTE_EMPRESA
+  CLIENTE_RURAL
+}
+
+// ─────────────────────────────────────────────
+// CRM — CLIENTES
+// ─────────────────────────────────────────────
+model Client {
+  id          String        @id @default(cuid())
+  name        String
+  document    String        @unique  // CPF ou CNPJ
+  phone       String
+  email       String
+  address     String?
+  city        String
+  state       String        @default("MT")
+  zipCode     String?
+  segment     Segment
+  size        CompanySize
+  revenue     Decimal       @db.Decimal(15, 2)
+  status      ClientStatus  @default(LEAD)
+  notes       String?
+  responsibleId String
+  responsible   User        @relation("ResponsibleConsultant", fields: [responsibleId], references: [id])
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  contacts        Contact[]
+  attendance      Attendance[]
+  contracts       Contract[]
+  diagnosticsPJ   DiagnosticoPJ[]
+  diagnosticsAgro DiagnosticoAgro[]
+  actionPlans     ActionPlan[]
+  creditOps       CreditOperation[]
+  documents       Document[]
+
+  @@index([status, segment])
+}
+
+enum Segment {
+  AGRO
+  COMERCIO
+  SERVICOS
+  INDUSTRIA
+}
+
+enum CompanySize {
+  MICRO      // Até R$ 360k/ano
+  PEQUENA    // R$ 360k – R$ 4,8M
+  MEDIA      // R$ 4,8M – R$ 300M
+  GRANDE     // > R$ 300M
+}
+
+enum ClientStatus {
+  LEAD
+  PROPOSTA
+  NEGOCIACAO
+  ATIVO
+  INATIVO
+}
+
+model Contact {
+  id       String @id @default(cuid())
+  clientId String
+  client   Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  name     String
+  role     String?
+  phone    String?
+  email    String?
+  primary  Boolean @default(false)
+}
+
+model Attendance {
+  id         String   @id @default(cuid())
+  clientId   String
+  client     Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  date       DateTime
+  type       AttendanceType
+  summary    String
+  nextSteps  String?
+  createdAt  DateTime @default(now())
+}
+
+enum AttendanceType {
+  REUNIAO
+  LIGACAO
+  EMAIL
+  VISITA
+  DIAGNOSTICO
+}
+
+// ─────────────────────────────────────────────
+// CONTRATOS
+// ─────────────────────────────────────────────
+model Contract {
+  id           String         @id @default(cuid())
+  clientId     String
+  client       Client         @relation(fields: [clientId], references: [id])
+  plan         String
+  description  String?
+  monthlyValue Decimal        @db.Decimal(10, 2)
+  setupFee     Decimal?       @db.Decimal(10, 2)
+  startDate    DateTime
+  endDate      DateTime?
+  renewalDate  DateTime
+  status       ContractStatus @default(ATIVO)
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+}
+
+enum ContractStatus {
+  ATIVO
+  PENDENTE
+  CANCELADO
+  SUSPENSO
+  RENOVADO
+}
+
+// ─────────────────────────────────────────────
+// DIAGNÓSTICO EMPRESARIAL (PJ)
+// ─────────────────────────────────────────────
+model DiagnosticoPJ {
+  id          String   @id @default(cuid())
+  clientId    String
+  client      Client   @relation(fields: [clientId], references: [id])
+  consultorId String
+  consultor   User     @relation(fields: [consultorId], references: [id])
+  period      String   // Ex: "2024-Q2"
+  createdAt   DateTime @default(now())
+
+  // Dados base
+  segment     String
+  employees   Int?
+
+  // DRE
+  grossRevenue    Decimal @db.Decimal(15, 2)
+  deductions      Decimal @db.Decimal(15, 2) @default(0)
+  cmv             Decimal @db.Decimal(15, 2) @default(0)
+  fixedExpenses   Decimal @db.Decimal(15, 2) @default(0)
+  variableExpenses Decimal @db.Decimal(15, 2) @default(0)
+  financialExpenses Decimal @db.Decimal(15, 2) @default(0)
+  proLabore       Decimal @db.Decimal(15, 2) @default(0)
+
+  // Endividamento
+  totalDebt       Decimal @db.Decimal(15, 2) @default(0)
+  shortTermDebt   Decimal @db.Decimal(15, 2) @default(0)
+  bankName        String?
+
+  // Controles
+  hasAccounting   Boolean @default(false)
+  hasERP          Boolean @default(false)
+  hasFinancialControl Boolean @default(false)
+
+  // Resultado automático
+  classification  String?  // saudavel | atencao | critico | reestruturacao
+  grossMargin     Decimal? @db.Decimal(5, 2)
+  netMargin       Decimal? @db.Decimal(5, 2)
+  ebitda          Decimal? @db.Decimal(15, 2)
+  breakeven       Decimal? @db.Decimal(15, 2)
+
+  actionPlans ActionPlan[]
+  documents   Document[]
+}
+
+// ─────────────────────────────────────────────
+// DIAGNÓSTICO AGRO
+// ─────────────────────────────────────────────
+model DiagnosticoAgro {
+  id          String   @id @default(cuid())
+  clientId    String
+  client      Client   @relation(fields: [clientId], references: [id])
+  consultorId String
+  consultor   User     @relation(fields: [consultorId], references: [id])
+  season      String   // Ex: "2024/2025"
+  createdAt   DateTime @default(now())
+
+  // Área
+  ownArea     Decimal @db.Decimal(10, 2)
+  leasedArea  Decimal @db.Decimal(10, 2) @default(0)
+  leaseValueHa Decimal @db.Decimal(10, 2) @default(0)
+
+  // Culturas (JSON flexível)
+  cultures    Json     // Array de culturas com área, prod, preço, custo
+
+  // Endividamento
+  custeioValue  Decimal @db.Decimal(15, 2) @default(0)
+  custeioBank   String?
+  custeioRate   Decimal @db.Decimal(5, 2) @default(0)
+  investValue   Decimal @db.Decimal(15, 2) @default(0)
+  investBank    String?
+  investRate    Decimal @db.Decimal(5, 2) @default(0)
+  cprValue      Decimal @db.Decimal(15, 2) @default(0)
+  cprBank       String?
+
+  // Patrimônio
+  propertyValue  Decimal @db.Decimal(15, 2) @default(0)
+  machineryValue Decimal @db.Decimal(15, 2) @default(0)
+
+  // Controles
+  hasInsurance     Boolean @default(false)
+  hasPlanning      Boolean @default(false)
+  hasFinancialCtrl Boolean @default(false)
+
+  // Resultado automático
+  classification   String?
+  totalRevenue     Decimal? @db.Decimal(15, 2)
+  totalCost        Decimal? @db.Decimal(15, 2)
+  margin           Decimal? @db.Decimal(5, 2)
+  revenueHa        Decimal? @db.Decimal(10, 2)
+
+  actionPlans ActionPlan[]
+  documents   Document[]
+}
+
+// ─────────────────────────────────────────────
+// FLUXO DE CAIXA
+// ─────────────────────────────────────────────
+model CashFlow {
+  id         String   @id @default(cuid())
+  clientId   String
+  year       Int
+  month      Int
+  type       CashFlowType
+  category   String
+  description String
+  value      Decimal  @db.Decimal(15, 2)
+  dueDate    DateTime
+  paidDate   DateTime?
+  status     String   @default("pendente")
+  createdAt  DateTime @default(now())
+
+  @@index([clientId, year, month])
+}
+
+enum CashFlowType {
+  ENTRADA
+  SAIDA
+}
+
+// ─────────────────────────────────────────────
+// CRÉDITO
+// ─────────────────────────────────────────────
+model CreditOperation {
+  id         String        @id @default(cuid())
+  clientId   String
+  client     Client        @relation(fields: [clientId], references: [id])
+  bank       String
+  creditLine String
+  value      Decimal       @db.Decimal(15, 2)
+  rate       Decimal       @db.Decimal(5, 2)
+  termMonths Int
+  guarantees String?
+  startDate  DateTime?
+  status     CreditStatus  @default(ANALISE)
+  notes      String?
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+}
+
+enum CreditStatus {
+  ANALISE
+  APROVADO
+  CONTRATADO
+  NEGADO
+  CANCELADO
+}
+
+// ─────────────────────────────────────────────
+// PLANO DE AÇÃO
+// ─────────────────────────────────────────────
+model ActionPlan {
+  id               String       @id @default(cuid())
+  clientId         String
+  client           Client       @relation(fields: [clientId], references: [id])
+  consultorId      String
+  consultor        User         @relation(fields: [consultorId], references: [id])
+  diagnosticoPJId  String?
+  diagnosticoPJ    DiagnosticoPJ? @relation(fields: [diagnosticoPJId], references: [id])
+  diagnosticoAgroId String?
+  diagnosticoAgro  DiagnosticoAgro? @relation(fields: [diagnosticoAgroId], references: [id])
+  area             String
+  action           String
+  objective        String
+  priority         Priority
+  deadline         DateTime
+  responsible      String
+  expectedResult   String
+  status           ActionStatus @default(NAO_INICIADO)
+  notes            String?
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+}
+
+enum Priority {
+  IMEDIATA
+  ALTA
+  MEDIA
+  BAIXA
+}
+
+enum ActionStatus {
+  NAO_INICIADO
+  EM_ANDAMENTO
+  CONCLUIDO
+  PENDENTE
+  REAVALIAR
+}
+
+// ─────────────────────────────────────────────
+// DOCUMENTOS
+// ─────────────────────────────────────────────
+model Document {
+  id              String     @id @default(cuid())
+  clientId        String
+  client          Client     @relation(fields: [clientId], references: [id])
+  diagnosticoPJId String?
+  diagnosticoPJ   DiagnosticoPJ? @relation(fields: [diagnosticoPJId], references: [id])
+  diagnosticoAgroId String?
+  diagnosticoAgro DiagnosticoAgro? @relation(fields: [diagnosticoAgroId], references: [id])
+  name            String
+  type            DocumentType
+  url             String?    // Storage URL
+  size            Int?       // bytes
+  status          String     @default("rascunho")
+  createdAt       DateTime   @default(now())
+}
+
+enum DocumentType {
+  PROPOSTA
+  CONTRATO
+  DIAGNOSTICO_PJ
+  DIAGNOSTICO_AGRO
+  RELATORIO_MENSAL
+  DRE
+  FLUXO_CAIXA
+  PLANO_ACAO
+  PARECER
+}
