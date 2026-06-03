@@ -25,6 +25,8 @@ const navItems: NavItem[] = [
   { label: 'Empresarial Completo',    icon: Building2,       path: '/pj-completo',       roles: ['admin', 'consultor'] },
   { label: 'Planejamento Financeiro', icon: TrendingUp,      path: '/financeiro',        roles: ['admin', 'consultor', 'cliente_empresa', 'cliente_rural'] },
   { label: 'Crédito',                 icon: CreditCard,      path: '/credito',           roles: ['admin', 'consultor', 'cliente_empresa', 'cliente_rural'] },
+  { label: 'Crédito Empresarial',     icon: CreditCard,      path: '/credito-empresarial',roles: ['admin', 'consultor'] },
+  { label: 'Crédito Rural',           icon: Sprout,          path: '/credito-agro',      roles: ['admin', 'consultor'] },
   { label: 'Documentos',              icon: FileText,        path: '/documentos',        roles: ['admin', 'consultor', 'cliente_empresa', 'cliente_rural'] },
   { label: 'Área do Cliente',         icon: Building2,       path: '/area-cliente',      roles: ['admin', 'consultor', 'cliente_empresa', 'cliente_rural'] },
 ]

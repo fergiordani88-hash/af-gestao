@@ -8,10 +8,35 @@ const fmtBRL = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', cur
 
 const SAFRAS_HISTORICAS = ['2022/23', '2023/24', '2024/25']
 const SAFRA_PREVISAO = '2025/26'
+
+// Todas as culturas disponíveis — principal e segunda safra
+const CULTURAS_PRINCIPAL = ['Soja', 'Algodão', 'Milho verão', 'Sorgo verão', 'Girassol verão']
+const CULTURAS_SEGUNDA   = ['Milho 2ª', 'Sorgo 2ª', 'Milheto', 'Girassol 2ª', 'Algodão 2ª', 'Braquiária']
+
 const CULTURAS = [
-  { cultura: 'Soja', ordem: 'principal' },
+  { cultura: 'Soja',    ordem: 'principal' },
   { cultura: 'Milho 2ª', ordem: 'segunda' },
 ]
+
+// Mapeia cultura para key do benchmark
+function benchmarkKey(cultura: string): string {
+  const c = cultura.toLowerCase()
+  if (c.includes('soja'))     return 'SOJA'
+  if (c.includes('milho'))    return 'MILHO'
+  if (c.includes('algodão') || c.includes('algodao')) return 'ALGODAO'
+  if (c.includes('sorgo'))    return 'SORGO'
+  if (c.includes('milheto'))  return 'MILHETO'
+  if (c.includes('girassol')) return 'GIRASSOL'
+  return 'SOJA'
+}
+
+// Unidade de produção por cultura
+function unidadeProd(cultura: string): string {
+  const c = cultura.toLowerCase()
+  if (c.includes('algodão') || c.includes('algodao')) return '@/ha'
+  if (c.includes('girassol') || c.includes('sorgo') || c.includes('milheto')) return 'sc/ha'
+  return 'sc/ha'
+}
 
 function calcRow(p: AgroProducao) {
   const prodTotal      = p.area * p.produtividade
@@ -125,6 +150,16 @@ function SafraBlock({ safra, tipo, rows, clientId, onRefresh }: SafraBlockProps)
     onRefresh()
   }
 
+  const [novaCultura, setNovaCultura]       = useState('')
+  const [novaOrdem,   setNovaOrdem]         = useState('principal')
+  const [showCultForm, setShowCultForm]     = useState(false)
+
+  const handleAddCustom = async () => {
+    if (!novaCultura) return
+    await handleAdd(novaCultura, novaOrdem)
+    setNovaCultura(''); setShowCultForm(false)
+  }
+
   const totalRec = local.reduce((s, r) => s + calcRow(r).recBruta, 0)
   const totalCusto = local.reduce((s, r) => s + calcRow(r).custoTotal + calcRow(r).custoArrendTotal, 0)
   const totalLiq = totalRec - totalCusto
@@ -173,19 +208,36 @@ function SafraBlock({ safra, tipo, rows, clientId, onRefresh }: SafraBlockProps)
         </table>
       </div>
 
-      {missing.length > 0 && (
-        <div className="px-4 py-2 flex gap-2 border-t border-gray-50">
-          {missing.map(m => (
-            <button
-              key={m.cultura}
-              onClick={() => handleAdd(m.cultura, m.ordem)}
-              className="flex items-center gap-1 text-xs text-af-green hover:bg-af-green-pale px-2 py-1 rounded-lg border border-af-green/30"
-            >
-              <Plus size={11} /> {m.cultura}
-            </button>
-          ))}
-        </div>
-      )}
+      <div className="px-4 py-2 border-t border-gray-50 flex flex-wrap gap-2 items-center">
+        {missing.map(m => (
+          <button key={m.cultura} onClick={() => handleAdd(m.cultura, m.ordem)}
+            className="flex items-center gap-1 text-xs text-af-green hover:bg-af-green-pale px-2 py-1 rounded-lg border border-af-green/30">
+            <Plus size={11} /> {m.cultura}
+          </button>
+        ))}
+        {!showCultForm ? (
+          <button onClick={() => setShowCultForm(true)}
+            className="flex items-center gap-1 text-xs text-gray-500 hover:bg-gray-100 px-2 py-1 rounded-lg border border-gray-200">
+            <Plus size={11} /> Outra cultura
+          </button>
+        ) : (
+          <div className="flex items-center gap-2 bg-gray-50 rounded-lg px-3 py-1.5 border border-gray-200">
+            <select value={novaOrdem} onChange={e => setNovaOrdem(e.target.value)} className="text-xs border border-gray-200 rounded px-1 py-0.5 bg-white">
+              <option value="principal">1ª Safra</option>
+              <option value="segunda">2ª Safra</option>
+            </select>
+            <select value={novaCultura} onChange={e => setNovaCultura(e.target.value)} className="text-xs border border-gray-200 rounded px-1 py-0.5 bg-white">
+              <option value="">Selecione...</option>
+              {(novaOrdem === 'principal' ? CULTURAS_PRINCIPAL : CULTURAS_SEGUNDA).map(c => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
+            <button onClick={handleAddCustom} disabled={!novaCultura}
+              className="text-xs bg-af-green text-white px-2 py-0.5 rounded disabled:opacity-50">Adicionar</button>
+            <button onClick={() => setShowCultForm(false)} className="text-xs text-gray-400 hover:text-gray-600">✕</button>
+          </div>
+        )}
+      </div>
     </Card>
   )
 }
@@ -193,9 +245,6 @@ function SafraBlock({ safra, tipo, rows, clientId, onRefresh }: SafraBlockProps)
 export function TabProducao({ clientId }: { clientId: string }) {
   const [producoes, setProducoes] = useState<AgroProducao[]>([])
   const [loading, setLoading]     = useState(true)
-  const [bmSoja,  setBmSoja]      = useState<Record<string, any>>({})
-  const [bmMilho, setBmMilho]     = useState<Record<string, any>>({})
-
   const load = async () => {
     setLoading(true)
     try {
@@ -204,10 +253,20 @@ export function TabProducao({ clientId }: { clientId: string }) {
     } finally { setLoading(false) }
   }
 
+  const [bmCache, setBmCache] = useState<Record<string, any>>({})
+
+  const loadBm = async (key: string) => {
+    if (bmCache[key]) return
+    try {
+      const data = await pjBenchmarkApi.getAgro(key)
+      setBmCache(c => ({ ...c, [key]: data }))
+    } catch {}
+  }
+
   useEffect(() => {
-    pjBenchmarkApi.getAgro('SOJA').then(setBmSoja).catch(() => {})
-    pjBenchmarkApi.getAgro('MILHO').then(setBmMilho).catch(() => {})
-  }, [])
+    loadBm('SOJA'); loadBm('MILHO')
+    producoes.forEach(p => loadBm(benchmarkKey(p.cultura)))
+  }, [producoes])
 
   useEffect(() => { load() }, [clientId])
 
@@ -269,40 +328,44 @@ export function TabProducao({ clientId }: { clientId: string }) {
         </div>
       )}
 
-      {/* Painel de benchmark por cultura */}
-      {(Object.keys(bmSoja).length > 0 || Object.keys(bmMilho).length > 0) && (
+      {/* Painel de benchmark dinâmico — por cultura */}
+      {Object.keys(bmCache).length > 0 && (
         <div className="mt-6">
-          <h3 className="font-bold text-gray-900 mb-1">Benchmark de Referência — Mato Grosso</h3>
-          <p className="text-xs text-gray-400 mb-4">Fontes: IMEA Safra 2024/25, CONAB, CNA/Senar-MT, Abramilho. Hover no ℹ para detalhes.</p>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <h3 className="font-bold text-gray-900 mb-1">Benchmarks de Referência — Mato Grosso</h3>
+          <p className="text-xs text-gray-400 mb-4">Fontes: IMEA Safra 2024/25, CONAB, CNA/Senar-MT, CONFAEAB, SISTEMA FAEG.</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {[
-              { label: '🌾 Soja', bm: bmSoja },
-              { label: '🌽 Milho 2ª Safra', bm: bmMilho },
-            ].map(({ label, bm }) => (
-              <Card key={label} className="p-4">
-                <p className="font-bold text-gray-900 mb-3">{label}</p>
-                <div className="space-y-2">
-                  {Object.entries(bm).map(([k, v]: [string, any]) => (
-                    <div key={k} className="flex items-center justify-between py-1.5 border-b border-gray-50">
-                      <div>
-                        <span className="text-xs font-medium text-gray-700">{v.label}</span>
-                        <button title={`${v.descricao}\nFonte: ${v.fonte} (${v.ano})`} className="ml-1 text-gray-300 hover:text-gray-500 align-middle">
-                          <Info size={10} />
-                        </button>
-                      </div>
-                      <div className="text-right">
+              { key: 'SOJA',     emoji: '🌾', nome: 'Soja' },
+              { key: 'MILHO',    emoji: '🌽', nome: 'Milho 2ª Safra' },
+              { key: 'ALGODAO',  emoji: '🪡', nome: 'Algodão' },
+              { key: 'SORGO',    emoji: '🌾', nome: 'Sorgo' },
+              { key: 'MILHETO',  emoji: '🌿', nome: 'Milheto' },
+              { key: 'GIRASSOL', emoji: '🌻', nome: 'Girassol' },
+            ].filter(c => bmCache[c.key] && Object.keys(bmCache[c.key]).length > 0).map(({ key, emoji, nome }) => {
+              const bm = bmCache[key]
+              return (
+                <Card key={key} className="p-4">
+                  <p className="font-bold text-gray-900 mb-3">{emoji} {nome}</p>
+                  <div className="space-y-1.5">
+                    {Object.entries(bm).map(([k, v]: [string, any]) => (
+                      <div key={k} className="flex items-center justify-between py-1 border-b border-gray-50">
+                        <div className="flex items-center gap-1">
+                          <span className="text-xs text-gray-700">{v.label}</span>
+                          <button title={`${v.descricao}\nFonte: ${v.fonte} (${v.ano})`} className="text-gray-300 hover:text-gray-500"><Info size={9} /></button>
+                        </div>
                         <p className="text-xs font-semibold text-gray-900">
-                          {v.unit === 'R$' ? `R$ ${v.ideal_min.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})} – R$ ${v.ideal_max.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}` : ''}
-                          {v.unit === '%' ? `${v.ideal_min}% – ${v.ideal_max}%` : ''}
-                          {v.unit === 'sc/ha' ? `${v.ideal_min} – ${v.ideal_max} sc/ha` : ''}
+                          {v.unit === 'R$'    ? `R$ ${Number(v.ideal_min).toLocaleString('pt-BR', {maximumFractionDigits: 0})}–${Number(v.ideal_max).toLocaleString('pt-BR', {maximumFractionDigits: 0})}` :
+                           v.unit === '%'     ? `${v.ideal_min}–${v.ideal_max}%` :
+                           v.unit === '@/ha'  ? `${v.ideal_min}–${v.ideal_max} @/ha` :
+                           `${v.ideal_min}–${v.ideal_max} ${v.unit}`}
                         </p>
-                        <p className="text-xs text-gray-400">{v.fonte?.split('/')[0]?.trim()} · {v.ano}</p>
                       </div>
-                    </div>
-                  ))}
-                </div>
-              </Card>
-            ))}
+                    ))}
+                    {(() => { const first = Object.values(bm)[0] as any; return first ? <p className="text-xs text-gray-400 mt-1">{first.fonte?.split('/')[0]?.trim()} · {first.ano}</p> : null })()}
+                  </div>
+                </Card>
+              )
+            })}
           </div>
         </div>
       )}

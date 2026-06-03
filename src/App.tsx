@@ -5,6 +5,8 @@ import { DiagnosticoPJ } from './pages/DiagnosticoPJ'
 import { DiagnosticoAgro } from './pages/DiagnosticoAgro'
 import { AgroCompleto } from './pages/AgroCompleto'
 import { PJCompleto } from './pages/PJCompleto'
+import { CreditoEmpresarial } from './pages/CreditoEmpresarial'
+import { CreditoAgro } from './pages/CreditoAgro'
 import { Financeiro } from './pages/Financeiro'
 import { Credito } from './pages/Credito'
 import { Documentos } from './pages/Documentos'
@@ -67,6 +69,16 @@ export default function App() {
       <Route path="/credito" element={
         <ProtectedRoute>
           <Credito />
+        </ProtectedRoute>
+      } />
+      <Route path="/credito-empresarial" element={
+        <ProtectedRoute allowedRoles={['admin', 'consultor']}>
+          <CreditoEmpresarial />
+        </ProtectedRoute>
+      } />
+      <Route path="/credito-agro" element={
+        <ProtectedRoute allowedRoles={['admin', 'consultor']}>
+          <CreditoAgro />
         </ProtectedRoute>
       } />
       <Route path="/documentos" element={
