@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { Building2, ChevronRight, CheckCircle, AlertTriangle, TrendingDown, TrendingUp, Download, RefreshCw, Loader2 } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import { AppLayout } from '../components/Layout/AppLayout'
@@ -53,6 +54,7 @@ const fmtPct = (v: number) => `${v.toFixed(1)}%`
 
 export function DiagnosticoPJ() {
   const { clients } = useStore()
+  const [searchParams] = useSearchParams()
   const [step, setStep] = useState<Step>('form')
   const [form, setForm] = useState<PJForm>({
     clientId: '', segment: 'comercio', employees: '', grossRevenue: '', deductions: '',
@@ -60,6 +62,21 @@ export function DiagnosticoPJ() {
     totalDebt: '', shortTermDebt: '', bankName: '', mainProduct: '', avgTicket: '', clientCount: '',
     hasAccounting: false, hasERP: false, hasFinancialControl: false
   })
+
+  // Pré-seleciona cliente vindo do CRM
+  useEffect(() => {
+    const clientId = searchParams.get('clientId')
+    if (clientId) {
+      const client = clients.find(c => c.id === clientId)
+      if (client) {
+        setForm(f => ({
+          ...f,
+          clientId,
+          segment: client.segment === 'agro' ? 'comercio' : client.segment,
+        }))
+      }
+    }
+  }, [searchParams, clients])
 
   const set = (k: keyof PJForm, v: string | boolean) => setForm(f => ({ ...f, [k]: v }))
   const inp = 'w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-af-green/30 focus:border-af-green'

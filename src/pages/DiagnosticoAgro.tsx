@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { Sprout, ChevronRight, AlertTriangle, TrendingUp, Download, RefreshCw, Loader2 } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import { AppLayout } from '../components/Layout/AppLayout'
@@ -76,6 +77,7 @@ function calcAgro(f: AgroForm) {
 
 export function DiagnosticoAgro() {
   const { clients } = useStore()
+  const [searchParams] = useSearchParams()
   const [step, setStep] = useState<Step>('form')
   const [form, setForm] = useState<AgroForm>({
     clientId: '', ownArea: '', leasedArea: '', leaseValueHa: '',
@@ -87,6 +89,14 @@ export function DiagnosticoAgro() {
     ownMachinery: true, propertyValue: '', machineryValue: '',
     hasInsurance: false, hasPlanning: false, hasFinancialControl: false
   })
+
+  // Pré-seleciona cliente vindo do CRM
+  useEffect(() => {
+    const clientId = searchParams.get('clientId')
+    if (clientId) {
+      setForm(f => ({ ...f, clientId }))
+    }
+  }, [searchParams])
 
   const set = (k: keyof AgroForm, v: string | boolean) => setForm(f => ({ ...f, [k]: v }))
   const inp = 'w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-af-green/30 focus:border-af-green'

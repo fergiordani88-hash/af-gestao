@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Search, Plus, Filter, Phone, Mail, MapPin, Eye, Edit2, MoreVertical, Users } from 'lucide-react'
 import { AppLayout } from '../components/Layout/AppLayout'
 import { Card } from '../components/ui/Card'
@@ -13,6 +14,7 @@ type SegmentFilter = 'todos' | ClientSegment
 const fmtBRL = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })
 
 function ClientModal({ client, onClose }: { client: Client; onClose: () => void }) {
+  const navigate = useNavigate()
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
@@ -55,7 +57,17 @@ function ClientModal({ client, onClose }: { client: Client; onClose: () => void 
           )}
         </div>
         <div className="px-6 pb-6 flex gap-3">
-          <Button variant="primary" className="flex-1">Gerar Diagnóstico</Button>
+          <Button
+            variant="primary"
+            className="flex-1"
+            onClick={() => {
+              const route = client.segment === 'agro' ? '/diagnostico-agro' : '/diagnostico-pj'
+              navigate(`${route}?clientId=${client.id}`)
+              onClose()
+            }}
+          >
+            Gerar Diagnóstico
+          </Button>
           <Button variant="secondary" icon={<Edit2 size={14} />}>Editar</Button>
         </div>
       </div>
