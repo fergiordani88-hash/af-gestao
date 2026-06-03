@@ -79,8 +79,8 @@ export function Credito() {
     <AppLayout title="Estruturação de Crédito" subtitle="Linhas de crédito, simulador e análise de capacidade">
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
         <StatCard label="Operações Ativas" value="5" icon={<CreditCard size={18} />} color="green" />
-        <StatCard label="Volume Contratado" value="R$ 4,2M" icon={<TrendingUp size={18} />} color="gold" />
-        <StatCard label="Parcela Mensal Total" value="R$ 87k" icon={<CreditCard size={18} />} color="blue" />
+        <StatCard label="Volume Contratado" value={fmtBRL(4200000)} icon={<TrendingUp size={18} />} color="gold" />
+        <StatCard label="Parcela Mensal Total" value={fmtBRL(87000)} icon={<CreditCard size={18} />} color="blue" />
         <StatCard label="Taxa Média" value="10,3% a.a." icon={<TrendingUp size={18} />} color="purple" />
       </div>
 
@@ -145,7 +145,7 @@ export function Credito() {
               {[
                 { label: 'Score de Crédito', value: 'B+', desc: 'Bom — poucas restrições', color: 'text-emerald-600' },
                 { label: 'Capacidade de Pagamento', value: '28%', desc: 'Comprometimento atual', color: 'text-emerald-600' },
-                { label: 'Garantias Disponíveis', value: 'R$ 3,2M', desc: 'Imóveis + máquinas', color: 'text-af-green' },
+                { label: 'Garantias Disponíveis', value: fmtBRL(3200000), desc: 'Imóveis + máquinas', color: 'text-af-green' },
                 { label: 'Restrição SFN', value: 'Nenhuma', desc: 'Cadastro limpo', color: 'text-emerald-600' },
               ].map(item => (
                 <div key={item.label} className="flex justify-between items-start text-sm py-2 border-b border-gray-50 last:border-0">
