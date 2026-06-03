@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { pjApi } from '../../services/pjApi'
 import { Card } from '../../components/ui/Card'
 
-const fmtBRL  = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })
+const fmtBRL  = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 })
 const fmtDate = (d: string | Date) => new Date(d).toLocaleDateString('pt-BR')
 
 export function TabFluxoDiario({ clientId }: { clientId: string }) {

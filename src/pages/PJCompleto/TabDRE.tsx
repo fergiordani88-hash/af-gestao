@@ -4,7 +4,7 @@ import { pjApi, type PJDRE } from '../../services/pjApi'
 import { pjBenchmarkApi } from '../../services/benchmarkApi'
 import { Card } from '../../components/ui/Card'
 
-const fmtBRL  = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })
+const fmtBRL  = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 })
 const fmtPct  = (v: number) => `${(v * 100).toFixed(1)}%`
 const fmtX    = (v: number) => `${v.toFixed(2)}x`
 const fmtDias = (v: number) => `${v.toFixed(0)} dias`

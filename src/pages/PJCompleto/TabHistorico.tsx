@@ -8,7 +8,7 @@ import { historicoApi, type SnapshotPJ } from '../../services/historicoApi'
 import { pjApi } from '../../services/pjApi'
 import { Card } from '../../components/ui/Card'
 
-const fmtBRL = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })
+const fmtBRL = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 })
 const fmtPct = (v: number) => `${(v * 100).toFixed(1)}%`
 const fmtK   = (v: number) => `${(v / 1000).toFixed(0)}k`
 

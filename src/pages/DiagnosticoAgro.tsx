@@ -29,7 +29,7 @@ interface AgroForm {
 }
 
 const num = (s: string) => Number(s.replace(/\D/g, '')) || 0
-const fmtBRL = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })
+const fmtBRL = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 })
 const fmtSc = (v: number) => `${v.toFixed(0)} sc/ha`
 
 function calcAgro(f: AgroForm) {

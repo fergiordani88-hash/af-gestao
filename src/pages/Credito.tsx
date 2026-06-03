@@ -5,7 +5,7 @@ import { Card, StatCard } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
 import { useStore } from '../store/useStore'
 
-const fmtBRL = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })
+const fmtBRL = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
 const creditLines = [
   { name: 'PRONAMP', rate: 7, maxValue: 1500000, type: 'Agro Custeio', color: 'bg-green-50 text-green-700' },

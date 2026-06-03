@@ -3,7 +3,7 @@ import { Plus, Trash2 } from 'lucide-react'
 import { pjApi, type PJReceita } from '../../services/pjApi'
 import { Card } from '../../components/ui/Card'
 
-const fmtBRL  = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })
+const fmtBRL  = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 })
 const fmtDate = (d: string | Date) => new Date(d).toLocaleDateString('pt-BR')
 const TIPOS = ['Venda à vista', 'Venda a prazo', 'Recebimento de clientes', 'Antecipação', 'Outros']
 

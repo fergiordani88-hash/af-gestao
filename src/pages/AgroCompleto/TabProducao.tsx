@@ -4,7 +4,7 @@ import { agroApi, type AgroProducao } from '../../services/agroApi'
 import { pjBenchmarkApi } from '../../services/benchmarkApi'
 import { Card } from '../../components/ui/Card'
 
-const fmtBRL = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })
+const fmtBRL = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
 const SAFRAS_HISTORICAS = ['2022/23', '2023/24', '2024/25']
 const SAFRA_PREVISAO = '2025/26'
@@ -67,7 +67,7 @@ function ProducaoRow({ item, onChange, onSave, onDelete, dirty }: RowProps) {
           />
         </td>
       ))}
-      <td className="px-3 py-2 text-sm text-right text-gray-600">{c.prodTotal.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}</td>
+      <td className="px-3 py-2 text-sm text-right text-gray-600">{c.prodTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
       <td className="px-3 py-2 text-sm text-right font-semibold text-gray-900">{fmtBRL(c.recBruta)}</td>
       <td className="px-3 py-2 text-sm text-right text-red-500">{fmtBRL(c.custoTotal + c.custoArrendTotal)}</td>
       <td className={`px-3 py-2 text-sm text-right font-bold ${c.recLiq >= 0 ? 'text-af-green' : 'text-red-600'}`}>{fmtBRL(c.recLiq)}</td>
@@ -142,7 +142,7 @@ function SafraBlock({ safra, tipo, rows, clientId, onRefresh }: SafraBlockProps)
           <h3 className="font-bold text-gray-900">Safra {safra}</h3>
         </div>
         <div className="flex items-center gap-4 text-xs text-gray-500">
-          <span>Área: <strong>{totalArea.toLocaleString('pt-BR', { maximumFractionDigits: 0 })} ha</strong></span>
+          <span>Área: <strong>{totalArea.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ha</strong></span>
           <span>Receita Bruta: <strong className="text-gray-900">{fmtBRL(totalRec)}</strong></span>
           <span>Custo Total: <strong className="text-red-500">{fmtBRL(totalCusto)}</strong></span>
           <span>Resultado: <strong className={totalLiq >= 0 ? 'text-af-green' : 'text-red-600'}>{fmtBRL(totalLiq)}</strong></span>
@@ -292,7 +292,7 @@ export function TabProducao({ clientId }: { clientId: string }) {
                       </div>
                       <div className="text-right">
                         <p className="text-xs font-semibold text-gray-900">
-                          {v.unit === 'R$' ? `R$ ${v.ideal_min.toLocaleString('pt-BR', {maximumFractionDigits: 0})} – R$ ${v.ideal_max.toLocaleString('pt-BR', {maximumFractionDigits: 0})}` : ''}
+                          {v.unit === 'R$' ? `R$ ${v.ideal_min.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})} – R$ ${v.ideal_max.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}` : ''}
                           {v.unit === '%' ? `${v.ideal_min}% – ${v.ideal_max}%` : ''}
                           {v.unit === 'sc/ha' ? `${v.ideal_min} – ${v.ideal_max} sc/ha` : ''}
                         </p>

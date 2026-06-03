@@ -3,7 +3,7 @@ import { Plus, Trash2, Save, DollarSign } from 'lucide-react'
 import { agroApi, type AgroCustoFixo } from '../../services/agroApi'
 import { Card } from '../../components/ui/Card'
 
-const fmtBRL = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })
+const fmtBRL = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
 const CATEGORIAS_PADRAO: Record<string, string[]> = {
   'Custos Recorrentes':        ['Arrendamento', 'CCIR/ITR', 'Energia elétrica', 'Água', 'Internet', 'Telefone', 'Impostos mensais'],

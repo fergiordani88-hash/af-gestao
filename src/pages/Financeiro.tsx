@@ -28,7 +28,7 @@ const dreData = {
   financialExpenses: 48000, proLabore: 72000
 }
 
-const fmtBRL = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })
+const fmtBRL = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 })
 const fmtK = (v: number) => `R$ ${(v / 1000).toFixed(0)}k`
 
 type Tab = 'fluxo' | 'dre' | 'indicadores'

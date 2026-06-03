@@ -3,7 +3,7 @@ import { Plus, Trash2 } from 'lucide-react'
 import { pjApi, type PJDespesa } from '../../services/pjApi'
 import { Card } from '../../components/ui/Card'
 
-const fmtBRL  = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })
+const fmtBRL  = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 })
 const fmtDate = (d: string | Date) => new Date(d).toLocaleDateString('pt-BR')
 const TIPOS = ['CMV / Mercadoria', 'Salários', 'Aluguel', 'Investimento', 'Cartão de crédito', 'Marketing', 'Operacional', 'Previsões', 'Outros']
 const TIPO_COLOR: Record<string, string> = { 'CMV / Mercadoria': 'bg-red-100 text-red-700', 'Salários': 'bg-orange-100 text-orange-700', 'Aluguel': 'bg-amber-100 text-amber-700', 'Investimento': 'bg-blue-100 text-blue-700', 'Cartão de crédito': 'bg-purple-100 text-purple-700', 'Marketing': 'bg-pink-100 text-pink-700', 'Operacional': 'bg-slate-100 text-slate-700', 'Previsões': 'bg-gray-100 text-gray-700', 'Outros': 'bg-stone-100 text-stone-700' }

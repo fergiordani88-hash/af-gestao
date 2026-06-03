@@ -4,7 +4,7 @@ import { Plus, Trash2, Save } from 'lucide-react'
 import { pjApi, type PJCustoFixo } from '../../services/pjApi'
 import { Card } from '../../components/ui/Card'
 
-const fmtBRL = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })
+const fmtBRL = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 })
 const CATEGORIAS_PADRAO: Record<string, string[]> = {
   'Custos Recorrentes':  ['Aluguel', 'IPTU/condomínio', 'Energia elétrica', 'Água', 'Internet', 'Telefone', 'Impostos mensais'],
   'Folha de Pagamento':  ['Salários', 'Horas extras', 'Pró-labore', 'Encargos trabalhistas', 'Benefícios', 'Provisão 13°/férias'],

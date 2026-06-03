@@ -3,7 +3,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import { agroApi, type FluxoMensal } from '../../services/agroApi'
 import { Card } from '../../components/ui/Card'
 
-const fmtBRL = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })
+const fmtBRL = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 })
 const fmtK = (v: number) => `${(v / 1000).toFixed(0)}k`
 
 export function TabFluxoMensal({ clientId }: { clientId: string }) {

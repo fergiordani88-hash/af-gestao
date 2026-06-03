@@ -3,7 +3,7 @@ import { Plus, Trash2, Edit2, X, Shield } from 'lucide-react'
 import { agroApi, type AgroPatrimonio } from '../../services/agroApi'
 import { Card } from '../../components/ui/Card'
 
-const fmtBRL = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })
+const fmtBRL = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
 const CATEGORIAS = ['Máquinas', 'Equipamentos', 'Veículos', 'Imóveis rurais', 'Imóveis urbanos', 'Rebanho', 'Outros']
 const CAT_ICON: Record<string, string> = {

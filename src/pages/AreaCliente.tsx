@@ -18,7 +18,7 @@ const indicators = [
   { month: 'Jun', resultado: 465000 },
 ]
 
-const fmtBRL = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })
+const fmtBRL = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
 const recentDocs = [
   { name: 'Diagnóstico Agro 360° — Safra 2024', date: '01/06/2024', type: 'PDF' },

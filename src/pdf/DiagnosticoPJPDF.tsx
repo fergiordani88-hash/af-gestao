@@ -3,7 +3,7 @@ import {
   base, colors, PDFHeader, PDFFooter, KPIBox, DRERow, ActionItem
 } from './components/Base'
 
-const fmtBRL = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })
+const fmtBRL = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 })
 const fmtPct = (v: number) => `${Number(v).toFixed(1)}%`
 const today  = () => new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })
 

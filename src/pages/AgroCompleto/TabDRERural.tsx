@@ -5,7 +5,7 @@ import { historicoApi, type DRERural, type HistoricoSafra } from '../../services
 import { agroApi } from '../../services/agroApi'
 import { Card } from '../../components/ui/Card'
 
-const fmtBRL = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })
+const fmtBRL = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 })
 const fmtPct = (v: number) => `${(v * 100).toFixed(1)}%`
 const fmtK   = (v: number) => `${(v / 1000).toFixed(0)}k`
 
@@ -297,7 +297,7 @@ export function TabDRERural({ clientId }: { clientId: string }) {
                   {[...historico].reverse().map(h => (
                     <tr key={h.safra} className="hover:bg-gray-50/50">
                       <td className="px-3 py-2.5 font-bold text-gray-900">{h.safra}</td>
-                      <td className="px-3 py-2.5">{h.totalArea.toLocaleString('pt-BR', { maximumFractionDigits: 0 })} ha</td>
+                      <td className="px-3 py-2.5">{h.totalArea.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ha</td>
                       <td className="px-3 py-2.5 font-semibold text-gray-900">{fmtBRL(h.totalReceita)}</td>
                       <td className="px-3 py-2.5 text-red-500">{fmtBRL(h.totalCusto)}</td>
                       <td className={`px-3 py-2.5 font-bold ${h.totalResultado >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>{fmtBRL(h.totalResultado)}</td>

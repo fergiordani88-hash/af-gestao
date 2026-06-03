@@ -4,7 +4,7 @@ import { agroApi, type AgroContrato, type AgroParcela } from '../../services/agr
 import { Card } from '../../components/ui/Card'
 import { clsx } from 'clsx'
 
-const fmtBRL = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })
+const fmtBRL = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 })
 const fmtDate = (d: string | Date) => new Date(d).toLocaleDateString('pt-BR')
 
 const MODALIDADES = ['Capital de giro', 'Repactuação', 'Custeio', 'Investimento', 'Investimento CDI', 'BNDES Finame', 'CPR', 'Pronamp', 'Moderfrota', 'Pronaf', 'Outros']

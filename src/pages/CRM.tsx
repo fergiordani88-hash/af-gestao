@@ -11,7 +11,7 @@ import type { Client, ClientStatus, ClientSegment } from '../types'
 type StatusFilter = 'todos' | ClientStatus
 type SegmentFilter = 'todos' | ClientSegment
 
-const fmtBRL = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })
+const fmtBRL = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
 function ClientModal({ client, onClose }: { client: Client; onClose: () => void }) {
   const navigate = useNavigate()

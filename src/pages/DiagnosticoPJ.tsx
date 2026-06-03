@@ -49,7 +49,7 @@ const classify = (netMargin: number, debtRatio: number) => {
   return 'reestruturacao'
 }
 
-const fmtBRL = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })
+const fmtBRL = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 })
 const fmtPct = (v: number) => `${v.toFixed(1)}%`
 
 export function DiagnosticoPJ() {
