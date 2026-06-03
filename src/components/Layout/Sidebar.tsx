@@ -21,6 +21,7 @@ const navItems: NavItem[] = [
   { label: 'CRM Clientes',            icon: Users,           path: '/crm',               roles: ['admin', 'consultor'] },
   { label: 'Diagnóstico Empresarial', icon: ClipboardList,   path: '/diagnostico-pj',    roles: ['admin', 'consultor'] },
   { label: 'Diagnóstico Agro',        icon: Sprout,          path: '/diagnostico-agro',  roles: ['admin', 'consultor'] },
+  { label: 'Agro Completo',           icon: Sprout,          path: '/agro-completo',     roles: ['admin', 'consultor'] },
   { label: 'Planejamento Financeiro', icon: TrendingUp,      path: '/financeiro',        roles: ['admin', 'consultor', 'cliente_empresa', 'cliente_rural'] },
   { label: 'Crédito',                 icon: CreditCard,      path: '/credito',           roles: ['admin', 'consultor', 'cliente_empresa', 'cliente_rural'] },
   { label: 'Documentos',              icon: FileText,        path: '/documentos',        roles: ['admin', 'consultor', 'cliente_empresa', 'cliente_rural'] },

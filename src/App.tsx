@@ -3,6 +3,7 @@ import { Dashboard } from './pages/Dashboard'
 import { CRM } from './pages/CRM'
 import { DiagnosticoPJ } from './pages/DiagnosticoPJ'
 import { DiagnosticoAgro } from './pages/DiagnosticoAgro'
+import { AgroCompleto } from './pages/AgroCompleto'
 import { Financeiro } from './pages/Financeiro'
 import { Credito } from './pages/Credito'
 import { Documentos } from './pages/Documentos'
@@ -43,6 +44,11 @@ export default function App() {
       <Route path="/diagnostico-agro" element={
         <ProtectedRoute allowedRoles={['admin', 'consultor']}>
           <DiagnosticoAgro />
+        </ProtectedRoute>
+      } />
+      <Route path="/agro-completo" element={
+        <ProtectedRoute allowedRoles={['admin', 'consultor']}>
+          <AgroCompleto />
         </ProtectedRoute>
       } />
 
