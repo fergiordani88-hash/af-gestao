@@ -14,12 +14,14 @@ import { TabCustosFixos } from './TabCustosFixos'
 import { TabFluxoDiario } from './TabFluxoDiario'
 import { TabFluxoMensal } from './TabFluxoMensal'
 import { TabPatrimonio } from './TabPatrimonio'
+import { TabDRERural } from './TabDRERural'
 import { clsx } from 'clsx'
 
-type TabId = 'producao' | 'contratos' | 'despesas' | 'receitas' | 'custos' | 'fluxo-diario' | 'fluxo-mensal' | 'patrimonio'
+type TabId = 'producao' | 'dre-rural' | 'contratos' | 'despesas' | 'receitas' | 'custos' | 'fluxo-diario' | 'fluxo-mensal' | 'patrimonio'
 
 const TABS: { id: TabId; label: string; icon: React.ElementType; color: string }[] = [
   { id: 'producao',     label: 'Produção',           icon: Sprout,       color: 'text-green-600' },
+  { id: 'dre-rural',   label: 'DRE Rural',          icon: BarChart2,    color: 'text-emerald-700' },
   { id: 'contratos',    label: 'Contratos & Cronograma', icon: CreditCard, color: 'text-blue-600' },
   { id: 'despesas',     label: 'Despesas',            icon: TrendingDown, color: 'text-red-600' },
   { id: 'receitas',     label: 'Receitas',            icon: TrendingUp,   color: 'text-emerald-600' },
@@ -44,6 +46,7 @@ export function AgroCompleto() {
     if (!clientId) return null
     switch (activeTab) {
       case 'producao':     return <TabProducao clientId={clientId} />
+      case 'dre-rural':    return <TabDRERural clientId={clientId} />
       case 'contratos':    return <TabContratos clientId={clientId} />
       case 'despesas':     return <TabDespesas clientId={clientId} />
       case 'receitas':     return <TabReceitas clientId={clientId} />

@@ -12,9 +12,11 @@ import { TabCustosFixos } from './TabCustosFixos'
 import { TabFluxoDiario } from './TabFluxoDiario'
 import { TabFluxoMensal } from './TabFluxoMensal'
 import { TabStressTest } from './TabStressTest'
+import { TabHistorico } from './TabHistorico'
+import { TabCicloInadimplencia } from './TabCicloInadimplencia'
 import { clsx } from 'clsx'
 
-type TabId = 'dre' | 'receb-pag' | 'contratos' | 'despesas' | 'receitas' | 'custos' | 'fluxo-diario' | 'fluxo-mensal' | 'stress'
+type TabId = 'dre' | 'receb-pag' | 'contratos' | 'despesas' | 'receitas' | 'custos' | 'fluxo-diario' | 'fluxo-mensal' | 'stress' | 'historico' | 'ciclo'
 
 const TABS = [
   { id: 'dre'         as TabId, label: 'DRE & Indicadores',      icon: FileText,     color: 'text-blue-600' },
@@ -26,6 +28,8 @@ const TABS = [
   { id: 'fluxo-diario'as TabId, label: 'Fluxo Diário',           icon: Calendar,     color: 'text-purple-600' },
   { id: 'fluxo-mensal'as TabId, label: 'Fluxo Mensal',           icon: BarChart2,    color: 'text-violet-600' },
   { id: 'stress'      as TabId, label: 'Stress Test',             icon: Zap,          color: 'text-orange-600' },
+  { id: 'historico'   as TabId, label: 'Histórico',               icon: BarChart2,    color: 'text-gray-600' },
+  { id: 'ciclo'       as TabId, label: 'Ciclo & Inadimplência',   icon: Activity,     color: 'text-red-600' },
 ]
 
 export function PJCompleto() {
@@ -50,6 +54,8 @@ export function PJCompleto() {
       case 'fluxo-diario': return <TabFluxoDiario clientId={clientId} />
       case 'fluxo-mensal': return <TabFluxoMensal clientId={clientId} />
       case 'stress':       return <TabStressTest clientId={clientId} />
+      case 'historico':    return <TabHistorico clientId={clientId} />
+      case 'ciclo':        return <TabCicloInadimplencia clientId={clientId} />
     }
   }
 
