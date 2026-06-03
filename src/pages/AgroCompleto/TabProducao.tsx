@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
-import { Plus, Trash2, Save, Sprout } from 'lucide-react'
+import { Plus, Trash2, Save, Sprout, Info } from 'lucide-react'
 import { agroApi, type AgroProducao } from '../../services/agroApi'
+import { pjBenchmarkApi } from '../../services/benchmarkApi'
 import { Card } from '../../components/ui/Card'
 
 const fmtBRL = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })
@@ -13,14 +14,24 @@ const CULTURAS = [
 ]
 
 function calcRow(p: AgroProducao) {
-  const prodTotal = p.area * p.produtividade
-  const recBruta = prodTotal * p.cotacao
-  const custoTotal = p.area * p.custoPorHa
+  const prodTotal      = p.area * p.produtividade
+  const recBruta       = prodTotal * p.cotacao
+  const custoTotal     = p.area * p.custoPorHa
   const custoArrendTotal = p.areaArrendada * p.custoArrendHa
-  const recLiq = recBruta - custoTotal - custoArrendTotal
-  const peHa = p.cotacao > 0 ? p.custoPorHa / p.cotacao : 0
-  const margemPct = recBruta > 0 ? (recLiq / recBruta) * 100 : 0
-  return { prodTotal, recBruta, custoTotal, custoArrendTotal, recLiq, peHa, margemPct }
+  const recLiq         = recBruta - custoTotal - custoArrendTotal
+  const custoTotalHa   = p.custoPorHa + (p.area > 0 ? custoArrendTotal / p.area : 0)
+  const peHa           = p.cotacao > 0 ? custoTotalHa / p.cotacao : 0  // PE com arrendamento
+  const peHaCOE        = p.cotacao > 0 ? p.custoPorHa / p.cotacao : 0  // PE só custo operacional
+  const margemPct      = recBruta > 0 ? (recLiq / recBruta) * 100 : 0
+  const rentabilidadeHa= p.area > 0 ? recLiq / p.area : 0
+  const custoPorSaca   = p.produtividade > 0 ? p.custoPorHa / p.produtividade : 0
+  // Sensibilidade: queda de preço necessária para zerar margem
+  const quedaPrecoZero = p.cotacao > 0 ? ((p.cotacao - peHa) / p.cotacao) * 100 : 0
+  // Superávit/déficit em relação ao PE
+  const superavitSc    = p.produtividade - peHa
+  // Risco: se produtividade atual < PE com folga de 10%
+  const riscoQueda     = p.produtividade < peHa * 1.1
+  return { prodTotal, recBruta, custoTotal, custoArrendTotal, recLiq, peHa, peHaCOE, margemPct, rentabilidadeHa, custoPorSaca, quedaPrecoZero, superavitSc, riscoQueda }
 }
 
 interface RowProps {
@@ -60,7 +71,11 @@ function ProducaoRow({ item, onChange, onSave, onDelete, dirty }: RowProps) {
       <td className="px-3 py-2 text-sm text-right font-semibold text-gray-900">{fmtBRL(c.recBruta)}</td>
       <td className="px-3 py-2 text-sm text-right text-red-500">{fmtBRL(c.custoTotal + c.custoArrendTotal)}</td>
       <td className={`px-3 py-2 text-sm text-right font-bold ${c.recLiq >= 0 ? 'text-af-green' : 'text-red-600'}`}>{fmtBRL(c.recLiq)}</td>
+      <td className="px-3 py-2 text-sm text-right text-gray-600">{fmtBRL(c.rentabilidadeHa)}/ha</td>
+      <td className="px-3 py-2 text-sm text-right text-gray-500">R$ {c.custoPorSaca.toFixed(1)}/sc</td>
       <td className="px-3 py-2 text-sm text-right text-gray-500">{c.peHa.toFixed(1)} sc</td>
+      <td className={`px-3 py-2 text-sm text-right font-semibold ${c.superavitSc >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>{c.superavitSc >= 0 ? '+' : ''}{c.superavitSc.toFixed(1)} sc</td>
+      <td className={`px-3 py-2 text-sm text-right ${c.riscoQueda ? 'text-red-500 font-semibold' : 'text-emerald-600'}`}>{c.quedaPrecoZero.toFixed(0)}%</td>
       <td className={`px-3 py-2 text-sm text-right font-semibold ${c.margemPct >= 15 ? 'text-emerald-600' : 'text-red-500'}`}>{c.margemPct.toFixed(1)}%</td>
       <td className="px-3 py-2">
         <div className="flex gap-1">
@@ -138,7 +153,7 @@ function SafraBlock({ safra, tipo, rows, clientId, onRefresh }: SafraBlockProps)
         <table className="w-full text-xs">
           <thead>
             <tr className="bg-gray-50 border-b border-gray-100">
-              {['Cultura', 'Cotação (R$/sc)', 'Área (ha)', 'Produt. (sc/ha)', 'Custo/ha (R$)', 'Área Arren. (ha)', 'Custo Arren/ha', 'Prod. Total (sc)', 'Rec. Bruta', 'Custo Total', 'Resultado', 'PE (sc/ha)', 'Margem', ''].map(h => (
+              {['Cultura', 'Cotação (R$/sc)', 'Área (ha)', 'Produt. (sc/ha)', 'Custo/ha (R$)', 'Área Arren. (ha)', 'Custo Arren/ha', 'Prod. Total (sc)', 'Rec. Bruta', 'Custo Total', 'Resultado', 'R$/ha', 'Custo/saca', 'PE (sc/ha)', 'Supráv./Déf.', 'Queda máx.', 'Margem', ''].map(h => (
                 <th key={h} className="px-3 py-2 text-left font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">{h}</th>
               ))}
             </tr>
@@ -177,7 +192,9 @@ function SafraBlock({ safra, tipo, rows, clientId, onRefresh }: SafraBlockProps)
 
 export function TabProducao({ clientId }: { clientId: string }) {
   const [producoes, setProducoes] = useState<AgroProducao[]>([])
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading]     = useState(true)
+  const [bmSoja,  setBmSoja]      = useState<Record<string, any>>({})
+  const [bmMilho, setBmMilho]     = useState<Record<string, any>>({})
 
   const load = async () => {
     setLoading(true)
@@ -186,6 +203,11 @@ export function TabProducao({ clientId }: { clientId: string }) {
       setProducoes(data)
     } finally { setLoading(false) }
   }
+
+  useEffect(() => {
+    pjBenchmarkApi.getAgro('SOJA').then(setBmSoja).catch(() => {})
+    pjBenchmarkApi.getAgro('MILHO').then(setBmMilho).catch(() => {})
+  }, [])
 
   useEffect(() => { load() }, [clientId])
 
@@ -244,6 +266,44 @@ export function TabProducao({ clientId }: { clientId: string }) {
           <Sprout size={40} className="mx-auto mb-3 text-gray-300" />
           <p className="text-gray-500 text-sm">Nenhuma safra cadastrada</p>
           <p className="text-gray-400 text-xs mt-1">Clique nos botões acima para adicionar</p>
+        </div>
+      )}
+
+      {/* Painel de benchmark por cultura */}
+      {(Object.keys(bmSoja).length > 0 || Object.keys(bmMilho).length > 0) && (
+        <div className="mt-6">
+          <h3 className="font-bold text-gray-900 mb-1">Benchmark de Referência — Mato Grosso</h3>
+          <p className="text-xs text-gray-400 mb-4">Fontes: IMEA Safra 2024/25, CONAB, CNA/Senar-MT, Abramilho. Hover no ℹ para detalhes.</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {[
+              { label: '🌾 Soja', bm: bmSoja },
+              { label: '🌽 Milho 2ª Safra', bm: bmMilho },
+            ].map(({ label, bm }) => (
+              <Card key={label} className="p-4">
+                <p className="font-bold text-gray-900 mb-3">{label}</p>
+                <div className="space-y-2">
+                  {Object.entries(bm).map(([k, v]: [string, any]) => (
+                    <div key={k} className="flex items-center justify-between py-1.5 border-b border-gray-50">
+                      <div>
+                        <span className="text-xs font-medium text-gray-700">{v.label}</span>
+                        <button title={`${v.descricao}\nFonte: ${v.fonte} (${v.ano})`} className="ml-1 text-gray-300 hover:text-gray-500 align-middle">
+                          <Info size={10} />
+                        </button>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-xs font-semibold text-gray-900">
+                          {v.unit === 'R$' ? `R$ ${v.ideal_min.toLocaleString('pt-BR', {maximumFractionDigits: 0})} – R$ ${v.ideal_max.toLocaleString('pt-BR', {maximumFractionDigits: 0})}` : ''}
+                          {v.unit === '%' ? `${v.ideal_min}% – ${v.ideal_max}%` : ''}
+                          {v.unit === 'sc/ha' ? `${v.ideal_min} – ${v.ideal_max} sc/ha` : ''}
+                        </p>
+                        <p className="text-xs text-gray-400">{v.fonte?.split('/')[0]?.trim()} · {v.ano}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </Card>
+            ))}
+          </div>
         </div>
       )}
     </div>
