@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import {
   Sprout, CreditCard, TrendingDown, TrendingUp, DollarSign,
-  BarChart2, Calendar, Shield, ChevronDown, ChevronUp
+  BarChart2, Calendar, Shield, ChevronDown, ChevronUp, ClipboardList
 } from 'lucide-react'
 import { AppLayout } from '../../components/Layout/AppLayout'
 import { useStore } from '../../store/useStore'
@@ -15,9 +15,10 @@ import { TabFluxoDiario } from './TabFluxoDiario'
 import { TabFluxoMensal } from './TabFluxoMensal'
 import { TabPatrimonio } from './TabPatrimonio'
 import { TabDRERural } from './TabDRERural'
+import { TabQuestionarioAgro } from './TabQuestionarioAgro'
 import { clsx } from 'clsx'
 
-type TabId = 'producao' | 'dre-rural' | 'contratos' | 'despesas' | 'receitas' | 'custos' | 'fluxo-diario' | 'fluxo-mensal' | 'patrimonio'
+type TabId = 'producao' | 'dre-rural' | 'contratos' | 'despesas' | 'receitas' | 'custos' | 'fluxo-diario' | 'fluxo-mensal' | 'patrimonio' | 'questionario'
 
 const TABS: { id: TabId; label: string; icon: React.ElementType; color: string }[] = [
   { id: 'producao',     label: 'Produção',           icon: Sprout,       color: 'text-green-600' },
@@ -29,6 +30,7 @@ const TABS: { id: TabId; label: string; icon: React.ElementType; color: string }
   { id: 'fluxo-diario', label: 'Fluxo Diário',        icon: Calendar,     color: 'text-purple-600' },
   { id: 'fluxo-mensal', label: 'Fluxo Mensal',        icon: BarChart2,    color: 'text-indigo-600' },
   { id: 'patrimonio',   label: 'Patrimônio',          icon: Shield,       color: 'text-orange-600' },
+  { id: 'questionario', label: 'Questionário',        icon: ClipboardList,color: 'text-gray-600' },
 ]
 
 export function AgroCompleto() {
@@ -47,6 +49,7 @@ export function AgroCompleto() {
     switch (activeTab) {
       case 'producao':     return <TabProducao clientId={clientId} />
       case 'dre-rural':    return <TabDRERural clientId={clientId} />
+      case 'questionario': return <TabQuestionarioAgro clientId={clientId} />
       case 'contratos':    return <TabContratos clientId={clientId} />
       case 'despesas':     return <TabDespesas clientId={clientId} />
       case 'receitas':     return <TabReceitas clientId={clientId} />

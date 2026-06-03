@@ -14,9 +14,12 @@ import { TabFluxoMensal } from './TabFluxoMensal'
 import { TabStressTest } from './TabStressTest'
 import { TabHistorico } from './TabHistorico'
 import { TabCicloInadimplencia } from './TabCicloInadimplencia'
+import { TabQuestionario } from './TabQuestionario'
+import { TabMetas } from './TabMetas'
+import { TabDREProjetado } from './TabDREProjetado'
 import { clsx } from 'clsx'
 
-type TabId = 'dre' | 'receb-pag' | 'contratos' | 'despesas' | 'receitas' | 'custos' | 'fluxo-diario' | 'fluxo-mensal' | 'stress' | 'historico' | 'ciclo'
+type TabId = 'dre' | 'receb-pag' | 'contratos' | 'despesas' | 'receitas' | 'custos' | 'fluxo-diario' | 'fluxo-mensal' | 'stress' | 'historico' | 'ciclo' | 'questionario' | 'metas' | 'projetado'
 
 const TABS = [
   { id: 'dre'         as TabId, label: 'DRE & Indicadores',      icon: FileText,     color: 'text-blue-600' },
@@ -30,6 +33,9 @@ const TABS = [
   { id: 'stress'      as TabId, label: 'Stress Test',             icon: Zap,          color: 'text-orange-600' },
   { id: 'historico'   as TabId, label: 'Histórico',               icon: BarChart2,    color: 'text-gray-600' },
   { id: 'ciclo'       as TabId, label: 'Ciclo & Inadimplência',   icon: Activity,     color: 'text-red-600' },
+  { id: 'questionario'as TabId, label: 'Questionário',            icon: FileText,     color: 'text-gray-600' },
+  { id: 'metas'       as TabId, label: 'Metas',                   icon: Zap,          color: 'text-emerald-600' },
+  { id: 'projetado'   as TabId, label: 'Projetado vs. Real',      icon: BarChart2,    color: 'text-cyan-600' },
 ]
 
 export function PJCompleto() {
@@ -56,6 +62,9 @@ export function PJCompleto() {
       case 'stress':       return <TabStressTest clientId={clientId} />
       case 'historico':    return <TabHistorico clientId={clientId} />
       case 'ciclo':        return <TabCicloInadimplencia clientId={clientId} />
+      case 'questionario': return <TabQuestionario clientId={clientId} />
+      case 'metas':        return <TabMetas clientId={clientId} />
+      case 'projetado':    return <TabDREProjetado clientId={clientId} />
     }
   }
 
