@@ -53,9 +53,13 @@ const fmtBRL = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', cur
 const fmtPct = (v: number) => `${v.toFixed(1)}%`
 
 export function DiagnosticoPJ() {
+  // ── Todos os hooks no topo — nunca dentro de if/loops ──────────
   const { clients } = useStore()
+  const { user } = useAuthStore()
+  const { exportDiagnosticoPJ } = usePDF()
   const [searchParams] = useSearchParams()
   const [step, setStep] = useState<Step>('form')
+  const [exporting, setExporting] = useState(false)
   const [form, setForm] = useState<PJForm>({
     clientId: '', segment: 'comercio', employees: '', grossRevenue: '', deductions: '',
     cmv: '', fixedExpenses: '', variableExpenses: '', financialExpenses: '', proLabore: '',
@@ -110,9 +114,6 @@ export function DiagnosticoPJ() {
       dre.netMargin > 0 && dre.netMargin < 10 && 'Potencial de crescimento de margem com gestão financeira',
     ].filter(Boolean) as string[]
 
-    const { exportDiagnosticoPJ } = usePDF()
-    const { user } = useAuthStore()
-    const [exporting, setExporting] = useState(false)
     const clientName = clients.find(c => c.id === form.clientId)?.name ?? 'Cliente'
 
     const handleExport = async () => {

@@ -76,9 +76,13 @@ function calcAgro(f: AgroForm) {
 }
 
 export function DiagnosticoAgro() {
+  // ── Todos os hooks no topo ──────────────────────────────────────
   const { clients } = useStore()
+  const { user } = useAuthStore()
+  const { exportDiagnosticoAgro } = usePDF()
   const [searchParams] = useSearchParams()
   const [step, setStep] = useState<Step>('form')
+  const [exporting, setExporting] = useState(false)
   const [form, setForm] = useState<AgroForm>({
     clientId: '', ownArea: '', leasedArea: '', leaseValueHa: '',
     sojaArea: '', sojaProductivity: '58', sojaPrice: '118', sojaCostHa: '',
@@ -128,10 +132,6 @@ export function DiagnosticoAgro() {
       d.margin > 0 && 'Oportunidade de alongamento de dívida de custeio para investimento',
       'Análise de tradings para venda antecipada com melhor cotação',
     ].filter(Boolean) as string[]
-
-    const { exportDiagnosticoAgro } = usePDF()
-    const { user } = useAuthStore()
-    const [exporting, setExporting] = useState(false)
 
     const handleExport = async () => {
       setExporting(true)
