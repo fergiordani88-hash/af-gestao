@@ -101,17 +101,19 @@ const MODALIDADES_PJ = [
 
 type TipoTaxa = 'anual' | 'mensal'
 type TipoCorrecao = 'prefixada' | 'cdi' | 'tjlp'
+type Periodicidade = 'mensal' | 'semestral' | 'anual'
 
 function SimuladorPJ() {
-  const [modal,      setModal]      = useState(MODALIDADES_PJ[0].id)
-  const [valor,      setValor]      = useState('500000')
-  const [taxa,       setTaxa]       = useState('22')
-  const [tipoTaxa,   setTipoTaxa]   = useState<TipoTaxa>('anual')
-  const [prazo,      setPrazo]      = useState('24')
-  const [correcao,   setCorrecao]   = useState<TipoCorrecao>('prefixada')
-  const [spread,     setSpread]     = useState('3')
-  const [receita,    setReceita]    = useState('200000')
-  const [isPJ,       setIsPJ]       = useState(true)
+  const [modal,          setModal]          = useState(MODALIDADES_PJ[0].id)
+  const [valor,          setValor]          = useState('500000')
+  const [taxa,           setTaxa]           = useState('22')
+  const [tipoTaxa,       setTipoTaxa]       = useState<TipoTaxa>('anual')
+  const [prazo,          setPrazo]          = useState('24')
+  const [periodicidade,  setPeriodicidade]  = useState<Periodicidade>('mensal')
+  const [correcao,       setCorrecao]       = useState<TipoCorrecao>('prefixada')
+  const [spread,         setSpread]         = useState('3')
+  const [receita,        setReceita]        = useState('200000')
+  const [isPJ,           setIsPJ]           = useState(true)
 
   const modalInfo = MODALIDADES_PJ.find(m => m.id === modal)!
   const principal = Number(valor.replace(/\D/g, '')) || 0
@@ -129,17 +131,27 @@ function SimuladorPJ() {
   }
   const taxaEfAM = taxaAnualParaMensal(taxaEfAA)
 
-  // PMT (Price)
-  const r    = taxaEfAM / 100
-  const pmt  = r > 0 ? principal * (r * Math.pow(1 + r, prazoNum)) / (Math.pow(1 + r, prazoNum) - 1) : principal / prazoNum
-  const totalPago  = pmt * prazoNum
+  // Taxa e número de parcelas conforme periodicidade
+  const periodoLabel = periodicidade === 'mensal' ? 'mensal' : periodicidade === 'semestral' ? 'semestral' : 'anual'
+  const fatores = periodicidade === 'mensal' ? 1 : periodicidade === 'semestral' ? 6 : 12
+  const taxaPerPeriodo = (Math.pow(1 + taxaEfAM / 100, fatores) - 1) // taxa por período (decimal)
+  const nParcelas = Math.round(prazoNum / fatores)
+
+  // PMT (Price) por período
+  const r    = taxaPerPeriodo
+  const pmt  = nParcelas > 0
+    ? (r > 0 ? principal * (r * Math.pow(1 + r, nParcelas)) / (Math.pow(1 + r, nParcelas) - 1) : principal / nParcelas)
+    : 0
+  const totalPago  = pmt * nParcelas
   const totalJuros = totalPago - principal
 
   // IOF
   const iofValor  = modalInfo.iof ? calcIOF(principal, prazoNum * 30, isPJ) : 0
   const custoTotal = totalPago + iofValor
 
-  const comprometimento = (pmt / receitaM) * 100
+  // Comprometimento: normaliza a parcela para base mensal
+  const pmtMensal = pmt / fatores
+  const comprometimento = (pmtMensal / receitaM) * 100
   const ok = comprometimento <= 30
 
   // CET aproximado (taxa que remunera principal + IOF no prazo)
@@ -177,6 +189,17 @@ function SimuladorPJ() {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div><label className={lbl}>Valor da Operação (R$)</label><input className={inp} value={valor} onChange={e => setValor(e.target.value)} /></div>
           <div><label className={lbl}>Prazo (meses)</label><input type="number" className={inp} value={prazo} onChange={e => setPrazo(e.target.value)} /></div>
+          <div>
+            <label className={lbl}>Periodicidade das Parcelas</label>
+            <div className="flex gap-1">
+              {(['mensal','semestral','anual'] as Periodicidade[]).map(p => (
+                <button key={p} onClick={() => setPeriodicidade(p)}
+                  className={`flex-1 py-2 rounded-xl text-xs font-semibold border capitalize ${periodicidade === p ? 'bg-blue-600 text-white border-blue-600' : 'bg-white border-gray-200 text-gray-600'}`}>
+                  {p === 'mensal' ? 'Mensal' : p === 'semestral' ? 'Semestral' : 'Anual'}
+                </button>
+              ))}
+            </div>
+          </div>
           <div><label className={lbl}>Receita Mensal (R$)</label><input className={inp} value={receita} onChange={e => setReceita(e.target.value)} /></div>
           <div>
             <label className={lbl}>Tipo de Pessoa</label>
@@ -231,10 +254,10 @@ function SimuladorPJ() {
           <h3 className="font-semibold text-gray-900 mb-4">Resultado da Simulação</h3>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
             {[
-              { label: 'Parcela Mensal', value: fmtBRL(pmt), highlight: true },
+              { label: `Parcela ${periodicidade.charAt(0).toUpperCase() + periodicidade.slice(1)} (${nParcelas}x)`, value: fmtBRL(pmt), highlight: true },
               { label: 'Total Pago (s/ IOF)', value: fmtBRL(totalPago) },
               { label: 'Total de Juros', value: fmtBRL(totalJuros) },
-              { label: 'Comprometimento', value: fmtPct(comprometimento, 1) },
+              { label: 'Comprometimento Mensal', value: fmtPct(comprometimento, 1) },
             ].map(k => (
               <div key={k.label} className={`p-3 rounded-xl ${k.highlight ? 'bg-blue-600 text-white' : 'bg-gray-50'}`}>
                 <p className={`text-xs ${k.highlight ? 'text-white/70' : 'text-gray-500'}`}>{k.label}</p>

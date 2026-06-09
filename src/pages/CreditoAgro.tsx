@@ -83,16 +83,18 @@ const MODALIDADES_AGRO = [
 ]
 
 type TipoTaxa = 'anual' | 'mensal'
+type Periodicidade = 'mensal' | 'semestral' | 'anual'
 
 function SimuladorAgro() {
-  const [modal,    setModal]    = useState('pronamp')
-  const [valor,    setValor]    = useState('1500000')
-  const [taxa,     setTaxa]     = useState('')
-  const [tipoTaxa, setTipoTaxa] = useState<TipoTaxa>('anual')
-  const [prazo,    setPrazo]    = useState('24')
-  const [carencia, setCarencia] = useState('6')
-  const [receita,  setReceita]  = useState('3000000')
-  const [catFiltro,setCatFiltro]= useState('Todos')
+  const [modal,         setModal]         = useState('pronamp')
+  const [valor,         setValor]         = useState('1500000')
+  const [taxa,          setTaxa]          = useState('')
+  const [tipoTaxa,      setTipoTaxa]      = useState<TipoTaxa>('anual')
+  const [prazo,         setPrazo]         = useState('24')
+  const [carencia,      setCarencia]      = useState('6')
+  const [periodicidade, setPeriodicidade] = useState<Periodicidade>('mensal')
+  const [receita,       setReceita]       = useState('3000000')
+  const [catFiltro,     setCatFiltro]     = useState('Todos')
 
   const modalInfo = MODALIDADES_AGRO.find(m => m.id === modal)!
   const taxaUsada = taxa !== '' ? Number(taxa) : modalInfo.taxa
@@ -105,14 +107,22 @@ function SimuladorAgro() {
   const taxaEfAM = taxaAnualParaMensal(taxaEfAA)
 
   const prazoAmortizacao = prazoNum - carenciaNum
-  const r   = taxaEfAM / 100
-  const pmt = prazoAmortizacao > 0
-    ? (r > 0 ? principal * (r * Math.pow(1 + r, prazoAmortizacao)) / (Math.pow(1 + r, prazoAmortizacao) - 1) : principal / prazoAmortizacao)
+
+  // Taxa e número de parcelas conforme periodicidade
+  const fatores = periodicidade === 'mensal' ? 1 : periodicidade === 'semestral' ? 6 : 12
+  const taxaPerPeriodo = Math.pow(1 + taxaEfAM / 100, fatores) - 1
+  const nParcelas = prazoAmortizacao > 0 ? Math.max(1, Math.round(prazoAmortizacao / fatores)) : 0
+
+  const r   = taxaPerPeriodo
+  const pmt = nParcelas > 0
+    ? (r > 0 ? principal * (r * Math.pow(1 + r, nParcelas)) / (Math.pow(1 + r, nParcelas) - 1) : principal / nParcelas)
     : 0
-  const totalPago  = pmt * prazoAmortizacao
+  const totalPago  = pmt * nParcelas
   const totalJuros = totalPago - principal
-  const comprometimento = receitaA > 0 ? (pmt * 12 / receitaA) * 100 : 0
-  const ok = comprometimento <= 25 // rural: limite mais conservador 25%
+  // Normaliza para base anual: pmt / fatores = equivalente mensal × 12
+  const pmtMensalEq = pmt / fatores
+  const comprometimento = receitaA > 0 ? (pmtMensalEq * 12 / receitaA) * 100 : 0
+  const ok = comprometimento <= 25
 
   const cats = ['Todos', ...Array.from(new Set(MODALIDADES_AGRO.map(m => m.cat)))]
   const filtradas = catFiltro === 'Todos' ? MODALIDADES_AGRO : MODALIDADES_AGRO.filter(m => m.cat === catFiltro)
@@ -171,6 +181,20 @@ function SimuladorAgro() {
           <div><label className={lbl}>Valor da Operação (R$)</label><input className={inp} value={valor} onChange={e => setValor(e.target.value)} /></div>
           <div><label className={lbl}>Prazo total (meses)</label><input type="number" className={inp} value={prazo} onChange={e => setPrazo(e.target.value)} /></div>
           <div><label className={lbl}>Carência (meses)</label><input type="number" className={inp} value={carencia} onChange={e => setCarencia(e.target.value)} /></div>
+          <div className="col-span-2 md:col-span-3">
+            <label className={lbl}>Periodicidade das Parcelas</label>
+            <div className="flex gap-2">
+              {(['mensal','semestral','anual'] as Periodicidade[]).map(p => (
+                <button key={p} onClick={() => setPeriodicidade(p)}
+                  className={`px-4 py-2 rounded-xl text-xs font-semibold border ${periodicidade === p ? 'bg-af-green text-white border-af-green' : 'bg-white border-gray-200 text-gray-600'}`}>
+                  {p === 'mensal' ? 'Mensal' : p === 'semestral' ? 'Semestral' : 'Anual'}
+                </button>
+              ))}
+              <span className="self-center text-xs text-gray-400 ml-1">
+                {periodicidade !== 'mensal' && nParcelas > 0 && `→ ${nParcelas} parcela${nParcelas > 1 ? 's' : ''} ${periodicidade === 'semestral' ? 'semestrais' : 'anuais'}`}
+              </span>
+            </div>
+          </div>
           <div>
             <label className={lbl}>Taxa (deixe em branco = padrão da linha)</label>
             <input type="number" step="0.1" className={inp} value={taxa} onChange={e => setTaxa(e.target.value)}
@@ -193,7 +217,7 @@ function SimuladorAgro() {
           <h3 className="font-semibold text-gray-900 mb-4">Resultado</h3>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
             {[
-              { label: 'Parcela (após carência)', value: fmtBRL(pmt), highlight: true },
+              { label: `Parcela ${periodicidade.charAt(0).toUpperCase() + periodicidade.slice(1)} (${nParcelas}x)`, value: fmtBRL(pmt), highlight: true },
               { label: 'Total Pago', value: fmtBRL(totalPago) },
               { label: 'Total de Juros', value: fmtBRL(totalJuros) },
               { label: 'Prazo amortização', value: `${prazoAmortizacao} meses` },

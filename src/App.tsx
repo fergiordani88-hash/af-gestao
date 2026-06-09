@@ -8,7 +8,6 @@ import { PJCompleto } from './pages/PJCompleto'
 import { CreditoEmpresarial } from './pages/CreditoEmpresarial'
 import { CreditoAgro } from './pages/CreditoAgro'
 import { Financeiro } from './pages/Financeiro'
-import { Credito } from './pages/Credito'
 import { Documentos } from './pages/Documentos'
 import { AreaCliente } from './pages/AreaCliente'
 import { Login } from './pages/Login'
@@ -66,12 +65,7 @@ export default function App() {
           <Financeiro />
         </ProtectedRoute>
       } />
-      <Route path="/credito" element={
-        <ProtectedRoute>
-          <Credito />
-        </ProtectedRoute>
-      } />
-      <Route path="/credito-empresarial" element={
+<Route path="/credito-empresarial" element={
         <ProtectedRoute allowedRoles={['admin', 'consultor']}>
           <CreditoEmpresarial />
         </ProtectedRoute>
