@@ -1,4 +1,16 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
+import { ControleAuthProvider, ControleProtectedRoute } from './afcontrole/auth/ControleAuth'
+import { ControleLogin }       from './afcontrole/pages/ControleLogin'
+import { ControleDashboard }   from './afcontrole/pages/ControleDashboard'
+import { ControleEmpresa }     from './afcontrole/pages/ControleEmpresa'
+import { ControleLancamentos } from './afcontrole/pages/ControleLancamentos'
+import { ControleContratos }   from './afcontrole/pages/ControleContratos'
+import { ControleDespesas }    from './afcontrole/pages/ControleDespesas'
+import { ControleReceitas }    from './afcontrole/pages/ControleReceitas'
+import { ControleFluxoDiario } from './afcontrole/pages/ControleFluxoDiario'
+import { ControleFluxoMensal } from './afcontrole/pages/ControleFluxoMensal'
+import { ControleFluxoAnual }  from './afcontrole/pages/ControleFluxoAnual'
+import { ControleRelatorios }  from './afcontrole/pages/ControleRelatorios'
 import { Dashboard }         from './pages/Dashboard'
 import { CRM }               from './pages/CRM'
 import { DiagnosticoPJ }     from './pages/DiagnosticoPJ'
@@ -19,6 +31,7 @@ import { ProtectedRoute }    from './components/Auth/ProtectedRoute'
 
 export default function App() {
   return (
+    <ControleAuthProvider>
     <Routes>
       {/* Pública */}
       <Route path="/login"    element={<Login />} />
@@ -116,6 +129,20 @@ export default function App() {
 
       {/* Catch-all */}
       <Route path="*" element={<Navigate to="/" replace />} />
+
+      {/* ── AF Controle (sistema separado) ─────────────────── */}
+      <Route path="/afcontrole/login" element={<ControleLogin />} />
+      <Route path="/afcontrole" element={<ControleProtectedRoute><ControleDashboard /></ControleProtectedRoute>} />
+      <Route path="/afcontrole/empresa"     element={<ControleProtectedRoute><ControleEmpresa /></ControleProtectedRoute>} />
+      <Route path="/afcontrole/lancamentos" element={<ControleProtectedRoute><ControleLancamentos /></ControleProtectedRoute>} />
+      <Route path="/afcontrole/contratos"   element={<ControleProtectedRoute><ControleContratos /></ControleProtectedRoute>} />
+      <Route path="/afcontrole/despesas"    element={<ControleProtectedRoute><ControleDespesas /></ControleProtectedRoute>} />
+      <Route path="/afcontrole/receitas"    element={<ControleProtectedRoute><ControleReceitas /></ControleProtectedRoute>} />
+      <Route path="/afcontrole/diario"      element={<ControleProtectedRoute><ControleFluxoDiario /></ControleProtectedRoute>} />
+      <Route path="/afcontrole/mensal"      element={<ControleProtectedRoute><ControleFluxoMensal /></ControleProtectedRoute>} />
+      <Route path="/afcontrole/anual"       element={<ControleProtectedRoute><ControleFluxoAnual /></ControleProtectedRoute>} />
+      <Route path="/afcontrole/relatorios"  element={<ControleProtectedRoute><ControleRelatorios /></ControleProtectedRoute>} />
     </Routes>
+    </ControleAuthProvider>
   )
 }

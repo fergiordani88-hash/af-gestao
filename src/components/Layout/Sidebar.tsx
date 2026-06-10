@@ -16,6 +16,7 @@ interface NavItem {
   path: string
   roles: UserRole[]
   end?: boolean
+  header?: string
 }
 
 // ── Navegação por módulo ──────────────────────────────────────
@@ -30,13 +31,20 @@ const MODULE_NAV: Record<AppModule, NavItem[]> = {
     { label: 'Área do Cliente',      icon: Building2,       path: '/area-cliente',    roles: ['admin','consultor','cliente_rural'] },
   ],
   empresarial: [
-    { label: 'Dashboard',            icon: LayoutDashboard, path: '/',               roles: ['admin','consultor','cliente_empresa'], end: true },
-    { label: 'Diagnóstico Empresarial',icon: ClipboardList, path: '/diagnostico-pj', roles: ['admin','consultor'] },
-    { label: 'Empresarial Completo', icon: Building2,       path: '/pj-completo',     roles: ['admin','consultor'] },
-    { label: 'Planejamento Financeiro',icon: TrendingUp,    path: '/financeiro',      roles: ['admin','consultor','cliente_empresa'] },
-    { label: 'Crédito Empresarial',  icon: CreditCard,      path: '/credito-empresarial',roles: ['admin','consultor'] },
-    { label: 'Documentos',           icon: FileText,        path: '/documentos',      roles: ['admin','consultor','cliente_empresa'] },
-    { label: 'Área do Cliente',      icon: Building2,       path: '/area-cliente',    roles: ['admin','consultor','cliente_empresa'] },
+    { label: 'Dashboard',               icon: LayoutDashboard, path: '/',                    roles: ['admin','consultor','cliente_empresa'], end: true },
+    { label: 'Diagnóstico Empresarial', icon: ClipboardList,   path: '/diagnostico-pj',      roles: ['admin','consultor'] },
+    { label: 'Empresarial Completo',    icon: Building2,       path: '/pj-completo',          roles: ['admin','consultor'] },
+    { label: 'Visão Financeira',        icon: TrendingUp,      path: '/financeiro',           roles: ['admin','consultor','cliente_empresa'], header: 'Gestão Financeira' },
+    { label: 'Lançamentos',             icon: Activity,        path: '/pay/lancamentos',      roles: ['admin','consultor','cliente_empresa'] },
+    { label: 'Contratos',               icon: FileText,        path: '/pay/contratos',        roles: ['admin','consultor','cliente_empresa'] },
+    { label: 'Despesas',                icon: TrendingDown,    path: '/pay/despesas',         roles: ['admin','consultor','cliente_empresa'] },
+    { label: 'Receitas',                icon: DollarSign,      path: '/pay/receitas',         roles: ['admin','consultor','cliente_empresa'] },
+    { label: 'Fluxo Diário',            icon: Calendar,        path: '/pay/diario',           roles: ['admin','consultor','cliente_empresa'] },
+    { label: 'Fluxo Mensal',            icon: BarChart2,       path: '/pay/mensal',           roles: ['admin','consultor','cliente_empresa'] },
+    { label: 'Fluxo Anual',             icon: Layers,          path: '/pay/anual',            roles: ['admin','consultor','cliente_empresa'] },
+    { label: 'Crédito Empresarial',     icon: CreditCard,      path: '/credito-empresarial',  roles: ['admin','consultor'], header: 'Outros' },
+    { label: 'Documentos',              icon: FileText,        path: '/documentos',           roles: ['admin','consultor','cliente_empresa'] },
+    { label: 'Área do Cliente',         icon: Building2,       path: '/area-cliente',         roles: ['admin','consultor','cliente_empresa'] },
   ],
   pay: [
     { label: 'Dashboard',            icon: LayoutDashboard, path: '/pay',            roles: ['admin','consultor','cliente_empresa','cliente_rural'], end: true },
@@ -99,7 +107,7 @@ export function Sidebar() {
         {/* Logo */}
         <div className="flex items-center justify-between px-4 py-4 border-b border-white/10 shrink-0">
           <div className="flex items-center gap-2.5">
-            <img src="/logo.svg" alt="AF" className="w-9 h-9 rounded-xl shrink-0" />
+            <img src="/logo.png" alt="AF" className="w-9 h-9 rounded-xl shrink-0" />
             <div>
               <p className="font-bold text-sm leading-tight whitespace-nowrap">AF Gestão</p>
               <p className="text-xs text-white/40 leading-tight whitespace-nowrap">& Consultoria</p>
@@ -157,26 +165,32 @@ export function Sidebar() {
           )}
 
           {visibleItems.map(item => (
-            <NavLink
-              key={item.path + item.label}
-              to={item.path}
-              end={item.end}
-              onClick={() => { if (window.innerWidth < 1024) setSidebarOpen(false) }}
-              className={({ isActive }) => clsx(
-                'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors group whitespace-nowrap',
-                isActive
-                  ? 'bg-af-green text-white'
-                  : 'text-white/60 hover:text-white hover:bg-white/8'
+            <div key={item.path + item.label}>
+              {item.header && (
+                <p className="text-[9px] font-bold text-white/25 uppercase tracking-widest px-3 pt-3 pb-1.5">
+                  {item.header}
+                </p>
               )}
-            >
-              {({ isActive }) => (
-                <>
-                  <item.icon size={17} className={isActive ? 'text-white shrink-0' : 'text-white/50 group-hover:text-white/80 shrink-0'} />
-                  <span className="flex-1 truncate">{item.label}</span>
-                  {isActive && <ChevronRight size={14} className="shrink-0 opacity-60" />}
-                </>
-              )}
-            </NavLink>
+              <NavLink
+                to={item.path}
+                end={item.end}
+                onClick={() => { if (window.innerWidth < 1024) setSidebarOpen(false) }}
+                className={({ isActive }) => clsx(
+                  'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors group whitespace-nowrap',
+                  isActive
+                    ? 'bg-af-green text-white'
+                    : 'text-white/60 hover:text-white hover:bg-white/8'
+                )}
+              >
+                {({ isActive }) => (
+                  <>
+                    <item.icon size={17} className={isActive ? 'text-white shrink-0' : 'text-white/50 group-hover:text-white/80 shrink-0'} />
+                    <span className="flex-1 truncate">{item.label}</span>
+                    {isActive && <ChevronRight size={14} className="shrink-0 opacity-60" />}
+                  </>
+                )}
+              </NavLink>
+            </div>
           ))}
         </nav>
 

@@ -1,6 +1,33 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
-  <rect width="200" height="200" fill="#0C0C0C"/>
-  <circle cx="100" cy="100" r="82" fill="none" stroke="#C9A55A" stroke-width="1.6"/>
-  <text x="14" y="150" font-family="Georgia,'Times New Roman',serif" font-size="108" font-weight="700" fill="#C9A55A" letter-spacing="-4">AF</text>
-  <path d="M18 134 Q100 112 182 126" stroke="#C9A55A" stroke-width="2.8" fill="none" stroke-linecap="round"/>
+  <defs>
+    <style>
+      .letter { font-family: 'Times New Roman', Georgia, serif; font-weight: 700; fill: #C9A258; }
+    </style>
+    <!-- Clip circle for the swoosh fade effect -->
+    <clipPath id="circleClip">
+      <circle cx="100" cy="100" r="86"/>
+    </clipPath>
+  </defs>
+
+  <!-- Background -->
+  <rect width="200" height="200" rx="10" fill="#0A0A0A"/>
+
+  <!-- Outer thin gold circle -->
+  <circle cx="100" cy="100" r="84" fill="none" stroke="#C9A258" stroke-width="1.4"/>
+
+  <!-- Letter A -->
+  <text x="8" y="152" class="letter" font-size="118" letter-spacing="-6">A</text>
+
+  <!-- Letter F -->
+  <text x="96" y="152" class="letter" font-size="118" letter-spacing="-6">F</text>
+
+  <!-- Diagonal swoosh — from lower-left through center to upper-right -->
+  <line
+    x1="16" y1="148"
+    x2="184" y2="68"
+    stroke="#C9A258"
+    stroke-width="2.4"
+    stroke-linecap="round"
+    clip-path="url(#circleClip)"
+  />
 </svg>

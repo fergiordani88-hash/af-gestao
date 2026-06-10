@@ -45,7 +45,7 @@ export function Login() {
         {/* Logo */}
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center mb-4">
-            <img src="/logo.svg" alt="AF Gestão" className="w-20 h-20 rounded-2xl shadow-2xl" />
+            <img src="/logo.png" alt="AF Gestão" className="w-20 h-20 rounded-2xl shadow-2xl" />
           </div>
           <h1 className="text-2xl font-bold text-white">AF Gestão & Consultoria</h1>
           <p className="text-white/60 text-sm mt-1">Sistema de Gestão Integrado</p>

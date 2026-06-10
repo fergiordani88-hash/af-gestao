@@ -85,7 +85,7 @@ export function ModuleSelector() {
       {/* Header */}
       <header className="flex items-center justify-between px-6 md:px-10 py-5 border-b border-white/8">
         <div className="flex items-center gap-3">
-          <img src="/logo.svg" alt="AF" className="w-11 h-11 rounded-xl shadow-lg" />
+          <img src="/logo.png" alt="AF" className="w-11 h-11 rounded-xl shadow-lg" />
           <div>
             <p className="font-bold text-white text-sm leading-tight">AF Gestão & Consultoria</p>
             <p className="text-white/35 text-xs">Sistema Integrado de Gestão</p>
