@@ -9,9 +9,16 @@ export interface ControleCompany {
 export interface ControleEntry {
   id: string; tipo: 'receita' | 'despesa'; categoria: string; descricao: string
   valor: number; dataVenc: string; dataPag?: string
-  status: 'pago' | 'pendente' | 'atrasado' | 'previsto'
+  status: 'pago' | 'pendente' | 'atrasado' | 'previsto' | 'cancelado'
   recorrente: boolean; periodicidade?: 'semanal' | 'quinzenal' | 'mensal' | 'bimestral' | 'trimestral' | 'semestral' | 'anual'
   contrato?: string; obs?: string; createdAt: string
+  // Baixa de pagamento
+  motivoBaixa?: 'pagamento' | 'cancelamento'
+  formaPagamento?: 'debito_cc' | 'cheque' | 'pix' | 'transferencia' | 'cartao_credito' | 'outros'
+  numeroCheque?: string
+  banco?: string
+  contaTitular?: string
+  valorPago?: number
 }
 
 export interface ControleContract {
@@ -26,7 +33,17 @@ export interface ControleContract {
   valorParcela?: number
 }
 
-const KEY = { COMPANY: 'af-ctrl-company', ENTRIES: 'af-ctrl-entries', CONTRACTS: 'af-ctrl-contracts' }
+export interface SaldoInicial {
+  valor: number
+  data: string // YYYY-MM-DD — data de referência do saldo
+}
+
+const KEY = {
+  COMPANY:        'af-ctrl-company',
+  ENTRIES:        'af-ctrl-entries',
+  CONTRACTS:      'af-ctrl-contracts',
+  SALDO_INICIAL:  'af-ctrl-saldo-inicial',
+}
 
 function uid() { return Math.random().toString(36).slice(2) + Date.now().toString(36) }
 function parse<T>(key: string, fallback: T): T {
@@ -60,15 +77,19 @@ export const controleStorage = {
   deleteContract(id: string) { this._saveContracts(this.getContracts().filter(c => c.id !== id)) },
   _saveContracts: (c: ControleContract[]) => localStorage.setItem(KEY.CONTRACTS, JSON.stringify(c)),
 
+  // Saldo inicial em caixa
+  getSaldoInicial: (): SaldoInicial | null => parse(KEY.SALDO_INICIAL, null),
+  setSaldoInicial: (d: SaldoInicial) => localStorage.setItem(KEY.SALDO_INICIAL, JSON.stringify(d)),
+
   getSummary(year: number, month: number) {
     const inMonth = this.getEntries().filter(e => {
       const d = new Date(e.dataVenc)
-      return d.getFullYear() === year && d.getMonth() + 1 === month
+      return d.getFullYear() === year && d.getMonth() + 1 === month && e.status !== 'cancelado'
     })
     const receita  = inMonth.filter(e => e.tipo === 'receita').reduce((s, e) => s + e.valor, 0)
     const despesa  = inMonth.filter(e => e.tipo === 'despesa').reduce((s, e) => s + e.valor, 0)
-    const recPago  = inMonth.filter(e => e.tipo === 'receita' && e.status === 'pago').reduce((s, e) => s + e.valor, 0)
-    const despPago = inMonth.filter(e => e.tipo === 'despesa' && e.status === 'pago').reduce((s, e) => s + e.valor, 0)
+    const recPago  = inMonth.filter(e => e.tipo === 'receita' && e.status === 'pago').reduce((s, e) => s + (e.valorPago ?? e.valor), 0)
+    const despPago = inMonth.filter(e => e.tipo === 'despesa' && e.status === 'pago').reduce((s, e) => s + (e.valorPago ?? e.valor), 0)
     return { receita, despesa, resultado: receita - despesa, recPago, despPago, resultadoCaixa: recPago - despPago }
   },
 
@@ -77,7 +98,7 @@ export const controleStorage = {
     const lim = new Date(now); lim.setDate(lim.getDate() + days)
     return this.getEntries().filter(e => {
       const d = new Date(e.dataVenc); d.setHours(0,0,0,0)
-      return e.status !== 'pago' && d >= now && d <= lim
+      return e.status !== 'pago' && e.status !== 'cancelado' && d >= now && d <= lim
     }).sort((a, b) => new Date(a.dataVenc).getTime() - new Date(b.dataVenc).getTime())
   },
 
@@ -85,7 +106,7 @@ export const controleStorage = {
     const now = new Date(); now.setHours(0,0,0,0)
     return this.getEntries().filter(e => {
       const d = new Date(e.dataVenc); d.setHours(0,0,0,0)
-      return e.status !== 'pago' && d < now
+      return e.status !== 'pago' && e.status !== 'cancelado' && d < now
     })
   },
 
@@ -100,7 +121,6 @@ export const controleStorage = {
     return result
   },
 
-  // Projeção baseada na média móvel dos últimos 3 meses
   getProjection(months = 3) {
     const history = this.getLast12MonthsSummary()
     const last3   = history.slice(-3)
@@ -116,5 +136,50 @@ export const controleStorage = {
       })
     }
     return projections
+  },
+
+  // Fluxo de caixa dia-a-dia a partir do saldo inicial
+  getDailyFlux(startDate: string, endDate: string) {
+    const saldoInicial = this.getSaldoInicial()
+    const entries = this.getEntries()
+      .filter(e => e.status !== 'cancelado')
+      .sort((a, b) => a.dataVenc.localeCompare(b.dataVenc))
+
+    // Data inicial do saldo
+    const saldoData = saldoInicial?.data ?? startDate
+    const saldoValor = saldoInicial?.valor ?? 0
+
+    // Calcula saldo acumulado antes de startDate
+    let saldoAnterior = saldoValor
+    entries.forEach(e => {
+      if (e.dataVenc < startDate && e.dataVenc >= saldoData && e.status === 'pago') {
+        const v = e.valorPago ?? e.valor
+        saldoAnterior += e.tipo === 'receita' ? v : -v
+      }
+    })
+
+    // Agrupa por dia no período
+    const map: Record<string, { entradas: number; saidas: number; items: ControleEntry[] }> = {}
+    entries.forEach(e => {
+      if (e.dataVenc >= startDate && e.dataVenc <= endDate) {
+        if (!map[e.dataVenc]) map[e.dataVenc] = { entradas: 0, saidas: 0, items: [] }
+        const v = e.valorPago ?? e.valor
+        if (e.tipo === 'receita') map[e.dataVenc].entradas += v
+        else map[e.dataVenc].saidas += v
+        map[e.dataVenc].items.push(e)
+      }
+    })
+
+    // Gera linhas com saldo acumulado
+    const days = Object.keys(map).sort()
+    let saldoCorrente = saldoAnterior
+    return days.map(date => {
+      const d = map[date]
+      // Saldo considera apenas pagos para movimentação real
+      const entradasPagas = d.items.filter(e => e.tipo === 'receita' && e.status === 'pago').reduce((s, e) => s + (e.valorPago ?? e.valor), 0)
+      const saidasPagas   = d.items.filter(e => e.tipo === 'despesa' && e.status === 'pago').reduce((s, e) => s + (e.valorPago ?? e.valor), 0)
+      saldoCorrente += entradasPagas - saidasPagas
+      return { date, entradas: d.entradas, saidas: d.saidas, entradasPagas, saidasPagas, saldo: saldoCorrente, items: d.items }
+    })
   },
 }
