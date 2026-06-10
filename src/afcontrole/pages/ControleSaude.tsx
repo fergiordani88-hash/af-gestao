@@ -1,15 +1,29 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect } from 'react'
+import emailjs from '@emailjs/browser'
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, ReferenceLine
 } from 'recharts'
 import {
-  Heart, AlertTriangle, CheckCircle2, XCircle, TrendingUp, TrendingDown,
-  Wallet, Clock, Bell, BellOff, Smartphone, Target, Info, ChevronRight
+  Heart, AlertTriangle, TrendingUp, TrendingDown,
+  Wallet, Clock, Bell, BellOff, Smartphone, Target, Info, Mail,
+  CheckCircle2, Settings, X, Eye, EyeOff
 } from 'lucide-react'
 import { controleStorage } from '../storage/controleStorage'
 import { Card } from '../../components/ui/Card'
 import { ControleLayout } from '../layout/ControleLayout'
+
+interface EmailConfig {
+  serviceId: string
+  templateId: string
+  publicKey: string
+  destinatario: string
+}
+const EMAIL_KEY = 'af-ctrl-emailjs'
+function loadEmailConfig(): EmailConfig {
+  try { return JSON.parse(localStorage.getItem(EMAIL_KEY) ?? 'null') ?? { serviceId: '', templateId: '', publicKey: '', destinatario: '' } }
+  catch { return { serviceId: '', templateId: '', publicKey: '', destinatario: '' } }
+}
 
 const fmtBRL  = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 })
 const fmtDate = (s: string) => new Date(s + 'T12:00:00').toLocaleDateString('pt-BR')
@@ -230,6 +244,12 @@ export function ControleSaude() {
   const [whatsAppEdit, setWhatsAppEdit] = useState(false)
   const [alertasEnv,   setAlertasEnv]   = useState(false)
   const [semSaldoInicial, setSemSaldo]  = useState(false)
+  // E-mail
+  const [emailCfg,     setEmailCfg]     = useState<EmailConfig>(loadEmailConfig)
+  const [emailSetup,   setEmailSetup]   = useState(false)
+  const [emailDraft,   setEmailDraft]   = useState<EmailConfig>(loadEmailConfig)
+  const [emailStatus,  setEmailStatus]  = useState<'idle'|'sending'|'ok'|'erro'>('idle')
+  const [showKey,      setShowKey]      = useState(false)
 
   useEffect(() => {
     const si = controleStorage.getSaldoInicial()
@@ -327,6 +347,84 @@ export function ControleSaude() {
     localStorage.setItem('af-ctrl-whatsapp', whatsApp)
     setWhatsAppEdit(false)
   }
+
+  // ── E-mail ──────────────────────────────────────────────────────
+  const handleSalvarEmailCfg = () => {
+    localStorage.setItem(EMAIL_KEY, JSON.stringify(emailDraft))
+    setEmailCfg(emailDraft)
+    setEmailSetup(false)
+  }
+
+  const gerarCorpoEmail = () => {
+    const be      = breakEven
+    const geral   = saudeGeral
+    const now     = new Date().toLocaleDateString('pt-BR')
+    const overdue = controleStorage.getOverdue()
+    const nextDue = controleStorage.getNextDue(7)
+    const totalAtraso = overdue.reduce((s, e) => s + e.valor, 0)
+    const totalVenc7  = nextDue.reduce((s, e) => s + e.valor, 0)
+    const empresa = controleStorage.getCompany()
+
+    const linhas = [
+      `RELATÓRIO FINANCEIRO — AF CONTROLE`,
+      `Data: ${now}`,
+      `Empresa: ${empresa?.nomeFantasia ?? '—'}`,
+      ``,
+      `──────────────────────────────────`,
+      `SAÚDE FINANCEIRA GERAL: ${LABEL_NIVEL[geral]}`,
+      `Saldo atual em caixa: ${fmtBRL(saldoAtual)}`,
+      `──────────────────────────────────`,
+      ``,
+      be ? `RESULTADO DO MÊS` : '',
+      be ? `Receitas: ${fmtBRL(be.curRec)}` : '',
+      be ? `Custo médio mensal: ${fmtBRL(be.avgDesp)}` : '',
+      be ? `Break-even: ${be.pct.toFixed(0)}% atingido${be.pct >= 100 ? ' ✅' : ' ⚠️'}` : '',
+      be ? (be.pct >= 100 ? 'Situação: acima do ponto de equilíbrio' : `Faltam: ${fmtBRL(be.faltam)} para cobrir os custos`) : '',
+      ``,
+      `CONTAS`,
+      totalAtraso > 0 ? `❌ Em atraso: ${fmtBRL(totalAtraso)} (${overdue.length} conta(s))` : '✅ Nenhuma conta em atraso',
+      totalVenc7  > 0 ? `⏰ Vence em 7 dias: ${fmtBRL(totalVenc7)} (${nextDue.length} conta(s))` : '✅ Nenhuma conta vencendo nos próximos 7 dias',
+      ``,
+      projecao?.minSaldo30 !== undefined && projecao.minSaldo30 < 0
+        ? `🚨 ATENÇÃO: caixa pode ficar negativo nos próximos 30 dias (mínimo projetado: ${fmtBRL(projecao.minSaldo30)})`
+        : `✅ Projeção 30 dias: caixa positivo (mínimo: ${fmtBRL(projecao?.minSaldo30 ?? 0)})`,
+      ``,
+      `──────────────────────────────────`,
+      `Relatório gerado automaticamente pelo AF Controle`,
+    ].filter(l => l !== '').join('\n')
+
+    return linhas
+  }
+
+  const handleEnviarEmail = async () => {
+    const cfg = emailCfg
+    if (!cfg.serviceId || !cfg.templateId || !cfg.publicKey || !cfg.destinatario) {
+      setEmailSetup(true)
+      return
+    }
+    setEmailStatus('sending')
+    try {
+      await emailjs.send(
+        cfg.serviceId,
+        cfg.templateId,
+        {
+          to_email:   cfg.destinatario,
+          to_name:    controleStorage.getCompany()?.nomeFantasia ?? 'Gestor',
+          subject:    `Relatório Financeiro — AF Controle — ${new Date().toLocaleDateString('pt-BR')}`,
+          message:    gerarCorpoEmail(),
+          from_name:  'AF Controle',
+        },
+        cfg.publicKey,
+      )
+      setEmailStatus('ok')
+      setTimeout(() => setEmailStatus('idle'), 4000)
+    } catch {
+      setEmailStatus('erro')
+      setTimeout(() => setEmailStatus('idle'), 5000)
+    }
+  }
+
+  const emailConfigurado = !!(emailCfg.serviceId && emailCfg.templateId && emailCfg.publicKey && emailCfg.destinatario)
 
   const projecaoMax  = projecao ? Math.max(...projecao.days.map(d => d.saldo), 0) : 0
   const projecaoMin  = projecao ? Math.min(...projecao.days.map(d => d.saldo), 0) : 0
@@ -545,16 +643,16 @@ export function ControleSaude() {
           </Card>
         )}
 
-        {/* ── ALERTAS / WHATSAPP / NOTIFICAÇÕES ─────────────── */}
+        {/* ── ALERTAS / WHATSAPP / E-MAIL / NOTIFICAÇÕES ────── */}
         <Card className="p-5">
           <h2 className="font-bold text-gray-900 flex items-center gap-2 mb-1">
             🔔 Alertas e Avisos
           </h2>
           <p className="text-xs text-gray-500 mb-5">
-            Receba lembretes de contas vencendo e da situação do caixa pelo WhatsApp ou pelo navegador
+            Receba relatórios e lembretes pelo WhatsApp, e-mail ou pelo navegador
           </p>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {/* WhatsApp */}
             <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4">
               <div className="flex items-center gap-2 mb-3">
@@ -600,6 +698,117 @@ export function ControleSaude() {
 
               <p className="text-[10px] text-gray-400 mt-2 text-center">
                 Abre o WhatsApp com a mensagem pronta — você decide para quem enviar
+              </p>
+            </div>
+
+            {/* E-mail via EmailJS */}
+            <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 flex flex-col">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <Mail size={18} className="text-blue-700" />
+                  <h3 className="font-bold text-blue-900 text-sm">Enviar por E-mail</h3>
+                </div>
+                <button onClick={() => { setEmailDraft(emailCfg); setEmailSetup(s => !s) }}
+                  className="text-blue-500 hover:text-blue-700 transition-colors">
+                  <Settings size={15} />
+                </button>
+              </div>
+
+              {/* Painel de configuração */}
+              {emailSetup && (
+                <div className="bg-white border border-blue-100 rounded-xl p-3 mb-3 space-y-2">
+                  <div className="flex items-center justify-between mb-1">
+                    <p className="text-xs font-bold text-gray-700">Configurar EmailJS</p>
+                    <button onClick={() => setEmailSetup(false)}><X size={13} className="text-gray-400" /></button>
+                  </div>
+
+                  {/* Mini-guia */}
+                  <div className="bg-amber-50 border border-amber-100 rounded-lg p-2 text-[10px] text-amber-800 leading-relaxed">
+                    <strong>Como configurar (gratuito, 200 e-mails/mês):</strong>
+                    <ol className="list-decimal list-inside mt-1 space-y-0.5">
+                      <li>Acesse <strong>emailjs.com</strong> e crie conta gratuita</li>
+                      <li>Em <em>Email Services</em>, conecte seu Gmail ou Outlook</li>
+                      <li>Em <em>Email Templates</em>, crie um template com os campos:<br/>
+                        <code className="bg-amber-100 px-0.5 rounded">{'{{to_email}}, {{subject}}, {{message}}'}</code>
+                      </li>
+                      <li>Copie o <strong>Service ID</strong>, <strong>Template ID</strong> e <strong>Public Key</strong></li>
+                    </ol>
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] font-semibold text-gray-500 block mb-0.5">Service ID</label>
+                    <input className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-300"
+                      placeholder="Ex: service_abc123"
+                      value={emailDraft.serviceId}
+                      onChange={e => setEmailDraft(d => ({ ...d, serviceId: e.target.value }))} />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-semibold text-gray-500 block mb-0.5">Template ID</label>
+                    <input className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-300"
+                      placeholder="Ex: template_xyz789"
+                      value={emailDraft.templateId}
+                      onChange={e => setEmailDraft(d => ({ ...d, templateId: e.target.value }))} />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-semibold text-gray-500 block mb-0.5">Public Key</label>
+                    <div className="flex gap-1">
+                      <input
+                        type={showKey ? 'text' : 'password'}
+                        className="flex-1 border border-gray-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-300"
+                        placeholder="Sua chave pública"
+                        value={emailDraft.publicKey}
+                        onChange={e => setEmailDraft(d => ({ ...d, publicKey: e.target.value }))} />
+                      <button onClick={() => setShowKey(s => !s)} className="px-2 text-gray-400 hover:text-gray-600">
+                        {showKey ? <EyeOff size={12} /> : <Eye size={12} />}
+                      </button>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-semibold text-gray-500 block mb-0.5">Destinatário (e-mail)</label>
+                    <input type="email"
+                      className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-300"
+                      placeholder="voce@empresa.com.br"
+                      value={emailDraft.destinatario}
+                      onChange={e => setEmailDraft(d => ({ ...d, destinatario: e.target.value }))} />
+                  </div>
+                  <button onClick={handleSalvarEmailCfg}
+                    className="w-full py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold">
+                    Salvar configuração
+                  </button>
+                </div>
+              )}
+
+              {!emailSetup && (
+                <>
+                  <p className="text-xs text-gray-600 mb-3 leading-relaxed flex-1">
+                    {emailConfigurado
+                      ? `Envia o relatório completo para ${emailCfg.destinatario} com um clique.`
+                      : 'Configure uma vez e envie relatórios financeiros completos diretamente para seu e-mail.'}
+                  </p>
+                  {emailConfigurado && (
+                    <div className="bg-white border border-blue-100 rounded-xl px-3 py-2 mb-3 text-xs text-gray-500 truncate">
+                      📧 {emailCfg.destinatario}
+                    </div>
+                  )}
+                </>
+              )}
+
+              <button onClick={handleEnviarEmail} disabled={emailStatus === 'sending'}
+                className={`w-full py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all mt-auto
+                  ${emailStatus === 'ok'      ? 'bg-emerald-100 text-emerald-700'
+                  : emailStatus === 'erro'    ? 'bg-red-100 text-red-700'
+                  : emailStatus === 'sending' ? 'bg-blue-100 text-blue-500 cursor-wait'
+                  : emailConfigurado          ? 'bg-blue-600 hover:bg-blue-700 text-white'
+                                              : 'bg-blue-100 text-blue-700 hover:bg-blue-200'}`}>
+                <Mail size={16} />
+                {emailStatus === 'sending' ? 'Enviando...'
+                  : emailStatus === 'ok'   ? '✓ E-mail enviado!'
+                  : emailStatus === 'erro' ? '✗ Erro ao enviar — verifique a configuração'
+                  : emailConfigurado       ? 'Enviar relatório por e-mail'
+                                           : 'Configurar e-mail'}
+              </button>
+              <p className="text-[10px] text-gray-400 mt-2 text-center">
+                Serviço: EmailJS — 200 e-mails/mês gratuitos
               </p>
             </div>
 
@@ -658,12 +867,12 @@ export function ControleSaude() {
             </div>
           </div>
 
-          {/* Nota sobre WhatsApp automático */}
+          {/* Nota informativa */}
           <div className="mt-4 bg-gray-50 border border-gray-200 rounded-xl p-3 flex items-start gap-2">
             <Info size={13} className="text-gray-400 shrink-0 mt-0.5" />
             <p className="text-[11px] text-gray-500 leading-relaxed">
-              <strong>Envio automático via WhatsApp:</strong> o sistema atual é 100% no navegador, sem servidor — por isso o envio automático requer que você clique no botão.
-              Em breve, com a integração de um servidor, os alertas poderão ser enviados automaticamente todo dia no horário que você escolher.
+              <strong>Dica:</strong> use o e-mail para envios formais ao contador ou sócio, o WhatsApp para alertas rápidos do dia a dia, e as notificações do navegador para avisos instantâneos enquanto trabalha no sistema.
+              O envio de e-mail utiliza o EmailJS diretamente do navegador — sem necessidade de servidor.
             </p>
           </div>
         </Card>
