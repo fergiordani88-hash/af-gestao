@@ -11,8 +11,10 @@ import { ControleLayout } from '../layout/ControleLayout'
 const fmtBRL  = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 })
 const fmtDate = (s: string) => new Date(s + 'T12:00:00').toLocaleDateString('pt-BR')
 
-const CATS_REC  = ['Vendas de Produtos','Prestação de Serviços','Aluguéis','Comissões','Royalties','Outros']
-const CATS_DESP = ['Aluguel','Folha de Pagamento','Pró-labore','Fornecedores','Impostos','Energia','Telefone/Internet','Manutenção','Marketing','Transporte','Financeiro/Juros','Outros']
+import { CATS_DESPESA, CATS_RECEITA } from '../utils/categorias'
+
+const CATS_REC  = CATS_RECEITA
+const CATS_DESP = CATS_DESPESA
 
 const STATUS_COR: Record<string, string> = {
   pago:      'bg-emerald-100 text-emerald-700',
