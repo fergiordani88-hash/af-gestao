@@ -1,14 +1,19 @@
 import { create } from 'zustand'
+import { persist } from 'zustand/middleware'
 import type { Client, Contract } from '../types'
 import { clientsApi, contractsApi } from '../services/api'
+
+export type AppModule = 'agro' | 'empresarial' | 'pay' | 'consultoria'
 
 interface AppStore {
   clients: Client[]
   contracts: Contract[]
   sidebarOpen: boolean
   isDataLoaded: boolean
+  currentModule: AppModule | null
 
   setSidebarOpen: (v: boolean) => void
+  setCurrentModule: (m: AppModule | null) => void
   loadData: () => Promise<void>
   addClient: (c: Omit<Client, 'id' | 'createdAt'>) => Promise<void>
   updateClient: (id: string, data: Partial<Client>) => Promise<void>
@@ -49,13 +54,17 @@ function normalizeContract(c: Record<string, unknown>): Contract {
   }
 }
 
-export const useStore = create<AppStore>((set, get) => ({
+export const useStore = create<AppStore>()(
+  persist(
+    (set, get) => ({
   clients:      [],
   contracts:    [],
   sidebarOpen:  true,
   isDataLoaded: false,
+  currentModule: null,
 
-  setSidebarOpen: (v) => set({ sidebarOpen: v }),
+  setSidebarOpen:    (v) => set({ sidebarOpen: v }),
+  setCurrentModule:  (m) => set({ currentModule: m }),
 
   loadData: async () => {
     if (get().isDataLoaded) return
@@ -97,4 +106,9 @@ export const useStore = create<AppStore>((set, get) => ({
       throw err
     }
   },
-}))
+  }),
+  {
+    name: 'af-app',
+    partialize: (s) => ({ currentModule: s.currentModule }),
+  }
+))

@@ -18,7 +18,7 @@ export function Login() {
   const [showPass, setShowPass] = useState(false)
 
   useEffect(() => {
-    if (isAuthenticated) navigate('/', { replace: true })
+    if (isAuthenticated) navigate('/modules', { replace: true })
   }, [isAuthenticated, navigate])
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -44,8 +44,8 @@ export function Login() {
       <div className="w-full max-w-md relative z-10">
         {/* Logo */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-af-gold rounded-2xl shadow-xl mb-4">
-            <span className="text-af-dark font-black text-2xl">AF</span>
+          <div className="inline-flex items-center justify-center mb-4">
+            <img src="/logo.svg" alt="AF Gestão" className="w-20 h-20 rounded-2xl shadow-2xl" />
           </div>
           <h1 className="text-2xl font-bold text-white">AF Gestão & Consultoria</h1>
           <p className="text-white/60 text-sm mt-1">Sistema de Gestão Integrado</p>
