@@ -20,6 +20,10 @@ export interface ControleContract {
   periodicidade: 'mensal' | 'trimestral' | 'semestral' | 'anual' | 'pontual'
   diaVencimento: number; status: 'ativo' | 'encerrado' | 'suspenso'
   obs?: string; createdAt: string
+  tipoTaxa?: 'prefixada' | 'posfixada'
+  taxaAnual?: number
+  indexador?: 'selic' | 'cdi' | 'ipca'
+  valorParcela?: number
 }
 
 const KEY = { COMPANY: 'af-ctrl-company', ENTRIES: 'af-ctrl-entries', CONTRACTS: 'af-ctrl-contracts' }
@@ -42,6 +46,7 @@ export const controleStorage = {
     this._saveEntries(this.getEntries().map(e => e.id === id ? { ...e, ...d } : e))
   },
   deleteEntry(id: string) { this._saveEntries(this.getEntries().filter(e => e.id !== id)) },
+  deleteEntriesByContract(contractId: string) { this._saveEntries(this.getEntries().filter(e => e.contrato !== contractId)) },
   _saveEntries: (e: ControleEntry[]) => localStorage.setItem(KEY.ENTRIES, JSON.stringify(e)),
 
   getContracts: (): ControleContract[] => parse(KEY.CONTRACTS, []),

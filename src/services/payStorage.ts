@@ -45,6 +45,11 @@ export interface PayContract {
   status: 'ativo' | 'encerrado' | 'suspenso'
   obs?: string
   createdAt: string
+  // Encargos financeiros
+  tipoTaxa?: 'prefixada' | 'posfixada'
+  taxaAnual?: number
+  indexador?: 'selic' | 'cdi' | 'ipca'
+  valorParcela?: number
 }
 
 const KEY = {
@@ -74,6 +79,7 @@ export const payStorage = {
     this._saveEntries(this.getEntries().map(e => e.id === id ? { ...e, ...d } : e))
   },
   deleteEntry(id: string) { this._saveEntries(this.getEntries().filter(e => e.id !== id)) },
+  deleteEntriesByContract(contractId: string) { this._saveEntries(this.getEntries().filter(e => e.contrato !== contractId)) },
   _saveEntries: (e: PayEntry[]) => localStorage.setItem(KEY.ENTRIES, JSON.stringify(e)),
 
   // ── Contracts ───────────────────────────────────────────────
