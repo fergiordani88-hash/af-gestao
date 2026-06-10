@@ -11,6 +11,7 @@ import { ControleFluxoDiario } from './afcontrole/pages/ControleFluxoDiario'
 import { ControleFluxoMensal } from './afcontrole/pages/ControleFluxoMensal'
 import { ControleFluxoAnual }  from './afcontrole/pages/ControleFluxoAnual'
 import { ControleRelatorios }  from './afcontrole/pages/ControleRelatorios'
+import { ControleSaude }       from './afcontrole/pages/ControleSaude'
 import { Dashboard }         from './pages/Dashboard'
 import { CRM }               from './pages/CRM'
 import { DiagnosticoPJ }     from './pages/DiagnosticoPJ'
@@ -142,6 +143,7 @@ export default function App() {
       <Route path="/afcontrole/mensal"      element={<ControleProtectedRoute><ControleFluxoMensal /></ControleProtectedRoute>} />
       <Route path="/afcontrole/anual"       element={<ControleProtectedRoute><ControleFluxoAnual /></ControleProtectedRoute>} />
       <Route path="/afcontrole/relatorios"  element={<ControleProtectedRoute><ControleRelatorios /></ControleProtectedRoute>} />
+      <Route path="/afcontrole/saude"       element={<ControleProtectedRoute><ControleSaude /></ControleProtectedRoute>} />
     </Routes>
     </ControleAuthProvider>
   )

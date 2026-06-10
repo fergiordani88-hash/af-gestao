@@ -3,7 +3,7 @@ import { NavLink, useNavigate } from 'react-router-dom'
 import { clsx } from 'clsx'
 import {
   LayoutDashboard, Building2, Receipt, FileText, TrendingDown, TrendingUp,
-  Calendar, BarChart2, Layers, LogOut, Menu, X, ChevronRight, FileBarChart2
+  Calendar, BarChart2, Layers, LogOut, Menu, X, ChevronRight, FileBarChart2, HeartPulse
 } from 'lucide-react'
 import { useControleAuth } from '../auth/ControleAuth'
 
@@ -18,6 +18,7 @@ const NAV = [
   { label: 'Fluxo Mensal',     icon: BarChart2,        path: '/afcontrole/mensal' },
   { label: 'Fluxo Anual',      icon: Layers,           path: '/afcontrole/anual' },
   { label: 'Relatórios',       icon: FileBarChart2,    path: '/afcontrole/relatorios' },
+  { label: 'Saúde Financeira', icon: HeartPulse,       path: '/afcontrole/saude' },
 ]
 
 export function ControleLayout({ children, title, subtitle }: { children: ReactNode; title: string; subtitle?: string }) {
