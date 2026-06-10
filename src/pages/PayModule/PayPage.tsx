@@ -12,7 +12,7 @@ import { TabFluxoAnual }  from './TabFluxoAnual'
 type PayTab = 'dashboard' | 'empresa' | 'lancamentos' | 'contratos' | 'despesas' | 'receitas' | 'diario' | 'mensal' | 'anual'
 
 const TAB_META: Record<PayTab, { title: string; subtitle: string }> = {
-  dashboard:    { title: 'Pay — Dashboard',           subtitle: 'Visão geral financeira do mês atual' },
+  dashboard:    { title: 'Controle — Dashboard',       subtitle: 'Visão geral financeira do mês atual' },
   empresa:      { title: 'Minha Empresa',              subtitle: 'Cadastro e dados da empresa' },
   lancamentos:  { title: 'Contas a Pagar e Receber',  subtitle: 'Registro e controle de lançamentos financeiros' },
   contratos:    { title: 'Cronograma de Contratos',   subtitle: 'Contratos recorrentes de receita e despesa' },

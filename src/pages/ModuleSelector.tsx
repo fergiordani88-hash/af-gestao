@@ -39,7 +39,7 @@ const MODULES: {
   },
   {
     id: 'pay',
-    title: 'Pay',
+    title: 'Controle',
     subtitle: 'Gestor financeiro diário — contas, fluxo e projeções',
     icon: DollarSign,
     gradient: 'from-amber-950 via-amber-900 to-amber-800',

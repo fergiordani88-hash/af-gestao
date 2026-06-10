@@ -73,7 +73,7 @@ const MODULE_NAV: Record<AppModule, NavItem[]> = {
 const MODULE_LABELS: Record<AppModule, { label: string; color: string }> = {
   agro:        { label: 'Módulo Agro',        color: 'text-emerald-400' },
   empresarial: { label: 'Módulo Empresarial', color: 'text-blue-400' },
-  pay:         { label: 'Módulo Pay',         color: 'text-amber-400' },
+  pay:         { label: 'Módulo Controle',     color: 'text-amber-400' },
   consultoria: { label: 'Módulo Consultoria', color: 'text-purple-400' },
 }
 
