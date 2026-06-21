@@ -85,13 +85,13 @@ export const useStore = create<AppStore>()(
 
   addClient: async (data) => {
     try {
-      // A API espera responsibleId (UUID), mas o tipo interno usa responsible (nome).
-      // O campo 'responsible' pode chegar como UUID quando vem do formulário de criação.
+      // A API espera responsibleId; o tipo interno usa responsible (nome exibido).
+      // Ao criar, 'responsible' vem preenchido com o ID do usuário selecionado.
       const payload: any = { ...data }
-      if (!payload.responsibleId && payload.responsible?.match(/^[0-9a-f-]{36}$/i)) {
+      if (!payload.responsibleId && payload.responsible) {
         payload.responsibleId = payload.responsible
-        delete payload.responsible
       }
+      delete payload.responsible
       const raw = await clientsApi.create(payload) as Record<string, unknown>
       const newClient = normalizeClient(raw)
       set((s) => ({ clients: [newClient, ...s.clients] }))
