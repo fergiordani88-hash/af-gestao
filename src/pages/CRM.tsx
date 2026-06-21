@@ -98,8 +98,8 @@ function NewClientModal({ onClose }: { onClose: () => void }) {
         segment:     ((data.get('segment') as string || 'AGRO').toUpperCase() as ClientSegment),
         revenue:     Number(((data.get('revenue') as string) || '0').replace(/\D/g, '')),
         responsible: (data.get('responsible') as string) || 'Consultor',
-        size:        'media',
-        status:      'lead',
+        size:        'MEDIA' as any,
+        status:      'LEAD' as any,
       })
       onClose()
     } catch (e: any) {
