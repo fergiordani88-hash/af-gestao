@@ -96,7 +96,7 @@ function NewClientModal({ onClose }: { onClose: () => void }) {
         </div>
         <div className="p-6 space-y-3">
           <div className="grid grid-cols-2 gap-3">
-            <div className="col-span-2"><label className="text-xs font-medium text-gray-600 mb-1 block">Nome / Razão Social *</label><input className={inp} value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Ex: Fazenda São Pedro" /></div>
+            <div className="col-span-2"><label className="text-xs font-medium text-gray-600 mb-1 block">Nome / Razão Social *</label><input className={inp} value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} onBlur={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Ex: Fazenda São Pedro" /></div>
             <div><label className="text-xs font-medium text-gray-600 mb-1 block">CPF / CNPJ</label><input className={inp} value={form.document} onChange={e => setForm(f => ({ ...f, document: e.target.value }))} /></div>
             <div><label className="text-xs font-medium text-gray-600 mb-1 block">Telefone</label><input className={inp} value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} /></div>
             <div className="col-span-2"><label className="text-xs font-medium text-gray-600 mb-1 block">E-mail</label><input className={inp} type="email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} /></div>
