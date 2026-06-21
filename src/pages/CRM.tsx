@@ -130,8 +130,8 @@ function NewClientModal({ onClose }: { onClose: () => void }) {
               <div className="col-span-2"><label className="text-xs font-medium text-gray-600 mb-1 block">E-mail</label><input name="email" type="email" className={inp} /></div>
               <div><label className="text-xs font-medium text-gray-600 mb-1 block">Cidade</label><input name="city" className={inp} /></div>
               <div><label className="text-xs font-medium text-gray-600 mb-1 block">Segmento</label>
-                <select name="segment" className={inp} defaultValue="agro">
-                  <option value="agro">Agro</option><option value="comercio">Comércio</option><option value="servicos">Serviços</option><option value="industria">Indústria</option>
+                <select name="segment" className={inp} defaultValue="AGRO">
+                  <option value="AGRO">Agro</option><option value="COMERCIO">Comércio</option><option value="SERVICOS">Serviços</option><option value="INDUSTRIA">Indústria</option>
                 </select>
               </div>
               <div><label className="text-xs font-medium text-gray-600 mb-1 block">Faturamento Anual (R$)</label><input name="revenue" className={inp} placeholder="Ex: 1200000" /></div>
