@@ -77,22 +77,30 @@ function ClientModal({ client, onClose }: { client: Client; onClose: () => void 
 
 function NewClientModal({ onClose }: { onClose: () => void }) {
   const { addClient } = useStore()
-  const [form, setForm] = useState({ name: '', document: '', phone: '', email: '', city: '', state: 'MT', segment: 'agro' as ClientSegment, revenue: '', responsible: '', status: 'lead' as ClientStatus })
   const [saving, setSaving] = useState(false)
-  const [erro, setErro] = useState('')
-  const nameRef = useRef<HTMLInputElement>(null)
-
-  // Captura mudanças inclusive de autofill do navegador
-  const setField = (field: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
-    setForm(f => ({ ...f, [field]: e.target.value }))
+  const [erro, setErro]     = useState('')
+  const formRef = useRef<HTMLFormElement>(null)
 
   const save = async () => {
-    // Lê o DOM diretamente para pegar valores preenchidos por autofill
-    const nome = form.name || nameRef.current?.value || ''
-    if (!nome.trim()) { setErro('Informe o nome do cliente.'); return }
+    if (!formRef.current) return
+    const data = new FormData(formRef.current)
+    const nome = (data.get('name') as string || '').trim()
+    if (!nome) { setErro('Informe o nome do cliente.'); return }
     setSaving(true); setErro('')
     try {
-      await addClient({ ...form, name: nome, revenue: Number((form.revenue || '0').replace(/\D/g, '')), size: 'media', responsible: form.responsible || 'Consultor' })
+      await addClient({
+        name:        nome,
+        document:    (data.get('document') as string) || '',
+        phone:       (data.get('phone')    as string) || '',
+        email:       (data.get('email')    as string) || '',
+        city:        (data.get('city')     as string) || '',
+        state:       'MT',
+        segment:     ((data.get('segment') as ClientSegment) || 'agro'),
+        revenue:     Number(((data.get('revenue') as string) || '0').replace(/\D/g, '')),
+        responsible: (data.get('responsible') as string) || 'Consultor',
+        size:        'media',
+        status:      'lead',
+      })
       onClose()
     } catch (e: any) {
       setErro(`Erro ao salvar: ${e?.message ?? 'verifique sua conexão e tente novamente.'}`)
@@ -110,30 +118,32 @@ function NewClientModal({ onClose }: { onClose: () => void }) {
           <h2 className="text-lg font-bold">Novo Cliente</h2>
           <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-lg">✕</button>
         </div>
-        <div className="p-6 space-y-3">
-          <div className="grid grid-cols-2 gap-3">
-            <div className="col-span-2">
-              <label className="text-xs font-medium text-gray-600 mb-1 block">Nome / Razão Social *</label>
-              <input ref={nameRef} className={inp} value={form.name} onChange={setField('name')} onInput={e => setForm(f => ({ ...f, name: (e.target as HTMLInputElement).value }))} placeholder="Ex: Fazenda São Pedro" />
+        <form ref={formRef} onSubmit={e => { e.preventDefault(); save() }}>
+          <div className="p-6 space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="col-span-2">
+                <label className="text-xs font-medium text-gray-600 mb-1 block">Nome / Razão Social *</label>
+                <input name="name" className={inp} placeholder="Ex: Fazenda São Pedro" autoComplete="off" />
+              </div>
+              <div><label className="text-xs font-medium text-gray-600 mb-1 block">CPF / CNPJ</label><input name="document" className={inp} /></div>
+              <div><label className="text-xs font-medium text-gray-600 mb-1 block">Telefone</label><input name="phone" className={inp} /></div>
+              <div className="col-span-2"><label className="text-xs font-medium text-gray-600 mb-1 block">E-mail</label><input name="email" type="email" className={inp} /></div>
+              <div><label className="text-xs font-medium text-gray-600 mb-1 block">Cidade</label><input name="city" className={inp} /></div>
+              <div><label className="text-xs font-medium text-gray-600 mb-1 block">Segmento</label>
+                <select name="segment" className={inp} defaultValue="agro">
+                  <option value="agro">Agro</option><option value="comercio">Comércio</option><option value="servicos">Serviços</option><option value="industria">Indústria</option>
+                </select>
+              </div>
+              <div><label className="text-xs font-medium text-gray-600 mb-1 block">Faturamento Anual (R$)</label><input name="revenue" className={inp} placeholder="Ex: 1200000" /></div>
+              <div><label className="text-xs font-medium text-gray-600 mb-1 block">Responsável</label><input name="responsible" className={inp} /></div>
             </div>
-            <div><label className="text-xs font-medium text-gray-600 mb-1 block">CPF / CNPJ</label><input className={inp} value={form.document} onChange={setField('document')} /></div>
-            <div><label className="text-xs font-medium text-gray-600 mb-1 block">Telefone</label><input className={inp} value={form.phone} onChange={setField('phone')} /></div>
-            <div className="col-span-2"><label className="text-xs font-medium text-gray-600 mb-1 block">E-mail</label><input className={inp} type="email" value={form.email} onChange={setField('email')} /></div>
-            <div><label className="text-xs font-medium text-gray-600 mb-1 block">Cidade</label><input className={inp} value={form.city} onChange={setField('city')} /></div>
-            <div><label className="text-xs font-medium text-gray-600 mb-1 block">Segmento</label>
-              <select className={inp} value={form.segment} onChange={setField('segment')}>
-                <option value="agro">Agro</option><option value="comercio">Comércio</option><option value="servicos">Serviços</option><option value="industria">Indústria</option>
-              </select>
-            </div>
-            <div><label className="text-xs font-medium text-gray-600 mb-1 block">Faturamento Anual (R$)</label><input className={inp} value={form.revenue} onChange={setField('revenue')} placeholder="Ex: 1.200.000" /></div>
-            <div><label className="text-xs font-medium text-gray-600 mb-1 block">Responsável</label><input className={inp} value={form.responsible} onChange={setField('responsible')} /></div>
+            {erro && <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-xl px-3 py-2">{erro}</p>}
           </div>
-          {erro && <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-xl px-3 py-2">{erro}</p>}
-        </div>
-        <div className="px-6 pb-6 flex gap-3">
-          <Button onClick={save} className="flex-1" disabled={saving}>{saving ? 'Salvando...' : 'Salvar Cliente'}</Button>
-          <Button variant="secondary" onClick={onClose}>Cancelar</Button>
-        </div>
+          <div className="px-6 pb-6 flex gap-3">
+            <Button type="submit" className="flex-1" disabled={saving}>{saving ? 'Salvando...' : 'Salvar Cliente'}</Button>
+            <Button type="button" variant="secondary" onClick={onClose}>Cancelar</Button>
+          </div>
+        </form>
       </div>
     </div>
   )
