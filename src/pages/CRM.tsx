@@ -95,7 +95,7 @@ function NewClientModal({ onClose }: { onClose: () => void }) {
         email:       (data.get('email')    as string) || '',
         city:        (data.get('city')     as string) || '',
         state:       'MT',
-        segment:     ((data.get('segment') as ClientSegment) || 'agro'),
+        segment:     ((data.get('segment') as string || 'AGRO').toUpperCase() as ClientSegment),
         revenue:     Number(((data.get('revenue') as string) || '0').replace(/\D/g, '')),
         responsible: (data.get('responsible') as string) || 'Consultor',
         size:        'media',
