@@ -24,6 +24,12 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     },
   })
 
+  if (res.status === 401) {
+    localStorage.removeItem('af-token')
+    window.location.href = '/login'
+    throw new Error('Token inválido ou expirado. Faça login novamente.')
+  }
+
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: 'Erro desconhecido' }))
     throw new Error(err.error ?? `HTTP ${res.status}`)
