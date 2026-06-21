@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react'
+import React, { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Search, Plus, Filter, Phone, Mail, MapPin, Eye, Edit2, MoreVertical, Users } from 'lucide-react'
 import { AppLayout } from '../components/Layout/AppLayout'
@@ -6,6 +6,8 @@ import { Card } from '../components/ui/Card'
 import { Badge } from '../components/ui/Badge'
 import { Button } from '../components/ui/Button'
 import { useStore } from '../store/useStore'
+import { useAuthStore } from '../store/useAuthStore'
+import { usersApi } from '../services/api'
 import type { Client, ClientStatus, ClientSegment } from '../types'
 
 type StatusFilter = 'todos' | ClientStatus
@@ -76,31 +78,39 @@ function ClientModal({ client, onClose }: { client: Client; onClose: () => void 
 }
 
 function NewClientModal({ onClose }: { onClose: () => void }) {
-  const { addClient } = useStore()
-  const [saving, setSaving] = useState(false)
-  const [erro, setErro]     = useState('')
+  const { addClient }  = useStore()
+  const { user }       = useAuthStore()
+  const [saving, setSaving]   = useState(false)
+  const [erro,   setErro]     = useState('')
+  const [users,  setUsers]    = useState<{ id: string; name: string }[]>([])
   const formRef = useRef<HTMLFormElement>(null)
+
+  useEffect(() => {
+    usersApi.list().then((list: any[]) => setUsers(list.filter((u: any) => ['ADMIN','CONSULTOR'].includes(u.role)))).catch(() => {})
+  }, [])
 
   const save = async () => {
     if (!formRef.current) return
     const data = new FormData(formRef.current)
     const nome = (data.get('name') as string || '').trim()
     if (!nome) { setErro('Informe o nome do cliente.'); return }
+    const responsibleId = (data.get('responsibleId') as string) || user?.id || ''
+    if (!responsibleId) { setErro('Selecione um responsável.'); return }
     setSaving(true); setErro('')
     try {
       await addClient({
-        name:        nome,
-        document:    (data.get('document') as string) || '',
-        phone:       (data.get('phone')    as string) || '',
-        email:       (data.get('email')    as string) || '',
-        city:        (data.get('city')     as string) || '',
-        state:       'MT',
-        segment:     ((data.get('segment') as string || 'AGRO').toUpperCase() as ClientSegment),
-        revenue:     Number(((data.get('revenue') as string) || '0').replace(/\D/g, '')),
-        responsible: (data.get('responsible') as string) || 'Consultor',
-        size:        'MEDIA' as any,
-        status:      'LEAD' as any,
-      })
+        name:          nome,
+        document:      (data.get('document') as string) || '',
+        phone:         (data.get('phone')    as string) || '',
+        email:         (data.get('email')    as string) || '',
+        city:          (data.get('city')     as string) || '',
+        state:         'MT',
+        segment:       ((data.get('segment') as string || 'AGRO').toUpperCase() as ClientSegment),
+        revenue:       Number(((data.get('revenue') as string) || '0').replace(/\D/g, '')),
+        responsible:   responsibleId,
+        size:          'MEDIA' as any,
+        status:        'LEAD' as any,
+      } as any)
       onClose()
     } catch (e: any) {
       setErro(`Erro ao salvar: ${e?.message ?? 'verifique sua conexão e tente novamente.'}`)
@@ -135,7 +145,13 @@ function NewClientModal({ onClose }: { onClose: () => void }) {
                 </select>
               </div>
               <div><label className="text-xs font-medium text-gray-600 mb-1 block">Faturamento Anual (R$)</label><input name="revenue" className={inp} placeholder="Ex: 1200000" /></div>
-              <div><label className="text-xs font-medium text-gray-600 mb-1 block">Responsável</label><input name="responsible" className={inp} /></div>
+              <div>
+                <label className="text-xs font-medium text-gray-600 mb-1 block">Responsável</label>
+                <select name="responsibleId" className={inp} defaultValue={user?.id ?? ''}>
+                  {users.length === 0 && user && <option value={user.id}>{user.name}</option>}
+                  {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+                </select>
+              </div>
             </div>
             {erro && <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-xl px-3 py-2">{erro}</p>}
           </div>
