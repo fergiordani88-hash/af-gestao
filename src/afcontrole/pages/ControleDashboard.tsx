@@ -85,8 +85,24 @@ export function ControleDashboard() {
 
   const trendRec  = prevSummary.receita > 0 ? ((curSummary.receita - prevSummary.receita) / prevSummary.receita) * 100 : 0
   const trendDesp = prevSummary.despesa > 0 ? ((curSummary.despesa - prevSummary.despesa) / prevSummary.despesa) * 100 : 0
-  const saldoCaixa = curSummary.recPago - curSummary.despPago
   const meses = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro']
+
+  // Saldo real em caixa: saldo inicial + todos os lançamentos pagos
+  function calcSaldoAtual() {
+    const si = controleStorage.getSaldoInicial()
+    if (!si) return 0
+    const today = new Date().toISOString().slice(0, 10)
+    const ents = controleStorage.getEntries()
+    let s = si.valor
+    ents.forEach(e => {
+      if (e.status === 'pago') {
+        const dt = e.dataPag ?? e.dataVenc
+        if (dt >= si.data && dt <= today) s += e.tipo === 'receita' ? (e.valorPago ?? e.valor) : -(e.valorPago ?? e.valor)
+      }
+    })
+    return s
+  }
+  const saldoCaixa = calcSaldoAtual()
 
   // histórico + projeção para o gráfico combinado
   const chartData = [
@@ -119,7 +135,7 @@ export function ControleDashboard() {
         <KpiCard label={`Receita ${meses[month-1]}`}  value={fmtBRL(curSummary.receita)}  icon={<TrendingUp size={20} className="text-white"/>}  color="bg-emerald-600" trend={trendRec}  />
         <KpiCard label={`Despesa ${meses[month-1]}`}  value={fmtBRL(curSummary.despesa)}  icon={<TrendingDown size={20} className="text-white"/>} color="bg-red-600"     trend={trendDesp} />
         <KpiCard label="Resultado do Mês"             value={fmtBRL(curSummary.resultado)} icon={<DollarSign size={20} className="text-white"/>}  color={curSummary.resultado>=0?"bg-blue-600":"bg-orange-600"} />
-        <KpiCard label="Saldo em Caixa"               value={fmtBRL(saldoCaixa)}           icon={<Target size={20} className="text-white"/>}      color="bg-[#C9A258]"  sub="receitas pagas – despesas pagas" />
+        <KpiCard label="Saldo em Caixa"               value={fmtBRL(saldoCaixa)}           icon={<Target size={20} className="text-white"/>}      color="bg-[#C9A258]"  sub="saldo acumulado em caixa" />
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">

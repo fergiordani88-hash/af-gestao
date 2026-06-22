@@ -138,8 +138,8 @@ function calcIndicadores(saldoAtual: number, minSaldo30: number): Indicador[] {
   const diasCobertura = avgDiario > 0 ? Math.floor(saldoAtual / avgDiario) : 999
   const nivelCaixa: Nivel = diasCobertura >= 30 ? 'verde' : diasCobertura >= 15 ? 'amarelo' : 'vermelho'
 
-  // 2. Inadimplência / atrasos
-  const atrasados  = entries.filter(e => e.status === 'atrasado')
+  // 2. Inadimplência / atrasos — inclui pendentes com vencimento vencido (mesmo critério do dashboard)
+  const atrasados   = controleStorage.getOverdue()
   const totalAtraso = atrasados.reduce((s, e) => s + e.valor, 0)
   const totalOpen   = entries.filter(e => ['pendente','atrasado','previsto'].includes(e.status)).reduce((s, e) => s + e.valor, 0)
   const pctAtraso   = totalOpen > 0 ? (totalAtraso / totalOpen) * 100 : 0
