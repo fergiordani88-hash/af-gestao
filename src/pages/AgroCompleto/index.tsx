@@ -49,7 +49,7 @@ export function AgroCompleto() {
     switch (activeTab) {
       case 'producao':     return <TabProducao clientId={clientId} />
       case 'dre-rural':    return <TabDRERural clientId={clientId} />
-      case 'questionario': return <TabQuestionarioAgro clientId={clientId} />
+      case 'questionario': return <TabQuestionarioAgro clientId={clientId} nomeCliente={client?.name} />
       case 'contratos':    return <TabContratos clientId={clientId} />
       case 'despesas':     return <TabDespesas clientId={clientId} />
       case 'receitas':     return <TabReceitas clientId={clientId} />

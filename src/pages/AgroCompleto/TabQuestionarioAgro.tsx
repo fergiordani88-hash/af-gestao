@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react'
-import { Save, ChevronRight, CheckCircle } from 'lucide-react'
+import { useState, useEffect, useRef } from 'react'
+import { Save, ChevronRight, CheckCircle, FileDown, FileUp, Loader2 } from 'lucide-react'
 import { questionarioApi } from '../../services/questionarioApi'
 import { Card } from '../../components/ui/Card'
 import { clsx } from 'clsx'
+import { downloadQuestionarioExcel, readQuestionarioExcel } from '../../lib/questionarioExcel'
 
 const SECOES_AGRO = [
   {
@@ -164,13 +165,16 @@ function Pergunta({ p, valor, onChange }: { p: any; valor: string; onChange: (id
   )
 }
 
-export function TabQuestionarioAgro({ clientId }: { clientId: string }) {
+export function TabQuestionarioAgro({ clientId, nomeCliente }: { clientId: string; nomeCliente?: string }) {
   const [secaoAtiva, setSecaoAtiva] = useState(0)
   const [respostas,  setRespostas]  = useState<Record<string, Record<string, string>>>({})
   const [saving, setSaving] = useState(false)
   const [saved,  setSaved]  = useState(false)
   const [loading, setLoading] = useState(true)
   const [pct, setPct] = useState(0)
+  const [importing, setImporting] = useState(false)
+  const [importMsg, setImportMsg] = useState('')
+  const fileRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     const load = async () => {
@@ -213,6 +217,49 @@ export function TabQuestionarioAgro({ clientId }: { clientId: string }) {
     } finally { setSaving(false) }
   }
 
+  const handleDownloadExcel = () => {
+    downloadQuestionarioExcel(SECOES_AGRO, nomeCliente ?? 'Cliente')
+  }
+
+  const handleImportExcel = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setImporting(true)
+    setImportMsg('')
+    try {
+      const { respostas: importadas, total, preenchidas } = await readQuestionarioExcel(file)
+      // Merge with existing answers (imported ones override)
+      setRespostas(prev => {
+        const merged: Record<string, Record<string, string>> = { ...prev }
+        Object.entries(importadas).forEach(([secId, pergs]) => {
+          merged[secId] = { ...(prev[secId] ?? {}), ...pergs }
+        })
+        return merged
+      })
+      setSaved(false)
+      setImportMsg(`✅ ${preenchidas} de ${total} respostas importadas. Revise e clique em Salvar.`)
+    } catch (err: any) {
+      setImportMsg(`❌ ${err.message}`)
+    } finally {
+      setImporting(false)
+      if (fileRef.current) fileRef.current.value = ''
+    }
+  }
+
+  const handleSaveAll = async () => {
+    setSaving(true)
+    try {
+      const novosPct = calcPct()
+      for (const s of SECOES_AGRO) {
+        await questionarioApi.agro.saveSecao(clientId, s.id, respostas[s.id] ?? {}, novosPct)
+      }
+      setPct(novosPct)
+      setSaved(true)
+      setImportMsg('')
+      setTimeout(() => setSaved(false), 2500)
+    } finally { setSaving(false) }
+  }
+
   const secao     = SECOES_AGRO[secaoAtiva]
   const respSecao = respostas[secao.id] ?? {}
   const preenchidas = secao.perguntas.filter(p => (respSecao[p.id] ?? '').trim() !== '').length
@@ -221,25 +268,56 @@ export function TabQuestionarioAgro({ clientId }: { clientId: string }) {
 
   return (
     <div className="space-y-5">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
         <div>
           <h2 className="font-bold text-gray-900">Questionário Rural Completo</h2>
           <p className="text-xs text-gray-500 mt-0.5">Levantamento completo do produtor rural — base para o diagnóstico qualitativo</p>
         </div>
-        <div className="flex items-center gap-3">
-          <div className="text-right">
-            <p className="text-xs text-gray-500">Conclusão geral</p>
-            <p className="text-lg font-bold text-gray-900">{pct}%</p>
-          </div>
-          <div className="w-16 h-16">
-            <svg viewBox="0 0 36 36" className="w-full h-full rotate-[-90deg]">
-              <circle cx="18" cy="18" r="15.9" fill="none" stroke="#E5E7EB" strokeWidth="3" />
-              <circle cx="18" cy="18" r="15.9" fill="none" stroke="#1B5E20" strokeWidth="3"
-                strokeDasharray={`${pct} ${100 - pct}`} strokeLinecap="round" />
-            </svg>
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Download template */}
+          <button onClick={handleDownloadExcel}
+            className="flex items-center gap-2 border border-gray-300 text-gray-700 rounded-xl px-3 py-2 text-sm font-semibold hover:bg-gray-50">
+            <FileDown size={14} /> Baixar Excel
+          </button>
+          {/* Upload preenchido */}
+          <input ref={fileRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleImportExcel} />
+          <button onClick={() => fileRef.current?.click()} disabled={importing}
+            className="flex items-center gap-2 border border-af-green text-af-green rounded-xl px-3 py-2 text-sm font-semibold hover:bg-af-green/5 disabled:opacity-60">
+            {importing ? <Loader2 size={14} className="animate-spin" /> : <FileUp size={14} />}
+            {importing ? 'Importando...' : 'Importar Excel'}
+          </button>
+          {/* Progresso */}
+          <div className="flex items-center gap-2">
+            <div className="text-right">
+              <p className="text-xs text-gray-500">Conclusão</p>
+              <p className="text-lg font-bold text-gray-900">{pct}%</p>
+            </div>
+            <div className="w-12 h-12">
+              <svg viewBox="0 0 36 36" className="w-full h-full rotate-[-90deg]">
+                <circle cx="18" cy="18" r="15.9" fill="none" stroke="#E5E7EB" strokeWidth="3" />
+                <circle cx="18" cy="18" r="15.9" fill="none" stroke="#1B5E20" strokeWidth="3"
+                  strokeDasharray={`${pct} ${100 - pct}`} strokeLinecap="round" />
+              </svg>
+            </div>
           </div>
         </div>
       </div>
+
+      {importMsg && (
+        <div className={clsx(
+          'flex items-center gap-2 text-sm px-4 py-2.5 rounded-xl border',
+          importMsg.startsWith('✅') ? 'bg-green-50 border-green-200 text-green-700' : 'bg-red-50 border-red-200 text-red-700'
+        )}>
+          {importMsg}
+          {importMsg.startsWith('✅') && (
+            <button onClick={handleSaveAll} disabled={saving}
+              className="ml-auto flex items-center gap-1.5 bg-af-green text-white rounded-lg px-3 py-1 text-xs font-semibold hover:bg-af-green-light disabled:opacity-60">
+              {saving ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
+              {saving ? 'Salvando...' : 'Salvar tudo agora'}
+            </button>
+          )}
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-5">
         <div className="space-y-1">
