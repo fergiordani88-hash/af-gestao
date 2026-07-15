@@ -630,9 +630,15 @@ export function TabContratos({ clientId }: { clientId: string }) {
                     <td className="px-3 py-2.5 text-center text-gray-700">{c.parcelaAtual}</td>
                     <td className="px-3 py-2.5 text-gray-600">{c.periodicidade}</td>
                     <td className="px-3 py-2.5 text-center">
-                      <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${c.sistemaAmortizacao === 'SAC' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}`}>
-                        {c.sistemaAmortizacao ?? 'Price'}
-                      </span>
+                      {(() => {
+                        const isPosFix = c.indexador && c.indexador !== 'Pré-fixado'
+                        const isSAC = isPosFix || c.sistemaAmortizacao === 'SAC'
+                        return (
+                          <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${isSAC ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}`}>
+                            {isSAC ? 'SAC' : 'Price'}
+                          </span>
+                        )
+                      })()}
                     </td>
                     <td className="px-3 py-2.5 text-gray-600 whitespace-nowrap">
                       <span className="font-semibold">{calcCET(c.taxa, c.indexador, c.spreadIndexador).toFixed(2)}%</span>
