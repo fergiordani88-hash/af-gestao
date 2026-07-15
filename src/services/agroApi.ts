@@ -47,6 +47,7 @@ export interface AgroParcela {
   contratoId: string; modalidade: string; banco: string; contrato: string
   dataContratacao: string; valorTomado: number; totalParcelas: number
   parcelaNum: number; periodicidade: string; taxa: number; vencimento: string; valorParcela: number
+  indexador?: string; amortizacao?: number; juros?: number; saldoDevedor?: number
 }
 
 export interface AgroDespesa {

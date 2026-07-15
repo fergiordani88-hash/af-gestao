@@ -399,7 +399,7 @@ export function TabContratos({ clientId }: { clientId: string }) {
                       <table className="w-full text-xs">
                         <thead>
                           <tr className="border-b border-gray-100">
-                            {['Vencimento', 'Modalidade', 'Banco', 'Contrato', 'Parcela', 'Valor'].map(h => (
+                            {['Vencimento', 'Modalidade', 'Banco', 'Contrato', 'Parcela', 'Amortização', 'Juros', 'Total Parcela', 'Saldo Devedor'].map(h => (
                               <th key={h} className="py-1.5 text-left text-gray-400 font-semibold uppercase">{h}</th>
                             ))}
                           </tr>
@@ -407,12 +407,15 @@ export function TabContratos({ clientId }: { clientId: string }) {
                         <tbody className="divide-y divide-gray-50">
                           {parcelasAno.map((p, i) => (
                             <tr key={i} className="hover:bg-gray-50/50">
-                              <td className="py-1.5 font-medium text-gray-900">{fmtDate(p.vencimento)}</td>
+                              <td className="py-1.5 font-medium text-gray-900 whitespace-nowrap">{fmtDate(p.vencimento)}</td>
                               <td className="py-1.5 text-gray-700">{p.modalidade}</td>
                               <td className="py-1.5 text-gray-600">{p.banco}</td>
                               <td className="py-1.5 text-gray-500">{p.contrato || '—'}</td>
                               <td className="py-1.5 text-gray-600">{p.parcelaNum}/{p.totalParcelas}</td>
+                              <td className="py-1.5 text-gray-700">{p.amortizacao != null ? fmtBRL(p.amortizacao) : '—'}</td>
+                              <td className="py-1.5 text-amber-700">{p.juros != null ? fmtBRL(p.juros) : '—'}</td>
                               <td className="py-1.5 font-semibold text-gray-900">{fmtBRL(p.valorParcela)}</td>
+                              <td className="py-1.5 text-gray-500">{p.saldoDevedor != null ? fmtBRL(p.saldoDevedor) : '—'}</td>
                             </tr>
                           ))}
                         </tbody>
