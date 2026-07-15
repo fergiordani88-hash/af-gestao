@@ -68,12 +68,12 @@ function calcProjecao(
   const c = base.calculado
   if (!c) return []
 
-  const baseSafraAno = parseInt(base.safra.split('/')[0]) // ex: "2024/25" → 2024
+  const baseSafraAno = parseInt(base.safra.split('/')[0]) // ex: "2026/27" → 2026
   const rows: AnoRow[] = []
 
-  for (let i = 1; i <= 10; i++) {
+  for (let i = 0; i <= 10; i++) {
     const yr = baseSafraAno + i
-    const safra = `${yr}/${String(yr + 1).slice(-2)}`
+    const safra = i === 0 ? base.safra : `${yr}/${String(yr + 1).slice(-2)}`
 
     const gareaFactor    = Math.pow(1 + p.crescArea / 100, i)
     const gprodutFactor  = Math.pow(1 + p.crescProdut / 100, i)
@@ -161,11 +161,11 @@ export function TabProjecaoAnual({ clientId }: { clientId: string }) {
       agroApi.contratos.cronograma(clientId).catch(() => null),
     ]).then(([dres, crono]) => {
       if (dres.length > 0) {
-        // Ordena por safra decrescente, pega a mais recente com dados calculados
         const sorted = [...dres].sort((a, b) => b.safra.localeCompare(a.safra))
-        const comCalc = sorted.find(d => d.calculado) ?? sorted[0]
-        setBaseDRE(comCalc)
-        setBaseSafra(comCalc.safra)
+        // Prioriza 26/27; senão pega a mais recente com dados calculados
+        const preferred = sorted.find(d => d.safra === '2026/27') ?? sorted.find(d => d.calculado) ?? sorted[0]
+        setBaseDRE(preferred)
+        setBaseSafra(preferred.safra)
         setSafrasDisp(sorted.map(d => d.safra))
       }
       if (crono?.porAno) {
