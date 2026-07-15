@@ -169,10 +169,11 @@ export function TabProjecaoAnual({ clientId }: { clientId: string }) {
         setSafrasDisp(sorted.map(d => d.safra))
       }
       if (crono?.porAno) {
-        // porAno: { "2025": { total: X } } → mapeamos só juros (estimado como 40% do total)
         const mapa: Record<string, number> = {}
         for (const [ano, v] of Object.entries(crono.porAno)) {
-          mapa[ano] = (v as any).total * 0.35 // aprox. parcela de juros
+          const vv = v as any
+          // Usa juros reais (SAC/CDI) quando disponível; fallback: 35% do total
+          mapa[ano] = vv.juros > 0 ? vv.juros : vv.total * 0.35
         }
         setCronoPorAno(mapa)
       }

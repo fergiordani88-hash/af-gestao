@@ -92,7 +92,7 @@ export const agroApi = {
   // Contratos
   contratos: {
     list:       (cid: string) => req<AgroContrato[]>(`/contratos/${cid}`),
-    cronograma: (cid: string) => req<{ parcelas: AgroParcela[]; porAno: Record<string, { parcelas: number; total: number }>; totalEndividamento: number; totalFuturo: number; totalContratos: number }>(`/cronograma/${cid}`),
+    cronograma: (cid: string) => req<{ parcelas: AgroParcela[]; porAno: Record<string, { parcelas: number; total: number; juros: number; amortizacao: number }>; totalEndividamento: number; totalFuturo: number; totalContratos: number }>(`/cronograma/${cid}`),
     create:     (d: AgroContrato) => req<AgroContrato>('/contratos', { method: 'POST', body: JSON.stringify(d) }),
     update:     (id: string, d: Partial<AgroContrato>) => req<AgroContrato>(`/contratos/${id}`, { method: 'PUT', body: JSON.stringify(d) }),
     delete:     (id: string) => req<void>(`/contratos/${id}`, { method: 'DELETE' }),
