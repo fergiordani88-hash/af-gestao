@@ -132,6 +132,8 @@ export function TabContratos({ clientId }: { clientId: string }) {
   const [prefill, setPrefill] = useState<Partial<AgroContrato> | undefined>()
   const [importing, setImporting] = useState(false)
   const [importMsg, setImportMsg] = useState('')
+  const [prefillQueue, setPrefillQueue] = useState<Partial<AgroContrato>[]>([])
+  const [queueTotal, setQueueTotal] = useState(0)
   const fileRef = useRef<HTMLInputElement>(null)
   const [anoExpandido, setAnoExpandido] = useState<string | null>(null)
 
@@ -194,22 +196,22 @@ export function TabContratos({ clientId }: { clientId: string }) {
       const data = await res.json()
       if (!res.ok) throw new Error(data.error ?? 'Erro ao processar')
 
-      // PDF com múltiplos contratos
+      // PDF com múltiplos contratos — abre um a um no modal para revisão
       if (Array.isArray(data.contratos) && data.contratos.length > 0) {
-        let salvos = 0
-        for (const ct of data.contratos) {
-          const fields = mapFields(ct)
-          if (fields.banco || fields.valorTomado) {
-            await agroApi.contratos.create({ ...fields, clientId } as AgroContrato)
-            salvos++
-          }
-        }
-        await load()
-        setImportMsg(`✅ ${salvos} contrato(s) importado(s) do PDF e salvos automaticamente. Verifique e ajuste os dados se necessário.`)
+        const queue = data.contratos.map((ct: any) => mapFields(ct)).filter((f: Partial<AgroContrato>) => f.banco || f.valorTomado)
+        if (queue.length === 0) throw new Error('Nenhum contrato identificado no PDF.')
+        setQueueTotal(queue.length)
+        const [first, ...rest] = queue
+        setPrefillQueue(rest)
+        setPrefill({ ...first, clientId })
+        setModal('new')
+        setImportMsg(`✅ ${queue.length} contrato(s) identificado(s) — revise e salve um a um.`)
       } else {
         // Contrato único — abre modal para conferência
         const pre = mapFields(data)
-        setPrefill(pre)
+        setQueueTotal(1)
+        setPrefillQueue([])
+        setPrefill({ ...pre, clientId })
         setModal('new')
         const found = [pre.banco, pre.valorTomado, pre.dataContratacao, pre.vencimento, pre.totalParcelas].filter(v => v && v !== 0 && v !== '').length
         setImportMsg(`✅ ${found} campo(s) identificado(s) — confira e salve.`)
@@ -417,8 +419,22 @@ export function TabContratos({ clientId }: { clientId: string }) {
           contrato={modal === 'new' ? undefined : modal}
           clientId={clientId}
           prefill={modal === 'new' ? prefill : undefined}
-          onClose={() => { setModal(null); setPrefill(undefined); setImportMsg('') }}
-          onSaved={() => { load(); setModal(null); setPrefill(undefined); setImportMsg('') }}
+          onClose={() => { setModal(null); setPrefill(undefined); setPrefillQueue([]); setImportMsg('') }}
+          onSaved={() => {
+            load()
+            if (prefillQueue.length > 0) {
+              const [next, ...rest] = prefillQueue
+              setPrefillQueue(rest)
+              setPrefill({ ...next, clientId })
+              setModal('new')
+              const done = queueTotal - prefillQueue.length
+              setImportMsg(`✅ ${done}/${queueTotal} salvo(s) — revise o próximo contrato.`)
+            } else {
+              setModal(null)
+              setPrefill(undefined)
+              setImportMsg(`✅ Todos os contratos importados com sucesso.`)
+            }
+          }}
         />
       )}
     </div>
