@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Plus, Trash2, Edit2, X, ChevronDown, ChevronUp, AlertTriangle, FileUp, Loader2, TableProperties } from 'lucide-react'
+import { Plus, Trash2, Edit2, X, ChevronDown, ChevronUp, AlertTriangle, FileUp, Loader2, TableProperties, Filter, Download } from 'lucide-react'
 import { agroApi, type AgroContrato, type AgroParcela } from '../../services/agroApi'
 import { Card } from '../../components/ui/Card'
 import { clsx } from 'clsx'
@@ -9,7 +9,7 @@ const API_BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:3333/api'
 const fmtBRL = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 })
 const fmtDate = (d: string | Date) => new Date(d).toLocaleDateString('pt-BR')
 
-const MODALIDADES = ['Capital de giro', 'Repactuação', 'Custeio', 'Investimento', 'Investimento CDI', 'BNDES Finame', 'CPR', 'Pronamp', 'Moderfrota', 'Pronaf', 'Outros']
+const MODALIDADES = ['Capital de giro', 'Rotativo', 'Repactuação', 'Custeio', 'Investimento', 'Investimento CDI', 'BNDES Finame', 'BNDES', 'FCO', 'CPR', 'Moderfrota', 'Outros']
 const PERIODICIDADES = ['Mensal', 'Semestral', 'Anual', 'Trimestral', 'Único']
 
 const INDEXADORES = ['Pré-fixado', 'CDI', 'SELIC', 'IPCA', 'TR']
@@ -250,6 +250,60 @@ export function TabContratos({ clientId }: { clientId: string }) {
   const [anoExpandido, setAnoExpandido] = useState<string | null>(null)
   const [contratoExpandido, setContratoExpandido] = useState<string | null>(null)
 
+  // Filtros
+  const [showFilters, setShowFilters] = useState(false)
+  const [filterBanco, setFilterBanco] = useState('')
+  const [filterModalidade, setFilterModalidade] = useState('')
+  const [filterValorMin, setFilterValorMin] = useState('')
+  const [filterValorMax, setFilterValorMax] = useState('')
+  const [filterCETMax, setFilterCETMax] = useState('')
+  const [filterVencAte, setFilterVencAte] = useState('')
+
+  const contratosFiltrados = contratos.filter(c => {
+    if (filterBanco && !c.banco.toLowerCase().includes(filterBanco.toLowerCase())) return false
+    if (filterModalidade && c.modalidade !== filterModalidade) return false
+    if (filterValorMin && c.valorTomado < Number(filterValorMin)) return false
+    if (filterValorMax && c.valorTomado > Number(filterValorMax)) return false
+    if (filterCETMax && calcCET(c.taxa, c.indexador, c.spreadIndexador) > Number(filterCETMax)) return false
+    if (filterVencAte && new Date(c.vencimento) > new Date(filterVencAte)) return false
+    return true
+  })
+
+  const filtrosAtivos = [filterBanco, filterModalidade, filterValorMin, filterValorMax, filterCETMax, filterVencAte].filter(Boolean).length
+
+  function exportarCSV() {
+    const header = ['Modalidade', 'Banco', 'Contrato', 'Contratação', 'Vencimento', 'Valor Tomado', 'Total Parc.', 'Parc. Atual', 'Periodicidade', 'Amortização', 'Taxa Nominal (%aa)', 'Indexador', 'Spread (%)', 'CET (%aa)', 'Parc. Nominal', 'Obs']
+    const rows = contratosFiltrados.map(c => [
+      c.modalidade,
+      c.banco,
+      c.numeroContrato ?? '',
+      c.dataContratacao,
+      c.vencimento,
+      c.valorTomado,
+      c.totalParcelas,
+      c.parcelaAtual,
+      c.periodicidade,
+      c.sistemaAmortizacao ?? 'Price',
+      (c.taxa * 100).toFixed(4),
+      c.indexador ?? 'Pré-fixado',
+      ((c.spreadIndexador ?? 0) * 100).toFixed(4),
+      calcCET(c.taxa, c.indexador, c.spreadIndexador).toFixed(2),
+      c.sistemaAmortizacao === 'SAC' && (!c.indexador || c.indexador === 'Pré-fixado')
+        ? calcParcelaAtualSAC(c).toFixed(2)
+        : c.valorParcela.toFixed(2),
+      c.obs ?? '',
+    ])
+    const csv = [header, ...rows].map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(';')).join('\r\n')
+    const bom = '﻿'
+    const blob = new Blob([bom + csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `contratos_credito.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
   const load = async () => {
     setLoading(true)
     try {
@@ -360,7 +414,22 @@ export function TabContratos({ clientId }: { clientId: string }) {
           <h2 className="font-bold text-gray-900">Contratos de Crédito</h2>
           <p className="text-xs text-gray-500 mt-0.5">Lançamento contrato a contrato → cronograma ordenado automático</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            onClick={exportarCSV}
+            className="flex items-center gap-2 border border-gray-300 text-gray-600 rounded-xl px-4 py-2 text-sm font-semibold hover:bg-gray-50"
+            title="Exportar para Excel (CSV)"
+          >
+            <Download size={15} /> Exportar Excel
+          </button>
+          <button
+            onClick={() => setShowFilters(v => !v)}
+            className={`flex items-center gap-2 border rounded-xl px-4 py-2 text-sm font-semibold ${showFilters || filtrosAtivos > 0 ? 'border-af-green text-af-green bg-af-green/5' : 'border-gray-300 text-gray-600 hover:bg-gray-50'}`}
+          >
+            <Filter size={15} />
+            Filtros
+            {filtrosAtivos > 0 && <span className="bg-af-green text-white text-xs rounded-full w-4 h-4 flex items-center justify-center leading-none">{filtrosAtivos}</span>}
+          </button>
           <input ref={fileRef} type="file" accept=".pdf" className="hidden" onChange={handleImportPdf} />
           <button
             onClick={() => fileRef.current?.click()}
@@ -378,6 +447,85 @@ export function TabContratos({ clientId }: { clientId: string }) {
       {importMsg && (
         <div className="flex items-center gap-2 text-sm px-4 py-2 bg-blue-50 border border-blue-200 rounded-xl text-blue-700">
           <AlertTriangle size={14} /> {importMsg}
+        </div>
+      )}
+
+      {/* Painel de Filtros */}
+      {showFilters && (
+        <div className="bg-white border border-gray-200 rounded-xl p-4">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 mb-1">Banco</label>
+              <input
+                type="text"
+                value={filterBanco}
+                onChange={e => setFilterBanco(e.target.value)}
+                placeholder="Ex: Sicredi"
+                className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-af-green/30"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 mb-1">Modalidade</label>
+              <select
+                value={filterModalidade}
+                onChange={e => setFilterModalidade(e.target.value)}
+                className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-af-green/30"
+              >
+                <option value="">Todas</option>
+                {MODALIDADES.map(m => <option key={m}>{m}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 mb-1">Valor Tomado Mín. (R$)</label>
+              <input
+                type="number"
+                value={filterValorMin}
+                onChange={e => setFilterValorMin(e.target.value)}
+                placeholder="0"
+                className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-af-green/30"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 mb-1">Valor Tomado Máx. (R$)</label>
+              <input
+                type="number"
+                value={filterValorMax}
+                onChange={e => setFilterValorMax(e.target.value)}
+                placeholder="ilimitado"
+                className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-af-green/30"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 mb-1">CET Máx. (% a.a.)</label>
+              <input
+                type="number"
+                value={filterCETMax}
+                onChange={e => setFilterCETMax(e.target.value)}
+                placeholder="ilimitado"
+                className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-af-green/30"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 mb-1">Próx. Venc. até</label>
+              <input
+                type="date"
+                value={filterVencAte}
+                onChange={e => setFilterVencAte(e.target.value)}
+                className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-af-green/30"
+              />
+            </div>
+          </div>
+          {filtrosAtivos > 0 && (
+            <div className="mt-3 flex items-center gap-3">
+              <span className="text-xs text-gray-500">{contratosFiltrados.length} de {contratos.length} contrato(s)</span>
+              <button
+                onClick={() => { setFilterBanco(''); setFilterModalidade(''); setFilterValorMin(''); setFilterValorMax(''); setFilterCETMax(''); setFilterVencAte('') }}
+                className="text-xs text-red-500 hover:underline"
+              >
+                Limpar filtros
+              </button>
+            </div>
+          )}
         </div>
       )}
 
@@ -412,7 +560,7 @@ export function TabContratos({ clientId }: { clientId: string }) {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
-                {contratos.map(c => {
+                {contratosFiltrados.map(c => {
                 const parcContrato = cronograma?.parcelas.filter(p => p.contratoId === c.id) ?? []
                 return (<>
                   <tr key={c.id} className="hover:bg-gray-50/50 group">
@@ -505,7 +653,7 @@ export function TabContratos({ clientId }: { clientId: string }) {
                 </>)})}
               </tbody>
             </table>
-            {contratos.length === 0 && <div className="py-10 text-center text-gray-400 text-sm">Nenhum contrato cadastrado</div>}
+            {contratosFiltrados.length === 0 && <div className="py-10 text-center text-gray-400 text-sm">{contratos.length === 0 ? 'Nenhum contrato cadastrado' : 'Nenhum contrato corresponde aos filtros'}</div>}
           </div>
         )}
       </Card>
