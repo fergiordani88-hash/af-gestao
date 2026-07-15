@@ -13,7 +13,15 @@ const MODALIDADES = ['Capital de giro', 'Repactuação', 'Custeio', 'Investiment
 const PERIODICIDADES = ['Mensal', 'Semestral', 'Anual', 'Trimestral', 'Único']
 
 const INDEXADORES = ['Pré-fixado', 'CDI', 'SELIC', 'IPCA', 'TR']
-const SELIC_ATUAL = 14.75 // % a.a. — atualizar conforme COPOM
+
+// Taxas de referência vigentes (% a.a.) — atualizar conforme divulgação oficial
+const TAXAS_REF: Record<string, number> = {
+  CDI:  14.75, // Meta SELIC/CDI — COPOM jul/2025
+  SELIC: 14.75,
+  IPCA:  5.48, // IPCA acumulado 12 meses jun/2025 — IBGE
+  TR:    0.88, // TR estimada — BACEN jul/2025
+}
+const taxaRef = (idx?: string) => TAXAS_REF[idx ?? ''] ?? 0
 
 const SISTEMAS_AMORT = ['Price', 'SAC']
 
@@ -50,22 +58,18 @@ function calcParcelaAtualSAC(c: AgroContrato): number {
   return amort + saldo * i
 }
 
-// Custo Efetivo Total anual: taxa contratual + indexador (quando pós-fixado)
-function calcCET(taxa: number, indexador: string | undefined, spread: number | undefined, selic: number): number {
+// Custo Efetivo Total anual: taxa contratual + índice de referência (quando pós-fixado)
+function calcCET(taxa: number, indexador: string | undefined, spread: number | undefined): number {
   const taxaAnual = taxa * 100
   if (!indexador || indexador === 'Pré-fixado') return taxaAnual
-  // CDI ≈ SELIC; SELIC = referência; IPCA/TR simplificado como selic
-  const indRate = selic
-  const sp = spread ?? 0
-  // CET = (1 + indRate/100) * (1 + sp) - 1, depois soma taxa nominal
-  return taxaAnual + indRate + sp * 100
+  return taxaAnual + taxaRef(indexador) + (spread ?? 0) * 100
 }
 
 // Estima valor futuro da parcela corrigida pelo indexador
-function calcParcelaCorrigida(valorParcela: number, indexador: string | undefined, spread: number | undefined, periodicidade: string, selic: number): number {
+function calcParcelaCorrigida(valorParcela: number, indexador: string | undefined, spread: number | undefined, periodicidade: string): number {
   if (!valorParcela || !indexador || indexador === 'Pré-fixado') return valorParcela
   const periodos = periodicidade === 'Mensal' ? 12 : periodicidade === 'Semestral' ? 2 : 1
-  const taxaAnual = selic / 100 + (spread ?? 0)
+  const taxaAnual = taxaRef(indexador) / 100 + (spread ?? 0)
   const taxaPeriodo = Math.pow(1 + taxaAnual, 1 / periodos) - 1
   return valorParcela * (1 + taxaPeriodo)
 }
@@ -162,8 +166,8 @@ function ContratoModal({ contrato, clientId, onClose, onSaved, prefill }: {
               </div>
               <div>
                 <label className={lbl}>{form.indexador} atual usado no cálculo (% a.a.)</label>
-                <input type="number" step="0.01" className={`${inp} bg-gray-100`} value={SELIC_ATUAL} readOnly />
-                <p className="text-xs text-amber-700 mt-1">CET estimado: {(form.taxa * 100 + SELIC_ATUAL + (form.spreadIndexador ?? 0) * 100).toFixed(2)}% a.a.</p>
+                <input type="number" step="0.01" className={`${inp} bg-gray-100`} value={taxaRef(form.indexador)} readOnly />
+                <p className="text-xs text-amber-700 mt-1">CET estimado: {(form.taxa * 100 + taxaRef(form.indexador) + (form.spreadIndexador ?? 0) * 100).toFixed(2)}% a.a.</p>
               </div>
             </div>
           )}
@@ -424,7 +428,7 @@ export function TabContratos({ clientId }: { clientId: string }) {
                       </span>
                     </td>
                     <td className="px-3 py-2.5 text-gray-600 whitespace-nowrap">
-                      <span className="font-semibold">{calcCET(c.taxa, c.indexador, c.spreadIndexador, SELIC_ATUAL).toFixed(2)}%</span>
+                      <span className="font-semibold">{calcCET(c.taxa, c.indexador, c.spreadIndexador).toFixed(2)}%</span>
                       {c.indexador && c.indexador !== 'Pré-fixado' && (
                         <span className="ml-1 text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full">{c.indexador}</span>
                       )}
@@ -440,7 +444,7 @@ export function TabContratos({ clientId }: { clientId: string }) {
                     </td>
                     <td className="px-3 py-2.5 font-bold text-gray-900">
                       {c.indexador && c.indexador !== 'Pré-fixado'
-                        ? <span className="text-amber-700">{fmtBRL(calcParcelaCorrigida(c.valorParcela, c.indexador, c.spreadIndexador, c.periodicidade, SELIC_ATUAL))}</span>
+                        ? <span className="text-amber-700">{fmtBRL(calcParcelaCorrigida(c.valorParcela, c.indexador, c.spreadIndexador, c.periodicidade))}</span>
                         : <span className="text-gray-400 text-xs">—</span>
                       }
                     </td>
