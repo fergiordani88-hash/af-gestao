@@ -3,7 +3,7 @@ import { clsx } from 'clsx'
 import {
   LayoutDashboard, Users, ClipboardList, Sprout, TrendingUp, TrendingDown,
   CreditCard, FileText, Building2, X, ChevronRight, Settings, Bell, UserCog,
-  DollarSign, Calendar, BarChart2, ArrowLeft, Activity, Shield, Layers
+  DollarSign, Calendar, BarChart2, ArrowLeft, Activity, Shield, Layers, RefreshCcw
 } from 'lucide-react'
 import { useStore } from '../../store/useStore'
 import { useAuthStore } from '../../store/useAuthStore'
@@ -23,8 +23,9 @@ interface NavItem {
 const MODULE_NAV: Record<AppModule, NavItem[]> = {
   agro: [
     { label: 'Dashboard',            icon: LayoutDashboard, path: '/',               roles: ['admin','consultor','cliente_rural'], end: true },
-    { label: 'Diagnóstico Agro',     icon: ClipboardList,   path: '/diagnostico-agro',roles: ['admin','consultor'] },
+    { label: 'Usuários',             icon: UserCog,         path: '/usuarios',        roles: ['admin'] },
     { label: 'Agro Completo',        icon: Sprout,          path: '/agro-completo',   roles: ['admin','consultor'] },
+    { label: 'Reestruturação',       icon: RefreshCcw,      path: '/reestruturacao',  roles: ['admin','consultor'] },
     { label: 'Planejamento Financeiro',icon: TrendingUp,    path: '/financeiro',      roles: ['admin','consultor','cliente_rural'] },
     { label: 'Crédito Rural',        icon: CreditCard,      path: '/credito-agro',    roles: ['admin','consultor'] },
     { label: 'Documentos',           icon: FileText,        path: '/documentos',      roles: ['admin','consultor','cliente_rural'] },
@@ -32,8 +33,9 @@ const MODULE_NAV: Record<AppModule, NavItem[]> = {
   ],
   empresarial: [
     { label: 'Dashboard',               icon: LayoutDashboard, path: '/',                    roles: ['admin','consultor','cliente_empresa'], end: true },
-    { label: 'Diagnóstico Empresarial', icon: ClipboardList,   path: '/diagnostico-pj',      roles: ['admin','consultor'] },
+    { label: 'Usuários',                icon: UserCog,         path: '/usuarios',             roles: ['admin'] },
     { label: 'Empresarial Completo',    icon: Building2,       path: '/pj-completo',          roles: ['admin','consultor'] },
+    { label: 'Reestruturação',          icon: RefreshCcw,      path: '/reestruturacao',       roles: ['admin','consultor'] },
     { label: 'Visão Financeira',        icon: TrendingUp,      path: '/financeiro',           roles: ['admin','consultor','cliente_empresa'], header: 'Gestão Financeira' },
     { label: 'Lançamentos',             icon: Activity,        path: '/pay/lancamentos',      roles: ['admin','consultor','cliente_empresa'] },
     { label: 'Contratos',               icon: FileText,        path: '/pay/contratos',        roles: ['admin','consultor','cliente_empresa'] },
@@ -61,10 +63,9 @@ const MODULE_NAV: Record<AppModule, NavItem[]> = {
     { label: 'Dashboard',            icon: LayoutDashboard, path: '/',               roles: ['admin','consultor'], end: true },
     { label: 'CRM Clientes',         icon: Users,           path: '/crm',            roles: ['admin','consultor'] },
     { label: 'Usuários',             icon: UserCog,         path: '/usuarios',       roles: ['admin'] },
-    { label: 'Diagnóstico Empresarial',icon: ClipboardList, path: '/diagnostico-pj', roles: ['admin','consultor'] },
-    { label: 'Diagnóstico Agro',     icon: Sprout,          path: '/diagnostico-agro',roles: ['admin','consultor'] },
     { label: 'Empresarial Completo', icon: Building2,       path: '/pj-completo',    roles: ['admin','consultor'] },
     { label: 'Agro Completo',        icon: Sprout,          path: '/agro-completo',  roles: ['admin','consultor'] },
+    { label: 'Reestruturação',       icon: RefreshCcw,      path: '/reestruturacao', roles: ['admin','consultor'] },
     { label: 'Planejamento Financeiro',icon: TrendingUp,    path: '/financeiro',     roles: ['admin','consultor'] },
     { label: 'Documentos',           icon: FileText,        path: '/documentos',     roles: ['admin','consultor'] },
   ],

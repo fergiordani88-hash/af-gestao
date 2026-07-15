@@ -16,21 +16,23 @@ import { TabFluxoMensal } from './TabFluxoMensal'
 import { TabPatrimonio } from './TabPatrimonio'
 import { TabDRERural } from './TabDRERural'
 import { TabQuestionarioAgro } from './TabQuestionarioAgro'
+import { TabProjecaoAnual } from './TabProjecaoAnual'
 import { clsx } from 'clsx'
 
-type TabId = 'producao' | 'dre-rural' | 'contratos' | 'despesas' | 'receitas' | 'custos' | 'fluxo-diario' | 'fluxo-mensal' | 'patrimonio' | 'questionario'
+type TabId = 'producao' | 'dre-rural' | 'contratos' | 'despesas' | 'receitas' | 'custos' | 'fluxo-diario' | 'fluxo-mensal' | 'patrimonio' | 'questionario' | 'projecao-anual'
 
 const TABS: { id: TabId; label: string; icon: React.ElementType; color: string }[] = [
-  { id: 'producao',     label: 'Produção',           icon: Sprout,       color: 'text-green-600' },
-  { id: 'dre-rural',   label: 'DRE Rural',          icon: BarChart2,    color: 'text-emerald-700' },
-  { id: 'contratos',    label: 'Contratos & Cronograma', icon: CreditCard, color: 'text-blue-600' },
-  { id: 'despesas',     label: 'Despesas',            icon: TrendingDown, color: 'text-red-600' },
-  { id: 'receitas',     label: 'Receitas',            icon: TrendingUp,   color: 'text-emerald-600' },
-  { id: 'custos',       label: 'Custos Fixos',        icon: DollarSign,   color: 'text-amber-600' },
-  { id: 'fluxo-diario', label: 'Fluxo Diário',        icon: Calendar,     color: 'text-purple-600' },
-  { id: 'fluxo-mensal', label: 'Fluxo Mensal',        icon: BarChart2,    color: 'text-indigo-600' },
-  { id: 'patrimonio',   label: 'Patrimônio',          icon: Shield,       color: 'text-orange-600' },
-  { id: 'questionario', label: 'Questionário',        icon: ClipboardList,color: 'text-gray-600' },
+  { id: 'producao',       label: 'Produção',               icon: Sprout,       color: 'text-green-600' },
+  { id: 'dre-rural',      label: 'DRE Rural',              icon: BarChart2,    color: 'text-emerald-700' },
+  { id: 'projecao-anual', label: 'Projeção 10 Anos',        icon: TrendingUp,   color: 'text-violet-600' },
+  { id: 'contratos',      label: 'Contratos & Cronograma', icon: CreditCard,   color: 'text-blue-600' },
+  { id: 'despesas',       label: 'Despesas',               icon: TrendingDown, color: 'text-red-600' },
+  { id: 'receitas',       label: 'Receitas',               icon: TrendingUp,   color: 'text-emerald-600' },
+  { id: 'custos',         label: 'Custos Fixos',           icon: DollarSign,   color: 'text-amber-600' },
+  { id: 'fluxo-diario',   label: 'Fluxo Diário',           icon: Calendar,     color: 'text-purple-600' },
+  { id: 'fluxo-mensal',   label: 'Fluxo Mensal',           icon: BarChart2,    color: 'text-indigo-600' },
+  { id: 'patrimonio',     label: 'Patrimônio',             icon: Shield,       color: 'text-orange-600' },
+  { id: 'questionario',   label: 'Questionário',           icon: ClipboardList,color: 'text-gray-600' },
 ]
 
 export function AgroCompleto() {
@@ -49,7 +51,8 @@ export function AgroCompleto() {
     switch (activeTab) {
       case 'producao':     return <TabProducao clientId={clientId} />
       case 'dre-rural':    return <TabDRERural clientId={clientId} />
-      case 'questionario': return <TabQuestionarioAgro clientId={clientId} nomeCliente={client?.name} />
+      case 'questionario':   return <TabQuestionarioAgro clientId={clientId} nomeCliente={client?.name} />
+      case 'projecao-anual': return <TabProjecaoAnual clientId={clientId} />
       case 'contratos':    return <TabContratos clientId={clientId} />
       case 'despesas':     return <TabDespesas clientId={clientId} />
       case 'receitas':     return <TabReceitas clientId={clientId} />

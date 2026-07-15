@@ -1,12 +1,22 @@
 import { useState, useEffect } from 'react'
-import { Plus, Trash2, TrendingUp } from 'lucide-react'
-import { agroApi, type AgroReceita } from '../../services/agroApi'
+import { Plus, Trash2, TrendingUp, Sprout } from 'lucide-react'
+import { agroApi, type AgroReceita, type AgroProducao } from '../../services/agroApi'
 import { Card } from '../../components/ui/Card'
 
 const fmtBRL = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 })
 const fmtDate = (d: string | Date) => new Date(d).toLocaleDateString('pt-BR')
 
 const TIPOS = ['Recebimento', 'Antecipação', 'CPR', 'Barter', 'Outros']
+
+type Sugestao = {
+  key: string
+  cultura: string
+  safra: string
+  volume: number
+  cotacao: number
+  valor: number
+  descricao: string
+}
 
 export function TabReceitas({ clientId }: { clientId: string }) {
   const [receitas, setReceitas] = useState<AgroReceita[]>([])
@@ -16,6 +26,9 @@ export function TabReceitas({ clientId }: { clientId: string }) {
     clientId, data: '', origem: '', tipo: 'Recebimento', descricao: '', valor: 0,
   })
   const [saving, setSaving] = useState(false)
+  const [producoes, setProducoes] = useState<AgroProducao[]>([])
+  const [suggDates, setSuggDates] = useState<Record<string, string>>({})
+  const [confirmingKey, setConfirmingKey] = useState<string | null>(null)
 
   const load = async () => {
     setLoading(true)
@@ -24,6 +37,7 @@ export function TabReceitas({ clientId }: { clientId: string }) {
   }
 
   useEffect(() => { load() }, [clientId])
+  useEffect(() => { agroApi.producao.list(clientId).then(setProducoes) }, [clientId])
 
   const handleAdd = async () => {
     if (!form.data || !form.descricao || !form.valor) return
@@ -42,6 +56,27 @@ export function TabReceitas({ clientId }: { clientId: string }) {
     load()
   }
 
+  const sugestoes: Sugestao[] = producoes
+    .filter(p => p.area > 0 && p.cotacao > 0 && p.produtividade > 0)
+    .map(p => {
+      const volume = p.area * p.produtividade
+      const valor  = volume * p.cotacao
+      const descricao = `${p.cultura} — Safra ${p.safra} (${volume.toLocaleString('pt-BR', { maximumFractionDigits: 0 })} sc × R$ ${p.cotacao.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}/sc)`
+      return { key: `${p.cultura}-${p.safra}`, cultura: p.cultura, safra: p.safra, volume, cotacao: p.cotacao, valor, descricao }
+    })
+    .filter(s => !receitas.some(r => r.descricao === s.descricao))
+
+  const handleConfirmSugestao = async (s: Sugestao) => {
+    const data = suggDates[s.key] ?? ''
+    setConfirmingKey(s.key)
+    try {
+      await agroApi.receitas.create({
+        clientId, data, origem: s.cultura, tipo: 'Recebimento', descricao: s.descricao, valor: s.valor,
+      })
+      load()
+    } finally { setConfirmingKey(null) }
+  }
+
   const total = receitas.reduce((s, r) => s + r.valor, 0)
   const inp = 'w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-400'
 
@@ -56,6 +91,42 @@ export function TabReceitas({ clientId }: { clientId: string }) {
           <Plus size={15} /> Nova Receita
         </button>
       </div>
+
+      {/* Sugestões da Produção */}
+      {sugestoes.length > 0 && (
+        <Card className="border-2 border-emerald-100 bg-emerald-50/40">
+          <div className="flex items-center gap-2 px-4 py-3 border-b border-emerald-100">
+            <Sprout size={15} className="text-emerald-600" />
+            <span className="font-semibold text-sm text-emerald-800">Receitas Derivadas da Produção</span>
+            <span className="text-xs text-emerald-600 ml-1">— confirme cada venda para incluir na lista</span>
+          </div>
+          <div className="divide-y divide-emerald-50">
+            {sugestoes.map(s => (
+              <div key={s.key} className="flex items-center gap-3 px-4 py-3 flex-wrap">
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-gray-900">{s.descricao}</p>
+                  <p className="text-xs text-gray-500 mt-0.5">Valor estimado: <strong className="text-emerald-700">{fmtBRL(s.valor)}</strong></p>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <div>
+                    <label className="text-xs text-gray-500 block mb-0.5">Data da venda</label>
+                    <input type="date" className="border border-gray-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-emerald-300"
+                      value={suggDates[s.key] ?? ''}
+                      onChange={e => setSuggDates(d => ({ ...d, [s.key]: e.target.value }))} />
+                  </div>
+                  <button
+                    onClick={() => handleConfirmSugestao(s)}
+                    disabled={confirmingKey === s.key}
+                    className="bg-emerald-600 text-white rounded-lg px-3 py-1.5 text-xs font-semibold hover:bg-emerald-700 disabled:opacity-50 mt-4"
+                  >
+                    {confirmingKey === s.key ? 'Salvando...' : 'Confirmar'}
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
 
       {/* Totais por tipo */}
       {receitas.length > 0 && (

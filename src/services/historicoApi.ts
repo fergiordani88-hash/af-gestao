@@ -28,15 +28,17 @@ export interface Inadimplencia {
 export interface DRERural {
   id?: string; clientId: string; safra: string
   recSojaVolume: number; recSojaPreco: number
-  recMilhoVolume: number; recMilhoPreco: number; recOutras: number
+  recMilhoVolume: number; recMilhoPreco: number
+  recFeijaoVolume: number; recFeijaoPreco: number; recOutras: number
+  custoAtivTotal: number; totalAreaCusteada: number
   custoSementesHa: number; custoFertilizHa: number; custoDefensivosHa: number
   custoDieselHa: number; custoServicosHa: number; custoOutrosHa: number
-  totalAreaCusteada: number; arrendamentoHa: number; areaArrendada: number
+  arrendamentoHa: number; areaArrendada: number
   folha: number; proLabore: number; contabilidade: number; energia: number
   internet: number; manutencaoVeic: number; seguros: number; outrasAdmin: number
   despFinanceiras: number; amortizacoes: number; depreciacao: number
   calculado?: {
-    recSoja: number; recMilho: number; recBruta: number; custoAtiv: number; arrendamento: number
+    recSoja: number; recMilho: number; recFeijao: number; recBruta: number; custoAtiv: number; arrendamento: number
     lucBruto: number; margBruta: number; despAdmin: number; ebitda: number; margEbitda: number
     depreciacao: number; ebit: number; despFin: number; amort: number; lucLiq: number
     sobraCaixa: number; margLiq: number; custoPorHaTotal: number; peVolumeTotal: number; classificacao: string

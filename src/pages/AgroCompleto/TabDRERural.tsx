@@ -16,13 +16,17 @@ const CLS_INFO: Record<string, { emoji: string; label: string; cor: string }> = 
   reestruturacao: { emoji: '🔴', label: 'Reestruturação', cor: 'bg-red-50 border-red-300 text-red-800' },
 }
 
-const SAFRAS = ['2022/23', '2023/24', '2024/25', '2025/26']
+const SAFRAS = [
+  '2022/23', '2023/24', '2024/25', '2025/26',
+  ...Array.from({ length: 10 }, (_, i) => { const a = 2026 + i; return `${a}/${String(a + 1).slice(-2)}` }),
+]
 
 const EMPTY_DRE: DRERural = {
   clientId: '', safra: '2024/25',
-  recSojaVolume: 0, recSojaPreco: 0, recMilhoVolume: 0, recMilhoPreco: 0, recOutras: 0,
+  recSojaVolume: 0, recSojaPreco: 0, recMilhoVolume: 0, recMilhoPreco: 0, recFeijaoVolume: 0, recFeijaoPreco: 0, recOutras: 0,
+  custoAtivTotal: 0, totalAreaCusteada: 0,
   custoSementesHa: 0, custoFertilizHa: 0, custoDefensivosHa: 0, custoDieselHa: 0, custoServicosHa: 0, custoOutrosHa: 0,
-  totalAreaCusteada: 0, arrendamentoHa: 0, areaArrendada: 0,
+  arrendamentoHa: 0, areaArrendada: 0,
   folha: 0, proLabore: 0, contabilidade: 0, energia: 0, internet: 0, manutencaoVeic: 0, seguros: 0, outrasAdmin: 0,
   despFinanceiras: 0, amortizacoes: 0, depreciacao: 0,
 }
@@ -46,6 +50,7 @@ export function TabDRERural({ clientId }: { clientId: string }) {
   const [dirty, setDirty] = useState(false)
   const [saving, setSaving] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [importing, setImporting] = useState(false)
 
   const load = async () => {
     setLoading(true)
@@ -64,6 +69,49 @@ export function TabDRERural({ clientId }: { clientId: string }) {
   useEffect(() => { load() }, [clientId, safra])
 
   const set = (k: keyof DRERural, v: number) => { setDre(d => ({ ...d, [k]: v })); setDirty(true) }
+
+  const handleImportProducao = async () => {
+    setImporting(true)
+    try {
+      const data = await agroApi.producao.list(clientId)
+      const raw = data.filter(p => p.safra === safra)
+
+      // Deduplica por cultura (mantém o de maior score), igual ao handleCopyPrevSafra
+      const dedupMap = new Map<string, typeof raw[0]>()
+      for (const r of raw) {
+        const score = (r.cotacao || 0) + (r.area || 0) + (r.produtividade || 0)
+        const prev = dedupMap.get(r.cultura)
+        const prevScore = prev ? (prev.cotacao||0)+(prev.area||0)+(prev.produtividade||0) : -1
+        if (score > prevScore) dedupMap.set(r.cultura, r)
+      }
+      const ps = Array.from(dedupMap.values())
+
+      const soja   = ps.find(p => p.cultura === 'Soja')
+      const milho  = ps.find(p => ['Milho 2ª', 'Milho verão'].includes(p.cultura))
+      const feijao = ps.find(p => p.cultura.toLowerCase().startsWith('feij'))
+
+      // Custo total de plantio = soma(área × custoPorHa × cotação) — custoPorHa está em sacas/ha
+      const custoTotal = ps.reduce((s, p) => s + (p.area ?? 0) * (p.custoPorHa ?? 0) * (p.cotacao ?? 0), 0)
+
+      // Arrendamento APENAS da Soja (única safra com arrendamento)
+      const areaArrendSoja = soja?.areaArrendada ?? 0
+      const custoArrendSoja = soja?.custoArrendHa ?? 0
+
+      setDre(d => ({
+        ...d,
+        recSojaVolume:    soja   ? (soja.area   * soja.produtividade)   : d.recSojaVolume,
+        recSojaPreco:     soja   ? soja.cotacao                         : d.recSojaPreco,
+        recMilhoVolume:   milho  ? (milho.area  * milho.produtividade)  : d.recMilhoVolume,
+        recMilhoPreco:    milho  ? milho.cotacao                        : d.recMilhoPreco,
+        recFeijaoVolume:  feijao ? (feijao.area * feijao.produtividade) : d.recFeijaoVolume,
+        recFeijaoPreco:   feijao ? feijao.cotacao                       : d.recFeijaoPreco,
+        custoAtivTotal:   custoTotal > 0 ? custoTotal : d.custoAtivTotal,
+        areaArrendada:    areaArrendSoja > 0 ? areaArrendSoja : d.areaArrendada,
+        arrendamentoHa:   custoArrendSoja > 0 ? custoArrendSoja : d.arrendamentoHa,
+      }))
+      setDirty(true)
+    } finally { setImporting(false) }
+  }
 
   const handleSave = async () => {
     setSaving(true)
@@ -124,6 +172,10 @@ export function TabDRERural({ clientId }: { clientId: string }) {
             className="border border-gray-200 rounded-xl px-3 py-2 text-sm bg-white">
             {SAFRAS.map(s => <option key={s}>{s}</option>)}
           </select>
+          <button onClick={handleImportProducao} disabled={importing}
+            className="flex items-center gap-2 border border-emerald-300 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 disabled:opacity-50 rounded-xl px-4 py-2 text-sm font-semibold">
+            {importing ? 'Importando...' : '⬇ Importar da Produção'}
+          </button>
           <button onClick={handleSave} disabled={saving || !dirty}
             className="flex items-center gap-2 bg-af-green hover:bg-af-green-light disabled:opacity-40 text-white rounded-xl px-4 py-2 text-sm font-semibold">
             <Save size={14} /> {saving ? 'Salvando...' : dirty ? 'Salvar' : 'Salvo'}
@@ -153,24 +205,49 @@ export function TabDRERural({ clientId }: { clientId: string }) {
             <div><label className={lbl}>Soja — Preço (R$/sc)</label><input type="number" className={inp} value={dre.recSojaPreco || ''} onChange={e => set('recSojaPreco', +e.target.value)} /></div>
             <div><label className={lbl}>Milho 2ª — Volume (sacas)</label><input type="number" className={inp} value={dre.recMilhoVolume || ''} onChange={e => set('recMilhoVolume', +e.target.value)} /></div>
             <div><label className={lbl}>Milho 2ª — Preço (R$/sc)</label><input type="number" className={inp} value={dre.recMilhoPreco || ''} onChange={e => set('recMilhoPreco', +e.target.value)} /></div>
+            <div><label className={lbl}>3ª Safra (Feijão) — Volume (sacas)</label><input type="number" className={inp} value={dre.recFeijaoVolume || ''} onChange={e => set('recFeijaoVolume', +e.target.value)} /></div>
+            <div><label className={lbl}>3ª Safra (Feijão) — Preço (R$/sc)</label><input type="number" className={inp} value={dre.recFeijaoPreco || ''} onChange={e => set('recFeijaoPreco', +e.target.value)} /></div>
             <div className="col-span-2"><label className={lbl}>Outras receitas (R$)</label><input type="number" className={inp} value={dre.recOutras || ''} onChange={e => set('recOutras', +e.target.value)} /></div>
           </div>
 
-          <p className={sec}>Custo da Atividade (R$/ha)</p>
+          <p className={sec}>Custo da Atividade</p>
           <div className="grid grid-cols-2 gap-3">
             <div><label className={lbl}>Área custeada total (ha)</label><input type="number" className={inp} value={dre.totalAreaCusteada || ''} onChange={e => set('totalAreaCusteada', +e.target.value)} /></div>
-            <div><label className={lbl}>Sementes</label><input type="number" className={inp} value={dre.custoSementesHa || ''} onChange={e => set('custoSementesHa', +e.target.value)} /></div>
-            <div><label className={lbl}>Fertilizantes</label><input type="number" className={inp} value={dre.custoFertilizHa || ''} onChange={e => set('custoFertilizHa', +e.target.value)} /></div>
-            <div><label className={lbl}>Defensivos</label><input type="number" className={inp} value={dre.custoDefensivosHa || ''} onChange={e => set('custoDefensivosHa', +e.target.value)} /></div>
-            <div><label className={lbl}>Diesel / Combustível</label><input type="number" className={inp} value={dre.custoDieselHa || ''} onChange={e => set('custoDieselHa', +e.target.value)} /></div>
-            <div><label className={lbl}>Serviços (plantio, colheita)</label><input type="number" className={inp} value={dre.custoServicosHa || ''} onChange={e => set('custoServicosHa', +e.target.value)} /></div>
-            <div><label className={lbl}>Outros custos/ha</label><input type="number" className={inp} value={dre.custoOutrosHa || ''} onChange={e => set('custoOutrosHa', +e.target.value)} /></div>
+            <div><label className={lbl}>Custo Total da Atividade (R$)</label><input type="number" className={inp} value={dre.custoAtivTotal || ''} onChange={e => set('custoAtivTotal', +e.target.value)} /></div>
+          </div>
+
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mt-4 mb-2">Composição do custo (R$ total)</p>
+          <div className="grid grid-cols-2 gap-2 bg-gray-50 rounded-xl p-3">
+            <div><label className={lbl}>Sementes (R$)</label><input type="number" className={inp} value={dre.custoSementesHa || ''} onChange={e => set('custoSementesHa', +e.target.value)} /></div>
+            <div><label className={lbl}>Fertilizantes (R$)</label><input type="number" className={inp} value={dre.custoFertilizHa || ''} onChange={e => set('custoFertilizHa', +e.target.value)} /></div>
+            <div><label className={lbl}>Defensivos (R$)</label><input type="number" className={inp} value={dre.custoDefensivosHa || ''} onChange={e => set('custoDefensivosHa', +e.target.value)} /></div>
+            <div><label className={lbl}>Diesel / Combustível (R$)</label><input type="number" className={inp} value={dre.custoDieselHa || ''} onChange={e => set('custoDieselHa', +e.target.value)} /></div>
+            <div><label className={lbl}>Serviços — plantio, colheita (R$)</label><input type="number" className={inp} value={dre.custoServicosHa || ''} onChange={e => set('custoServicosHa', +e.target.value)} /></div>
+            <div><label className={lbl}>Outros (R$)</label><input type="number" className={inp} value={dre.custoOutrosHa || ''} onChange={e => set('custoOutrosHa', +e.target.value)} /></div>
+            {(() => {
+              const soma = dre.custoSementesHa + dre.custoFertilizHa + dre.custoDefensivosHa + dre.custoDieselHa + dre.custoServicosHa + dre.custoOutrosHa
+              return soma > 0 ? (
+                <div className="col-span-2 flex justify-between items-center pt-2 border-t border-gray-200 text-xs">
+                  <span className="text-gray-500">Soma do detalhamento:</span>
+                  <span className={`font-semibold ${dre.custoAtivTotal > 0 && Math.abs(soma - dre.custoAtivTotal) > 1 ? 'text-amber-600' : 'text-gray-700'}`}>{fmtBRL(soma)}</span>
+                </div>
+              ) : null
+            })()}
           </div>
 
           <p className={sec}>Arrendamento</p>
           <div className="grid grid-cols-2 gap-3">
-            <div><label className={lbl}>Área arrendada (ha)</label><input type="number" className={inp} value={dre.areaArrendada || ''} onChange={e => set('areaArrendada', +e.target.value)} /></div>
-            <div><label className={lbl}>Custo arrendamento (R$/ha)</label><input type="number" className={inp} value={dre.arrendamentoHa || ''} onChange={e => set('arrendamentoHa', +e.target.value)} /></div>
+            <div><label className={lbl}>Área arrendada — apenas soja (ha)</label><input type="number" className={inp} value={dre.areaArrendada || ''} onChange={e => set('areaArrendada', +e.target.value)} /></div>
+            <div>
+              <label className={lbl}>Taxa de arrendamento (sc soja/ha)</label>
+              <input type="number" className={inp} value={dre.arrendamentoHa || ''} onChange={e => set('arrendamentoHa', +e.target.value)} />
+            </div>
+            {dre.areaArrendada > 0 && dre.arrendamentoHa > 0 && dre.recSojaPreco > 0 && (
+              <div className="col-span-2 flex justify-between items-center text-xs bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
+                <span className="text-gray-600">{dre.areaArrendada} ha × {dre.arrendamentoHa} sc/ha × {fmtBRL(dre.recSojaPreco)}/sc =</span>
+                <span className="font-bold text-amber-700">{fmtBRL(dre.areaArrendada * dre.arrendamentoHa * dre.recSojaPreco)}</span>
+              </div>
+            )}
           </div>
 
           <p className={sec}>Despesas Administrativas (R$/ano)</p>
@@ -198,9 +275,10 @@ export function TabDRERural({ clientId }: { clientId: string }) {
             <h3 className="font-semibold text-gray-900 mb-3">DRE Rural — Safra {safra}</h3>
             <div className="space-y-1 text-sm">
               {[
-                { label: 'Receita Bruta — Soja',     val: calc.recSoja,      indent: true },
-                { label: 'Receita Bruta — Milho 2ª', val: calc.recMilho,     indent: true },
-                { label: '= RECEITA BRUTA TOTAL',    val: calc.recBruta,     total: true },
+                { label: 'Receita Bruta — Soja',          val: calc.recSoja,      indent: true },
+                { label: 'Receita Bruta — Milho 2ª',     val: calc.recMilho,     indent: true },
+                { label: 'Receita Bruta — 3ª Safra (Feijão)', val: calc.recFeijao, indent: true },
+                { label: '= RECEITA BRUTA TOTAL',         val: calc.recBruta,     total: true },
                 { label: '(–) Custo da Atividade',   val: -calc.custoAtiv,   neg: true, indent: true },
                 { label: '(–) Custo de Arrendamento',val: -calc.arrendamento,neg: true, indent: true },
                 { label: '= LUCRO BRUTO DA ATIVIDADE', val: calc.lucBruto,   total: true, pct: fmtPct(calc.margBruta) },

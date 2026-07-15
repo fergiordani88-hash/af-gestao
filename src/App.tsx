@@ -28,6 +28,7 @@ import { SemAcesso }         from './pages/SemAcesso'
 import { Usuarios }          from './pages/Usuarios'
 import { ModuleSelector }    from './pages/ModuleSelector'
 import { PayPage }           from './pages/PayModule/PayPage'
+import { Reestruturacao }    from './pages/Reestruturacao'
 import { ProtectedRoute }    from './components/Auth/ProtectedRoute'
 
 export default function App() {
@@ -127,6 +128,13 @@ export default function App() {
       <Route path="/pay/diario"       element={<ProtectedRoute><PayPage tab="diario" /></ProtectedRoute>} />
       <Route path="/pay/mensal"       element={<ProtectedRoute><PayPage tab="mensal" /></ProtectedRoute>} />
       <Route path="/pay/anual"        element={<ProtectedRoute><PayPage tab="anual" /></ProtectedRoute>} />
+
+      {/* Reestruturação de Passivos */}
+      <Route path="/reestruturacao" element={
+        <ProtectedRoute allowedRoles={['admin', 'consultor']}>
+          <Reestruturacao />
+        </ProtectedRoute>
+      } />
 
       {/* Catch-all */}
       <Route path="*" element={<Navigate to="/" replace />} />

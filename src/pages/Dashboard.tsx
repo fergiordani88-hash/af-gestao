@@ -6,6 +6,7 @@ import {
   AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend
 } from 'recharts'
+import { useNavigate } from 'react-router-dom'
 import { AppLayout } from '../components/Layout/AppLayout'
 import { Card, StatCard } from '../components/ui/Card'
 import { Badge } from '../components/ui/Badge'
@@ -56,6 +57,7 @@ export function Dashboard() {
   const proposals      = dashData?.kpis.negotiatingCount ?? clients.filter(c => c.status === 'proposta' || c.status === 'negociacao').length
   const conversionRate = dashData?.kpis.conversionRate ?? 68
 
+  const navigate = useNavigate()
   const fmtBRL = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 0 })
 
   return (
@@ -166,11 +168,11 @@ export function Dashboard() {
       <div className="mt-6 grid grid-cols-2 md:grid-cols-4 gap-3">
         {[
           { label: 'Novo Cliente', icon: Users, color: 'bg-af-green-pale text-af-green', path: '/crm' },
-          { label: 'Diagnóstico PJ', icon: Building2, color: 'bg-blue-50 text-blue-600', path: '/diagnostico-pj' },
-          { label: 'Diagnóstico Agro', icon: Sprout, color: 'bg-emerald-50 text-emerald-600', path: '/diagnostico-agro' },
+          { label: 'Diagnóstico PJ', icon: Building2, color: 'bg-blue-50 text-blue-600', path: '/pj-completo' },
+          { label: 'Diagnóstico Agro', icon: Sprout, color: 'bg-emerald-50 text-emerald-600', path: '/agro-completo' },
           { label: 'Relatório', icon: FileText, color: 'bg-purple-50 text-purple-600', path: '/documentos' },
         ].map((item) => (
-          <Card key={item.label} className={`p-4 flex items-center gap-3 cursor-pointer hover:shadow-md transition-shadow`}>
+          <Card key={item.label} onClick={() => navigate(item.path)} className={`p-4 flex items-center gap-3 cursor-pointer hover:shadow-md transition-shadow`}>
             <span className={`p-2 rounded-xl ${item.color}`}>
               <item.icon size={18} />
             </span>

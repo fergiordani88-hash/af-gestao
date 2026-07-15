@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
-import { Plus, Trash2, Save, DollarSign } from 'lucide-react'
-import { agroApi, type AgroCustoFixo } from '../../services/agroApi'
+import { Plus, Trash2, Save, DollarSign, Sprout } from 'lucide-react'
+import { agroApi, type AgroCustoFixo, type AgroProducao } from '../../services/agroApi'
 import { Card } from '../../components/ui/Card'
 
 const fmtBRL = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -36,6 +36,7 @@ export function TabCustosFixos({ clientId }: { clientId: string }) {
   const [categoriaAberta, setCategoriaAberta] = useState<string>(CATEGORIAS[0])
   const [novoItem, setNovoItem] = useState({ categoria: CATEGORIAS[0], item: '', valorMensal: 0 })
   const [showNew, setShowNew] = useState(false)
+  const [producoes, setProducoes] = useState<AgroProducao[]>([])
 
   const load = async () => {
     setLoading(true)
@@ -44,6 +45,7 @@ export function TabCustosFixos({ clientId }: { clientId: string }) {
   }
 
   useEffect(() => { load() }, [clientId])
+  useEffect(() => { agroApi.producao.list(clientId).then(setProducoes) }, [clientId])
 
   const handleSaveEdit = async (id: string) => {
     await agroApi.custosFixos.update(id, { valorMensal: editVal })
@@ -74,6 +76,18 @@ export function TabCustosFixos({ clientId }: { clientId: string }) {
     load()
   }
 
+  const custosDeProducao = producoes
+    .filter(p => p.area > 0 || p.areaArrendada > 0)
+    .map(p => {
+      const custoPorHaReais = p.custoPorHa * (p.cotacao || 1)
+      const custoTotal  = p.area * custoPorHaReais
+      const arrendTotal = p.areaArrendada * p.custoArrendHa
+      return { key: `${p.cultura}-${p.safra}`, cultura: p.cultura, safra: p.safra, custoTotal, arrendTotal }
+    })
+    .filter(p => p.custoTotal > 0 || p.arrendTotal > 0)
+
+  const totalCustoProducao = custosDeProducao.reduce((s, p) => s + p.custoTotal + p.arrendTotal, 0)
+
   const totalMensal = custos.reduce((s, c) => s + c.valorMensal, 0)
   const totalAnual = totalMensal * 12
 
@@ -98,6 +112,47 @@ export function TabCustosFixos({ clientId }: { clientId: string }) {
           </button>
         </div>
       </div>
+
+      {/* Custos de Produção derivados */}
+      {custosDeProducao.length > 0 && (
+        <Card className="border-2 border-green-100 bg-green-50/40">
+          <div className="flex items-center gap-2 px-4 py-3 border-b border-green-100">
+            <Sprout size={15} className="text-green-600" />
+            <span className="font-semibold text-sm text-green-800">Custos Derivados da Produção</span>
+            <span className="text-xs text-green-600 ml-1">— custo total por cultura/safra (COE + arrendamento)</span>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="bg-gray-50 border-b">
+                  <th className="px-4 py-2 text-left font-semibold text-gray-500 uppercase">Cultura</th>
+                  <th className="px-4 py-2 text-left font-semibold text-gray-500 uppercase">Safra</th>
+                  <th className="px-4 py-2 text-right font-semibold text-gray-500 uppercase">Custo Produção</th>
+                  <th className="px-4 py-2 text-right font-semibold text-gray-500 uppercase">Arrendamento</th>
+                  <th className="px-4 py-2 text-right font-semibold text-gray-500 uppercase">Total</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {custosDeProducao.map(p => (
+                  <tr key={p.key} className="hover:bg-gray-50/50">
+                    <td className="px-4 py-2.5 font-semibold text-gray-900">{p.cultura}</td>
+                    <td className="px-4 py-2.5 text-gray-600">{p.safra}</td>
+                    <td className="px-4 py-2.5 text-right text-red-600">{fmtBRL(p.custoTotal)}</td>
+                    <td className="px-4 py-2.5 text-right text-orange-600">{fmtBRL(p.arrendTotal)}</td>
+                    <td className="px-4 py-2.5 text-right font-bold text-gray-900">{fmtBRL(p.custoTotal + p.arrendTotal)}</td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr className="bg-green-50 border-t font-bold">
+                  <td className="px-4 py-2" colSpan={4}>Total Custos de Produção</td>
+                  <td className="px-4 py-2 text-right text-green-800">{fmtBRL(totalCustoProducao)}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </Card>
+      )}
 
       {/* KPIs */}
       <div className="grid grid-cols-3 gap-3">
