@@ -309,6 +309,36 @@ export function TabContratos({ clientId }: { clientId: string }) {
 
   const filtrosAtivos = [filterBanco, filterModalidade, filterValorMin, filterValorMax, filterCETMax, filterVencAte].filter(Boolean).length
 
+  function exportarCronogramaCSV() {
+    if (!cronograma || cronograma.parcelas.length === 0) return
+    const header = ['Vencimento', 'Modalidade', 'Banco', 'Nº Contrato', 'Contratação', 'Valor Tomado', 'Parcela', 'Total Parc.', 'Periodicidade', 'Taxa (%aa)', 'Indexador', 'Amortização', 'Juros', 'Total Parcela', 'Saldo Devedor']
+    const rows = cronograma.parcelas.map(p => [
+      p.vencimento,
+      p.modalidade,
+      p.banco,
+      p.contrato || '',
+      p.dataContratacao,
+      p.valorTomado.toFixed(2),
+      `${p.parcelaNum}/${p.totalParcelas}`,
+      p.totalParcelas,
+      p.periodicidade,
+      (p.taxa * 100).toFixed(4),
+      p.indexador ?? 'Pré-fixado',
+      (p.amortizacao ?? 0).toFixed(2),
+      (p.juros ?? 0).toFixed(2),
+      p.valorParcela.toFixed(2),
+      (p.saldoDevedor ?? 0).toFixed(2),
+    ])
+    const csv = [header, ...rows].map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(';')).join('\r\n')
+    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'cronograma_parcelas.csv'
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
   function exportarCSV() {
     const header = ['Modalidade', 'Banco', 'Contrato', 'Contratação', 'Vencimento', 'Valor Tomado', 'Total Parc.', 'Parc. Atual', 'Periodicidade', 'Amortização', 'Taxa Nominal (%aa)', 'Indexador', 'Spread (%)', 'CET (%aa)', 'Parc. Nominal', 'Obs']
     const rows = contratosFiltrados.map(c => [
@@ -787,8 +817,16 @@ export function TabContratos({ clientId }: { clientId: string }) {
       {/* Cronograma completo ordenado */}
       {cronograma && cronograma.parcelas.length > 0 && (
         <Card>
-          <div className="px-4 py-3 border-b border-gray-100 font-semibold text-sm text-gray-700">
-            Cronograma Completo — Ordenado por Vencimento ({cronograma.parcelas.length} parcelas)
+          <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between gap-3">
+            <span className="font-semibold text-sm text-gray-700">
+              Cronograma Completo — Ordenado por Vencimento ({cronograma.parcelas.length} parcelas)
+            </span>
+            <button
+              onClick={exportarCronogramaCSV}
+              className="flex items-center gap-2 border border-gray-300 text-gray-600 rounded-xl px-3 py-1.5 text-xs font-semibold hover:bg-gray-50"
+            >
+              <Download size={13} /> Exportar Excel
+            </button>
           </div>
           <div className="overflow-x-auto max-h-96">
             <table className="w-full text-xs">
