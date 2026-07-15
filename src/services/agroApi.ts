@@ -39,6 +39,8 @@ export interface AgroContrato {
   numeroContrato?: string; dataContratacao: string; valorTomado: number
   totalParcelas: number; parcelaAtual: number; periodicidade: string
   taxa: number; vencimento: string; valorParcela: number; obs?: string
+  indexador?: string       // "Pré-fixado" | "CDI" | "SELIC" | "IPCA" | "TR"
+  spreadIndexador?: number // spread adicional sobre o indexador (ex: 0.02 = 2%)
 }
 
 export interface AgroParcela {

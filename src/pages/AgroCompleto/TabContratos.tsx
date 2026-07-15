@@ -12,10 +12,34 @@ const fmtDate = (d: string | Date) => new Date(d).toLocaleDateString('pt-BR')
 const MODALIDADES = ['Capital de giro', 'Repactuação', 'Custeio', 'Investimento', 'Investimento CDI', 'BNDES Finame', 'CPR', 'Pronamp', 'Moderfrota', 'Pronaf', 'Outros']
 const PERIODICIDADES = ['Mensal', 'Semestral', 'Anual', 'Trimestral', 'Único']
 
+const INDEXADORES = ['Pré-fixado', 'CDI', 'SELIC', 'IPCA', 'TR']
+const SELIC_ATUAL = 14.75 // % a.a. — atualizar conforme COPOM
+
 const EMPTY: Omit<AgroContrato, 'id'> = {
   clientId: '', modalidade: 'Capital de giro', banco: '', numeroContrato: '',
   dataContratacao: '', valorTomado: 0, totalParcelas: 1, parcelaAtual: 1,
   periodicidade: 'Mensal', taxa: 0, vencimento: '', valorParcela: 0, obs: '',
+  indexador: 'Pré-fixado', spreadIndexador: 0,
+}
+
+// Custo Efetivo Total anual: taxa contratual + indexador (quando pós-fixado)
+function calcCET(taxa: number, indexador: string | undefined, spread: number | undefined, selic: number): number {
+  const taxaAnual = taxa * 100
+  if (!indexador || indexador === 'Pré-fixado') return taxaAnual
+  // CDI ≈ SELIC; SELIC = referência; IPCA/TR simplificado como selic
+  const indRate = selic
+  const sp = spread ?? 0
+  // CET = (1 + indRate/100) * (1 + sp) - 1, depois soma taxa nominal
+  return taxaAnual + indRate + sp * 100
+}
+
+// Estima valor futuro da parcela corrigida pelo indexador
+function calcParcelaCorrigida(valorParcela: number, indexador: string | undefined, spread: number | undefined, periodicidade: string, selic: number): number {
+  if (!valorParcela || !indexador || indexador === 'Pré-fixado') return valorParcela
+  const periodos = periodicidade === 'Mensal' ? 12 : periodicidade === 'Semestral' ? 2 : 1
+  const taxaAnual = selic / 100 + (spread ?? 0)
+  const taxaPeriodo = Math.pow(1 + taxaAnual, 1 / periodos) - 1
+  return valorParcela * (1 + taxaPeriodo)
 }
 
 function ContratoModal({ contrato, clientId, onClose, onSaved, prefill }: {
@@ -93,9 +117,28 @@ function ContratoModal({ contrato, clientId, onClose, onSaved, prefill }: {
             </select>
           </div>
           <div>
-            <label className={lbl}>Taxa (% ao período)</label>
-            <input type="number" step="0.001" className={inp} value={form.taxa || ''} onChange={e => set('taxa', Number(e.target.value))} placeholder="Ex: 0.016 para 1,6%" />
+            <label className={lbl}>Taxa nominal (% a.a.)</label>
+            <input type="number" step="0.01" className={inp} value={form.taxa ? (form.taxa * 100).toFixed(4) : ''} onChange={e => set('taxa', Number(e.target.value) / 100)} placeholder="Ex: 9.5 para 9,5% a.a." />
           </div>
+          <div>
+            <label className={lbl}>Indexador</label>
+            <select className={inp} value={form.indexador ?? 'Pré-fixado'} onChange={e => set('indexador', e.target.value)}>
+              {INDEXADORES.map(i => <option key={i}>{i}</option>)}
+            </select>
+          </div>
+          {form.indexador && form.indexador !== 'Pré-fixado' && (
+            <div className="col-span-2 bg-amber-50 border border-amber-200 rounded-xl p-3 grid grid-cols-2 gap-3">
+              <div>
+                <label className={lbl}>Spread sobre {form.indexador} (% a.a.)</label>
+                <input type="number" step="0.01" className={inp} value={form.spreadIndexador ? (form.spreadIndexador * 100).toFixed(2) : ''} onChange={e => set('spreadIndexador', Number(e.target.value) / 100)} placeholder="Ex: 2.5 para 2,5% a.a." />
+              </div>
+              <div>
+                <label className={lbl}>{form.indexador} atual usado no cálculo (% a.a.)</label>
+                <input type="number" step="0.01" className={`${inp} bg-gray-100`} value={SELIC_ATUAL} readOnly />
+                <p className="text-xs text-amber-700 mt-1">CET estimado: {(form.taxa * 100 + SELIC_ATUAL + (form.spreadIndexador ?? 0) * 100).toFixed(2)}% a.a.</p>
+              </div>
+            </div>
+          )}
           <div>
             <label className={lbl}>Vencimento da Próxima Parcela *</label>
             <input type="date" className={inp} value={form.vencimento?.toString().split('T')[0] ?? ''} onChange={e => set('vencimento', e.target.value)} />
@@ -177,6 +220,8 @@ export function TabContratos({ clientId }: { clientId: string }) {
     taxa:            data.taxa         ?? 0,
     periodicidade:   data.periodicidade ?? 'Mensal',
     obs:             data.obs          ?? 'Importado via PDF — verifique os dados.',
+    indexador:       data.indexador    ?? 'Pré-fixado',
+    spreadIndexador: data.spreadIndexador ?? 0,
   })
 
   const handleImportPdf = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -280,7 +325,7 @@ export function TabContratos({ clientId }: { clientId: string }) {
             <table className="w-full text-xs">
               <thead>
                 <tr className="bg-gray-50 border-b">
-                  {['Modalidade', 'Banco', 'Contrato', 'Contratação', 'Valor Tomado', 'Total Parc.', 'Parc. Atual', 'Period.', 'Taxa', 'Próx. Venc.', 'Valor Parcela', ''].map(h => (
+                  {['Modalidade', 'Banco', 'Contrato', 'Contratação', 'Valor Tomado', 'Total Parc.', 'Parc. Atual', 'Period.', 'CET a.a.', 'Próx. Venc.', 'Parc. Nominal', 'Parc. c/ Índice', ''].map(h => (
                     <th key={h} className="px-3 py-2 text-left font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">{h}</th>
                   ))}
                 </tr>
@@ -296,11 +341,22 @@ export function TabContratos({ clientId }: { clientId: string }) {
                     <td className="px-3 py-2.5 text-center text-gray-700">{c.totalParcelas}</td>
                     <td className="px-3 py-2.5 text-center text-gray-700">{c.parcelaAtual}</td>
                     <td className="px-3 py-2.5 text-gray-600">{c.periodicidade}</td>
-                    <td className="px-3 py-2.5 text-gray-600">{(c.taxa * 100).toFixed(2)}%</td>
+                    <td className="px-3 py-2.5 text-gray-600 whitespace-nowrap">
+                      <span className="font-semibold">{calcCET(c.taxa, c.indexador, c.spreadIndexador, SELIC_ATUAL).toFixed(2)}%</span>
+                      {c.indexador && c.indexador !== 'Pré-fixado' && (
+                        <span className="ml-1 text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full">{c.indexador}</span>
+                      )}
+                    </td>
                     <td className={`px-3 py-2.5 font-medium whitespace-nowrap ${new Date(c.vencimento) < new Date() ? 'text-red-600' : 'text-gray-900'}`}>
                       {fmtDate(c.vencimento)}
                     </td>
-                    <td className="px-3 py-2.5 font-bold text-gray-900">{fmtBRL(c.valorParcela)}</td>
+                    <td className="px-3 py-2.5 text-gray-700">{fmtBRL(c.valorParcela)}</td>
+                    <td className="px-3 py-2.5 font-bold text-gray-900">
+                      {c.indexador && c.indexador !== 'Pré-fixado'
+                        ? <span className="text-amber-700">{fmtBRL(calcParcelaCorrigida(c.valorParcela, c.indexador, c.spreadIndexador, c.periodicidade, SELIC_ATUAL))}</span>
+                        : <span className="text-gray-400 text-xs">—</span>
+                      }
+                    </td>
                     <td className="px-3 py-2.5">
                       <div className="flex gap-1">
                         <button onClick={() => setModal(c)} className="p-1.5 hover:bg-blue-50 text-blue-500 rounded" title="Editar"><Edit2 size={14} /></button>
