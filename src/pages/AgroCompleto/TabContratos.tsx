@@ -412,7 +412,9 @@ export function TabContratos({ clientId }: { clientId: string }) {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
-                {contratos.map(c => (
+                {contratos.map(c => {
+                const parcContrato = cronograma?.parcelas.filter(p => p.contratoId === c.id) ?? []
+                return (<>
                   <tr key={c.id} className="hover:bg-gray-50/50 group">
                     <td className="px-3 py-2.5 font-medium text-gray-900 whitespace-nowrap">{c.modalidade}</td>
                     <td className="px-3 py-2.5 text-gray-700">{c.banco}</td>
@@ -456,55 +458,51 @@ export function TabContratos({ clientId }: { clientId: string }) {
                       </div>
                     </td>
                   </tr>
-                  {/* Tabela de amortização expandida por contrato */}
-                  {contratoExpandido === c.id && (() => {
-                    const parcContrato = cronograma?.parcelas.filter(p => p.contratoId === c.id) ?? []
-                    return (
-                      <tr key={`exp-${c.id}`}>
-                        <td colSpan={14} className="px-4 py-3 bg-blue-50/40 border-b border-blue-100">
-                          <div className="text-xs font-semibold text-blue-700 mb-2 flex items-center gap-2">
-                            <TableProperties size={13} />
-                            Tabela de Amortização — {c.banco} {c.numeroContrato ?? ''} ({c.sistemaAmortizacao ?? 'Price'})
-                          </div>
-                          {parcContrato.length === 0 ? (
-                            <p className="text-xs text-gray-400">Nenhuma parcela futura.</p>
-                          ) : (
-                            <div className="overflow-x-auto">
-                              <table className="w-full text-xs">
-                                <thead>
-                                  <tr className="border-b border-blue-200">
-                                    {['Nº', 'Vencimento', 'Amortização', 'Juros', 'Total Parcela', 'Saldo Devedor'].map(h => (
-                                      <th key={h} className="py-1.5 pr-4 text-left font-semibold text-gray-500 uppercase whitespace-nowrap">{h}</th>
-                                    ))}
-                                  </tr>
-                                </thead>
-                                <tbody className="divide-y divide-blue-100">
-                                  {parcContrato.map((p, i) => (
-                                    <tr key={i} className="hover:bg-blue-50">
-                                      <td className="py-1.5 pr-4 text-gray-500">{p.parcelaNum}/{p.totalParcelas}</td>
-                                      <td className="py-1.5 pr-4 font-medium text-gray-800 whitespace-nowrap">{fmtDate(p.vencimento)}</td>
-                                      <td className="py-1.5 pr-4 text-gray-700">{fmtBRL(p.amortizacao ?? 0)}</td>
-                                      <td className="py-1.5 pr-4 text-red-600">{fmtBRL(p.juros ?? 0)}</td>
-                                      <td className="py-1.5 pr-4 font-bold text-gray-900">{fmtBRL(p.valorParcela)}</td>
-                                      <td className="py-1.5 pr-4 text-gray-500">{fmtBRL(p.saldoDevedor ?? 0)}</td>
-                                    </tr>
+                  {contratoExpandido === c.id && (
+                    <tr key={`exp-${c.id}`}>
+                      <td colSpan={14} className="px-4 py-3 bg-blue-50/40 border-b border-blue-100">
+                        <div className="text-xs font-semibold text-blue-700 mb-2 flex items-center gap-2">
+                          <TableProperties size={13} />
+                          Tabela de Amortização — {c.banco} {c.numeroContrato ?? ''} ({c.sistemaAmortizacao ?? 'Price'})
+                        </div>
+                        {parcContrato.length === 0 ? (
+                          <p className="text-xs text-gray-400">Nenhuma parcela futura.</p>
+                        ) : (
+                          <div className="overflow-x-auto">
+                            <table className="w-full text-xs">
+                              <thead>
+                                <tr className="border-b border-blue-200">
+                                  {['Nº', 'Vencimento', 'Amortização', 'Juros', 'Total Parcela', 'Saldo Devedor'].map(h => (
+                                    <th key={h} className="py-1.5 pr-4 text-left font-semibold text-gray-500 uppercase whitespace-nowrap">{h}</th>
                                   ))}
-                                  <tr className="border-t-2 border-blue-300 font-bold">
-                                    <td colSpan={2} className="py-1.5 pr-4 text-gray-600">TOTAL</td>
-                                    <td className="py-1.5 pr-4 text-gray-800">{fmtBRL(parcContrato.reduce((s, p) => s + (p.amortizacao ?? 0), 0))}</td>
-                                    <td className="py-1.5 pr-4 text-red-700">{fmtBRL(parcContrato.reduce((s, p) => s + (p.juros ?? 0), 0))}</td>
-                                    <td className="py-1.5 pr-4 text-gray-900">{fmtBRL(parcContrato.reduce((s, p) => s + p.valorParcela, 0))}</td>
-                                    <td />
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-blue-100">
+                                {parcContrato.map((p, idx) => (
+                                  <tr key={idx} className="hover:bg-blue-50">
+                                    <td className="py-1.5 pr-4 text-gray-500">{p.parcelaNum}/{p.totalParcelas}</td>
+                                    <td className="py-1.5 pr-4 font-medium text-gray-800 whitespace-nowrap">{fmtDate(p.vencimento)}</td>
+                                    <td className="py-1.5 pr-4 text-gray-700">{fmtBRL(p.amortizacao ?? 0)}</td>
+                                    <td className="py-1.5 pr-4 text-red-600">{fmtBRL(p.juros ?? 0)}</td>
+                                    <td className="py-1.5 pr-4 font-bold text-gray-900">{fmtBRL(p.valorParcela)}</td>
+                                    <td className="py-1.5 pr-4 text-gray-500">{fmtBRL(p.saldoDevedor ?? 0)}</td>
                                   </tr>
-                                </tbody>
-                              </table>
-                            </div>
-                          )}
-                        </td>
-                      </tr>
-                    )
-                  })()}
-                ))}
+                                ))}
+                                <tr className="border-t-2 border-blue-300 font-bold">
+                                  <td colSpan={2} className="py-1.5 pr-4 text-gray-600">TOTAL</td>
+                                  <td className="py-1.5 pr-4 text-gray-800">{fmtBRL(parcContrato.reduce((s, p) => s + (p.amortizacao ?? 0), 0))}</td>
+                                  <td className="py-1.5 pr-4 text-red-700">{fmtBRL(parcContrato.reduce((s, p) => s + (p.juros ?? 0), 0))}</td>
+                                  <td className="py-1.5 pr-4 text-gray-900">{fmtBRL(parcContrato.reduce((s, p) => s + p.valorParcela, 0))}</td>
+                                  <td />
+                                </tr>
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  )}
+                </>)})}
               </tbody>
             </table>
             {contratos.length === 0 && <div className="py-10 text-center text-gray-400 text-sm">Nenhum contrato cadastrado</div>}
