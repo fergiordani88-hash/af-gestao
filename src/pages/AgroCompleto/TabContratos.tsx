@@ -579,9 +579,9 @@ export function TabContratos({ clientId }: { clientId: string }) {
       <Card>
         <div className="px-4 py-3 border-b border-gray-100 font-semibold text-sm text-gray-700">Contratos Cadastrados</div>
         {loading ? <div className="py-10 text-center text-gray-400 text-sm">Carregando...</div> : (
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto overflow-y-auto max-h-[520px]">
             <table className="w-full text-xs">
-              <thead>
+              <thead className="sticky top-0 z-10">
                 <tr className="bg-gray-50 border-b">
                   {([
                     { label: 'Modalidade',      key: 'modalidade' },
