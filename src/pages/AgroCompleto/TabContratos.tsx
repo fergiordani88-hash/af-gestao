@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Plus, Trash2, Edit2, X, ChevronDown, ChevronUp, AlertTriangle, FileUp, Loader2, TableProperties, Filter, Download } from 'lucide-react'
+import { Plus, Trash2, Edit2, X, ChevronDown, ChevronUp, AlertTriangle, FileUp, Loader2, TableProperties, Filter, Download, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react'
 import { agroApi, type AgroContrato, type AgroParcela } from '../../services/agroApi'
 import { Card } from '../../components/ui/Card'
 import { clsx } from 'clsx'
@@ -259,15 +259,44 @@ export function TabContratos({ clientId }: { clientId: string }) {
   const [filterCETMax, setFilterCETMax] = useState('')
   const [filterVencAte, setFilterVencAte] = useState('')
 
-  const contratosFiltrados = contratos.filter(c => {
-    if (filterBanco && !c.banco.toLowerCase().includes(filterBanco.toLowerCase())) return false
-    if (filterModalidade && c.modalidade !== filterModalidade) return false
-    if (filterValorMin && c.valorTomado < Number(filterValorMin)) return false
-    if (filterValorMax && c.valorTomado > Number(filterValorMax)) return false
-    if (filterCETMax && calcCET(c.taxa, c.indexador, c.spreadIndexador) > Number(filterCETMax)) return false
-    if (filterVencAte && new Date(c.vencimento) > new Date(filterVencAte)) return false
-    return true
-  })
+  // Ordenação
+  type SortKey = 'modalidade' | 'banco' | 'numeroContrato' | 'dataContratacao' | 'valorTomado' | 'totalParcelas' | 'parcelaAtual' | 'periodicidade' | 'sistemaAmortizacao' | 'cet' | 'vencimento' | 'valorParcela'
+  const [sortKey, setSortKey] = useState<SortKey | null>(null)
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
+
+  function toggleSort(key: SortKey) {
+    if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
+    else { setSortKey(key); setSortDir('asc') }
+  }
+
+  const contratosFiltrados = contratos
+    .filter(c => {
+      if (filterBanco && !c.banco.toLowerCase().includes(filterBanco.toLowerCase())) return false
+      if (filterModalidade && c.modalidade !== filterModalidade) return false
+      if (filterValorMin && c.valorTomado < Number(filterValorMin)) return false
+      if (filterValorMax && c.valorTomado > Number(filterValorMax)) return false
+      if (filterCETMax && calcCET(c.taxa, c.indexador, c.spreadIndexador) > Number(filterCETMax)) return false
+      if (filterVencAte && new Date(c.vencimento) > new Date(filterVencAte)) return false
+      return true
+    })
+    .sort((a, b) => {
+      if (!sortKey) return 0
+      let va: string | number = 0
+      let vb: string | number = 0
+      if (sortKey === 'cet') {
+        va = calcCET(a.taxa, a.indexador, a.spreadIndexador)
+        vb = calcCET(b.taxa, b.indexador, b.spreadIndexador)
+      } else if (sortKey === 'valorParcela') {
+        va = a.sistemaAmortizacao === 'SAC' && (!a.indexador || a.indexador === 'Pré-fixado') ? calcParcelaAtualSAC(a) : a.valorParcela
+        vb = b.sistemaAmortizacao === 'SAC' && (!b.indexador || b.indexador === 'Pré-fixado') ? calcParcelaAtualSAC(b) : b.valorParcela
+      } else {
+        va = a[sortKey] ?? ''
+        vb = b[sortKey] ?? ''
+      }
+      if (va < vb) return sortDir === 'asc' ? -1 : 1
+      if (va > vb) return sortDir === 'asc' ? 1 : -1
+      return 0
+    })
 
   const filtrosAtivos = [filterBanco, filterModalidade, filterValorMin, filterValorMax, filterCETMax, filterVencAte].filter(Boolean).length
 
@@ -554,8 +583,35 @@ export function TabContratos({ clientId }: { clientId: string }) {
             <table className="w-full text-xs">
               <thead>
                 <tr className="bg-gray-50 border-b">
-                  {['Modalidade', 'Banco', 'Contrato', 'Contratação', 'Valor Tomado', 'Total Parc.', 'Parc. Atual', 'Period.', 'Amort.', 'CET a.a.', 'Próx. Venc.', 'Parc. Nominal', 'Parc. c/ Índice', ''].map(h => (
-                    <th key={h} className="px-3 py-2 text-left font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">{h}</th>
+                  {([
+                    { label: 'Modalidade',      key: 'modalidade' },
+                    { label: 'Banco',           key: 'banco' },
+                    { label: 'Contrato',        key: 'numeroContrato' },
+                    { label: 'Contratação',     key: 'dataContratacao' },
+                    { label: 'Valor Tomado',    key: 'valorTomado' },
+                    { label: 'Total Parc.',     key: 'totalParcelas' },
+                    { label: 'Parc. Atual',     key: 'parcelaAtual' },
+                    { label: 'Period.',         key: 'periodicidade' },
+                    { label: 'Amort.',          key: 'sistemaAmortizacao' },
+                    { label: 'CET a.a.',        key: 'cet' },
+                    { label: 'Próx. Venc.',     key: 'vencimento' },
+                    { label: 'Parc. Nominal',   key: 'valorParcela' },
+                    { label: 'Parc. c/ Índice', key: null },
+                    { label: '',                key: null },
+                  ] as { label: string; key: SortKey | null }[]).map(({ label, key }) => (
+                    <th
+                      key={label}
+                      onClick={() => key && toggleSort(key)}
+                      className={`px-3 py-2 text-left font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap ${key ? 'cursor-pointer select-none hover:text-gray-800 hover:bg-gray-100' : ''}`}
+                    >
+                      <span className="inline-flex items-center gap-1">
+                        {label}
+                        {key && (sortKey === key
+                          ? (sortDir === 'asc' ? <ArrowUp size={11} className="text-af-green" /> : <ArrowDown size={11} className="text-af-green" />)
+                          : <ArrowUpDown size={11} className="text-gray-300" />
+                        )}
+                      </span>
+                    </th>
                   ))}
                 </tr>
               </thead>
