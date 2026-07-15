@@ -207,6 +207,16 @@ export function TabContratos({ clientId }: { clientId: string }) {
     } catch { return null }
   }
 
+  // Normaliza valores antigos/vindos de PDF que podem conter sufixos como "- ÍNDICE MENSAL"
+  const normalizeIndexador = (v?: string): string => {
+    if (!v) return 'Pré-fixado'
+    if (v.toUpperCase().includes('CDI'))  return 'CDI'
+    if (v.toUpperCase().includes('SELIC')) return 'SELIC'
+    if (v.toUpperCase().includes('IPCA')) return 'IPCA'
+    if (v.toUpperCase().includes('TR'))   return 'TR'
+    return INDEXADORES.includes(v) ? v : 'Pré-fixado'
+  }
+
   const mapFields = (data: any): Partial<AgroContrato> => ({
     banco:           data.banco        ?? '',
     numeroContrato:  data.numeroContrato ?? '',
@@ -220,7 +230,7 @@ export function TabContratos({ clientId }: { clientId: string }) {
     taxa:            data.taxa         ?? 0,
     periodicidade:   data.periodicidade ?? 'Mensal',
     obs:             data.obs          ?? 'Importado via PDF — verifique os dados.',
-    indexador:       data.indexador    ?? 'Pré-fixado',
+    indexador:       normalizeIndexador(data.indexador),
     spreadIndexador: data.spreadIndexador ?? 0,
   })
 
