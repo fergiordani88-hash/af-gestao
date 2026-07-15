@@ -66,6 +66,14 @@ function calcCET(taxa: number, indexador: string | undefined, spread: number | u
   return taxa * 100
 }
 
+function isPosFix(indexador?: string) {
+  return !!indexador && indexador !== 'Pré-fixado'
+}
+
+function amortLabel(c: { indexador?: string; sistemaAmortizacao?: string }) {
+  return isPosFix(c.indexador) || c.sistemaAmortizacao === 'SAC' ? 'SAC' : 'Price'
+}
+
 // Estima valor futuro da parcela corrigida pelo indexador
 function calcParcelaCorrigida(valorParcela: number, indexador: string | undefined, spread: number | undefined, periodicidade: string): number {
   if (!valorParcela || !indexador || indexador === 'Pré-fixado') return valorParcela
@@ -630,15 +638,9 @@ export function TabContratos({ clientId }: { clientId: string }) {
                     <td className="px-3 py-2.5 text-center text-gray-700">{c.parcelaAtual}</td>
                     <td className="px-3 py-2.5 text-gray-600">{c.periodicidade}</td>
                     <td className="px-3 py-2.5 text-center">
-                      {(() => {
-                        const isPosFix = c.indexador && c.indexador !== 'Pré-fixado'
-                        const isSAC = isPosFix || c.sistemaAmortizacao === 'SAC'
-                        return (
-                          <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${isSAC ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}`}>
-                            {isSAC ? 'SAC' : 'Price'}
-                          </span>
-                        )
-                      })()}
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${amortLabel(c) === 'SAC' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}`}>
+                        {amortLabel(c)}
+                      </span>
                     </td>
                     <td className="px-3 py-2.5 text-gray-600 whitespace-nowrap">
                       <span className="font-semibold">{calcCET(c.taxa, c.indexador, c.spreadIndexador).toFixed(2)}%</span>
