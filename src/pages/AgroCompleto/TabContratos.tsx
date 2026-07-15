@@ -1,8 +1,10 @@
-import { useState, useEffect } from 'react'
-import { Plus, Trash2, Edit2, X, ChevronDown, ChevronUp, AlertTriangle } from 'lucide-react'
+import { useState, useEffect, useRef } from 'react'
+import { Plus, Trash2, Edit2, X, ChevronDown, ChevronUp, AlertTriangle, FileUp, Loader2 } from 'lucide-react'
 import { agroApi, type AgroContrato, type AgroParcela } from '../../services/agroApi'
 import { Card } from '../../components/ui/Card'
 import { clsx } from 'clsx'
+
+const API_BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:3333/api'
 
 const fmtBRL = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 })
 const fmtDate = (d: string | Date) => new Date(d).toLocaleDateString('pt-BR')
@@ -16,11 +18,11 @@ const EMPTY: Omit<AgroContrato, 'id'> = {
   periodicidade: 'Mensal', taxa: 0, vencimento: '', valorParcela: 0, obs: '',
 }
 
-function ContratoModal({ contrato, clientId, onClose, onSaved }: {
-  contrato?: AgroContrato; clientId: string; onClose: () => void; onSaved: () => void
+function ContratoModal({ contrato, clientId, onClose, onSaved, prefill }: {
+  contrato?: AgroContrato; clientId: string; onClose: () => void; onSaved: () => void; prefill?: Partial<AgroContrato>
 }) {
   const [form, setForm] = useState<Omit<AgroContrato, 'id'>>(
-    contrato ? { ...contrato } : { ...EMPTY, clientId }
+    contrato ? { ...contrato } : { ...EMPTY, clientId, ...prefill }
   )
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -127,6 +129,10 @@ export function TabContratos({ clientId }: { clientId: string }) {
   const [cronograma, setCronograma] = useState<{ parcelas: AgroParcela[]; porAno: Record<string, { parcelas: number; total: number }>; totalEndividamento: number; totalFuturo: number }>()
   const [loading, setLoading] = useState(true)
   const [modal, setModal] = useState<AgroContrato | 'new' | null>(null)
+  const [prefill, setPrefill] = useState<Partial<AgroContrato> | undefined>()
+  const [importing, setImporting] = useState(false)
+  const [importMsg, setImportMsg] = useState('')
+  const fileRef = useRef<HTMLInputElement>(null)
   const [anoExpandido, setAnoExpandido] = useState<string | null>(null)
 
   const load = async () => {
@@ -149,20 +155,103 @@ export function TabContratos({ clientId }: { clientId: string }) {
     load()
   }
 
+  const getToken = () => {
+    try {
+      const raw = localStorage.getItem('af-auth')
+      return raw ? JSON.parse(raw)?.state?.token ?? null : null
+    } catch { return null }
+  }
+
+  const mapFields = (data: any): Partial<AgroContrato> => ({
+    banco:           data.banco        ?? '',
+    numeroContrato:  data.numeroContrato ?? '',
+    modalidade:      data.modalidade   ?? 'Capital de giro',
+    dataContratacao: data.dataContratacao ?? '',
+    vencimento:      data.vencimento   ?? '',
+    valorTomado:     data.valorTomado  ?? 0,
+    valorParcela:    data.valorParcela ?? 0,
+    totalParcelas:   data.totalParcelas ?? 1,
+    parcelaAtual:    data.parcelaAtual ?? 1,
+    taxa:            data.taxa         ?? 0,
+    periodicidade:   data.periodicidade ?? 'Mensal',
+    obs:             data.obs          ?? 'Importado via PDF — verifique os dados.',
+  })
+
+  const handleImportPdf = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setImporting(true)
+    setImportMsg('Analisando PDF com IA...')
+    try {
+      const token = getToken()
+      const fd = new FormData()
+      fd.append('pdf', file)
+      const res = await fetch(`${API_BASE}/agro/contratos/import-pdf`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: fd,
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error ?? 'Erro ao processar')
+
+      // PDF com múltiplos contratos
+      if (Array.isArray(data.contratos) && data.contratos.length > 0) {
+        let salvos = 0
+        for (const ct of data.contratos) {
+          const fields = mapFields(ct)
+          if (fields.banco || fields.valorTomado) {
+            await agroApi.contratos.create({ ...fields, clientId } as AgroContrato)
+            salvos++
+          }
+        }
+        await load()
+        setImportMsg(`✅ ${salvos} contrato(s) importado(s) do PDF e salvos automaticamente. Verifique e ajuste os dados se necessário.`)
+      } else {
+        // Contrato único — abre modal para conferência
+        const pre = mapFields(data)
+        setPrefill(pre)
+        setModal('new')
+        const found = [pre.banco, pre.valorTomado, pre.dataContratacao, pre.vencimento, pre.totalParcelas].filter(v => v && v !== 0 && v !== '').length
+        setImportMsg(`✅ ${found} campo(s) identificado(s) — confira e salve.`)
+      }
+    } catch (err: any) {
+      setImportMsg('❌ ' + err.message)
+    } finally {
+      setImporting(false)
+      if (fileRef.current) fileRef.current.value = ''
+    }
+  }
+
   const anos = cronograma ? Object.keys(cronograma.porAno).sort() : []
 
   return (
     <div className="space-y-5">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
         <div>
           <h2 className="font-bold text-gray-900">Contratos de Crédito</h2>
           <p className="text-xs text-gray-500 mt-0.5">Lançamento contrato a contrato → cronograma ordenado automático</p>
         </div>
-        <button onClick={() => setModal('new')} className="flex items-center gap-2 bg-af-green text-white rounded-xl px-4 py-2 text-sm font-semibold hover:bg-af-green-light">
-          <Plus size={15} /> Novo Contrato
-        </button>
+        <div className="flex items-center gap-2">
+          <input ref={fileRef} type="file" accept=".pdf" className="hidden" onChange={handleImportPdf} />
+          <button
+            onClick={() => fileRef.current?.click()}
+            disabled={importing}
+            className="flex items-center gap-2 border border-af-green text-af-green rounded-xl px-4 py-2 text-sm font-semibold hover:bg-af-green/5 disabled:opacity-60"
+          >
+            {importing ? <Loader2 size={15} className="animate-spin" /> : <FileUp size={15} />}
+            {importing ? 'Lendo...' : 'Importar PDF'}
+          </button>
+          <button onClick={() => { setPrefill(undefined); setModal('new') }} className="flex items-center gap-2 bg-af-green text-white rounded-xl px-4 py-2 text-sm font-semibold hover:bg-af-green-light">
+            <Plus size={15} /> Novo Contrato
+          </button>
+        </div>
       </div>
+      {importMsg && (
+        <div className="flex items-center gap-2 text-sm px-4 py-2 bg-blue-50 border border-blue-200 rounded-xl text-blue-700">
+          <AlertTriangle size={14} /> {importMsg}
+        </div>
+      )}
 
       {/* KPIs */}
       {cronograma && (
@@ -327,8 +416,9 @@ export function TabContratos({ clientId }: { clientId: string }) {
         <ContratoModal
           contrato={modal === 'new' ? undefined : modal}
           clientId={clientId}
-          onClose={() => setModal(null)}
-          onSaved={() => { load(); setModal(null) }}
+          prefill={modal === 'new' ? prefill : undefined}
+          onClose={() => { setModal(null); setPrefill(undefined); setImportMsg('') }}
+          onSaved={() => { load(); setModal(null); setPrefill(undefined); setImportMsg('') }}
         />
       )}
     </div>
