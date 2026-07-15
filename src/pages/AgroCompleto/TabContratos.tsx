@@ -60,9 +60,10 @@ function calcParcelaAtualSAC(c: AgroContrato): number {
 
 // Custo Efetivo Total anual: taxa contratual + índice de referência (quando pós-fixado)
 function calcCET(taxa: number, indexador: string | undefined, spread: number | undefined): number {
-  const taxaAnual = taxa * 100
-  if (!indexador || indexador === 'Pré-fixado') return taxaAnual
-  return taxaAnual + taxaRef(indexador) + (spread ?? 0) * 100
+  // Pós-fixado: CET = taxa_referência + spread (taxa nominal ignorada, igual ao backend)
+  if (indexador && indexador !== 'Pré-fixado') return taxaRef(indexador) + (spread ?? 0) * 100
+  // Pré-fixado: CET = taxa nominal
+  return taxa * 100
 }
 
 // Estima valor futuro da parcela corrigida pelo indexador
@@ -167,7 +168,7 @@ function ContratoModal({ contrato, clientId, onClose, onSaved, prefill }: {
               <div>
                 <label className={lbl}>{form.indexador} atual usado no cálculo (% a.a.)</label>
                 <input type="number" step="0.01" className={`${inp} bg-gray-100`} value={taxaRef(form.indexador)} readOnly />
-                <p className="text-xs text-amber-700 mt-1">CET estimado: {(form.taxa * 100 + taxaRef(form.indexador) + (form.spreadIndexador ?? 0) * 100).toFixed(2)}% a.a.</p>
+                <p className="text-xs text-amber-700 mt-1">CET estimado: {calcCET(form.taxa, form.indexador, form.spreadIndexador).toFixed(2)}% a.a.</p>
               </div>
             </div>
           )}
