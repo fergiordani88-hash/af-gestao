@@ -39,6 +39,17 @@ function calcPrimeiraSAC(pv: number, taxaAnual: number, n: number, periodicidade
   return pv / n + pv * i
 }
 
+// Calcula parcela SAC na posição k (k = parcelaAtual - 1 parcelas já pagas)
+function calcParcelaAtualSAC(c: AgroContrato): number {
+  if (!c.valorTomado || !c.totalParcelas || !c.taxa) return c.valorParcela
+  const np = c.periodicidade === 'Mensal' ? 12 : c.periodicidade === 'Semestral' ? 2 : c.periodicidade === 'Trimestral' ? 4 : 1
+  const i = Math.pow(1 + c.taxa, 1 / np) - 1
+  const amort = c.valorTomado / c.totalParcelas
+  const k = (c.parcelaAtual || 1) - 1
+  const saldo = c.valorTomado - amort * k
+  return amort + saldo * i
+}
+
 // Custo Efetivo Total anual: taxa contratual + indexador (quando pós-fixado)
 function calcCET(taxa: number, indexador: string | undefined, spread: number | undefined, selic: number): number {
   const taxaAnual = taxa * 100
@@ -420,7 +431,12 @@ export function TabContratos({ clientId }: { clientId: string }) {
                     <td className={`px-3 py-2.5 font-medium whitespace-nowrap ${new Date(c.vencimento) < new Date() ? 'text-red-600' : 'text-gray-900'}`}>
                       {fmtDate(c.vencimento)}
                     </td>
-                    <td className="px-3 py-2.5 text-gray-700">{fmtBRL(c.valorParcela)}</td>
+                    <td className="px-3 py-2.5 text-gray-700 whitespace-nowrap">
+                      {c.sistemaAmortizacao === 'SAC' && (!c.indexador || c.indexador === 'Pré-fixado')
+                        ? <span title="Parcela atual calculada (SAC decrescente)">{fmtBRL(calcParcelaAtualSAC(c))}</span>
+                        : fmtBRL(c.valorParcela)
+                      }
+                    </td>
                     <td className="px-3 py-2.5 font-bold text-gray-900">
                       {c.indexador && c.indexador !== 'Pré-fixado'
                         ? <span className="text-amber-700">{fmtBRL(calcParcelaCorrigida(c.valorParcela, c.indexador, c.spreadIndexador, c.periodicidade, SELIC_ATUAL))}</span>
