@@ -15,11 +15,28 @@ const PERIODICIDADES = ['Mensal', 'Semestral', 'Anual', 'Trimestral', 'Único']
 const INDEXADORES = ['Pré-fixado', 'CDI', 'SELIC', 'IPCA', 'TR']
 const SELIC_ATUAL = 14.75 // % a.a. — atualizar conforme COPOM
 
+const SISTEMAS_AMORT = ['Price', 'SAC']
+
 const EMPTY: Omit<AgroContrato, 'id'> = {
   clientId: '', modalidade: 'Capital de giro', banco: '', numeroContrato: '',
   dataContratacao: '', valorTomado: 0, totalParcelas: 1, parcelaAtual: 1,
   periodicidade: 'Mensal', taxa: 0, vencimento: '', valorParcela: 0, obs: '',
-  indexador: 'Pré-fixado', spreadIndexador: 0,
+  indexador: 'Pré-fixado', spreadIndexador: 0, sistemaAmortizacao: 'Price',
+}
+
+// Calcula PMT (Price): parcela constante
+function calcPMT(pv: number, taxaAnual: number, n: number, periodicidade: string): number {
+  const np = periodicidade === 'Mensal' ? 12 : periodicidade === 'Semestral' ? 2 : periodicidade === 'Trimestral' ? 4 : 1
+  const i = Math.pow(1 + taxaAnual, 1 / np) - 1
+  if (i === 0) return pv / n
+  return pv * (i * Math.pow(1 + i, n)) / (Math.pow(1 + i, n) - 1)
+}
+
+// Calcula primeira parcela SAC (maior, pois juros sobre saldo cheio)
+function calcPrimeiraSAC(pv: number, taxaAnual: number, n: number, periodicidade: string): number {
+  const np = periodicidade === 'Mensal' ? 12 : periodicidade === 'Semestral' ? 2 : periodicidade === 'Trimestral' ? 4 : 1
+  const i = Math.pow(1 + taxaAnual, 1 / np) - 1
+  return pv / n + pv * i
 }
 
 // Custo Efetivo Total anual: taxa contratual + indexador (quando pós-fixado)
@@ -139,14 +156,51 @@ function ContratoModal({ contrato, clientId, onClose, onSaved, prefill }: {
               </div>
             </div>
           )}
+          {/* Sistema de Amortização — só para pré-fixados; pós-fixados sempre SAC */}
+          {(!form.indexador || form.indexador === 'Pré-fixado') && (
+            <div className="col-span-2">
+              <label className={lbl}>Sistema de Amortização</label>
+              <div className="flex gap-3">
+                {SISTEMAS_AMORT.map(s => (
+                  <button key={s} type="button"
+                    onClick={() => set('sistemaAmortizacao', s)}
+                    className={`flex-1 py-2 rounded-xl text-sm font-semibold border transition-colors ${
+                      form.sistemaAmortizacao === s
+                        ? 'bg-af-green text-white border-af-green'
+                        : 'bg-white text-gray-600 border-gray-200 hover:border-af-green'
+                    }`}>
+                    {s === 'Price' ? 'Price (parcela fixa)' : 'SAC (amort. constante)'}
+                  </button>
+                ))}
+              </div>
+              {/* Preview da parcela calculada */}
+              {form.valorTomado > 0 && form.totalParcelas > 0 && form.taxa > 0 && (
+                <div className="mt-2 text-xs text-gray-500 bg-gray-50 rounded-lg px-3 py-2 flex gap-4">
+                  {form.sistemaAmortizacao === 'Price' ? (
+                    <span>Parcela fixa estimada: <strong className="text-af-green">
+                      {calcPMT(form.valorTomado, form.taxa, form.totalParcelas, form.periodicidade).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                    </strong></span>
+                  ) : (
+                    <>
+                      <span>1ª parcela (maior): <strong className="text-af-green">
+                        {calcPrimeiraSAC(form.valorTomado, form.taxa, form.totalParcelas, form.periodicidade).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                      </strong></span>
+                      <span>Amort. fixa: <strong>
+                        {(form.valorTomado / form.totalParcelas).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                      </strong></span>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
           <div>
             <label className={lbl}>Vencimento da Próxima Parcela *</label>
             <input type="date" className={inp} value={form.vencimento?.toString().split('T')[0] ?? ''} onChange={e => set('vencimento', e.target.value)} />
           </div>
           <div>
-            <label className={lbl}>Valor da Parcela (R$)</label>
-            <input type="number" className={inp} value={form.valorParcela || ''} onChange={e => set('valorParcela', Number(e.target.value))} />
-          </div>
+            <label className={lbl}>Valor da Parcela (R$) {form.sistemaAmortizacao === 'SAC' ? '— 1ª parcela' : ''}</label>
+            <input type="number" className={inp} value={form.valorParcela || ''} onChange={e => set('valorParcela', Number(e.target.value))} /></div>
           <div className="col-span-2">
             <label className={lbl}>Observações</label>
             <input className={inp} value={form.obs ?? ''} onChange={e => set('obs', e.target.value)} placeholder="Garantias, condições especiais, etc." />
@@ -230,8 +284,9 @@ export function TabContratos({ clientId }: { clientId: string }) {
     taxa:            data.taxa         ?? 0,
     periodicidade:   data.periodicidade ?? 'Mensal',
     obs:             data.obs          ?? 'Importado via PDF — verifique os dados.',
-    indexador:       normalizeIndexador(data.indexador),
-    spreadIndexador: data.spreadIndexador ?? 0,
+    indexador:          normalizeIndexador(data.indexador),
+    spreadIndexador:    data.spreadIndexador ?? 0,
+    sistemaAmortizacao: data.sistemaAmortizacao === 'SAC' ? 'SAC' : 'Price',
   })
 
   const handleImportPdf = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -335,7 +390,7 @@ export function TabContratos({ clientId }: { clientId: string }) {
             <table className="w-full text-xs">
               <thead>
                 <tr className="bg-gray-50 border-b">
-                  {['Modalidade', 'Banco', 'Contrato', 'Contratação', 'Valor Tomado', 'Total Parc.', 'Parc. Atual', 'Period.', 'CET a.a.', 'Próx. Venc.', 'Parc. Nominal', 'Parc. c/ Índice', ''].map(h => (
+                  {['Modalidade', 'Banco', 'Contrato', 'Contratação', 'Valor Tomado', 'Total Parc.', 'Parc. Atual', 'Period.', 'Amort.', 'CET a.a.', 'Próx. Venc.', 'Parc. Nominal', 'Parc. c/ Índice', ''].map(h => (
                     <th key={h} className="px-3 py-2 text-left font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">{h}</th>
                   ))}
                 </tr>
@@ -351,6 +406,11 @@ export function TabContratos({ clientId }: { clientId: string }) {
                     <td className="px-3 py-2.5 text-center text-gray-700">{c.totalParcelas}</td>
                     <td className="px-3 py-2.5 text-center text-gray-700">{c.parcelaAtual}</td>
                     <td className="px-3 py-2.5 text-gray-600">{c.periodicidade}</td>
+                    <td className="px-3 py-2.5 text-center">
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${c.sistemaAmortizacao === 'SAC' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}`}>
+                        {c.sistemaAmortizacao ?? 'Price'}
+                      </span>
+                    </td>
                     <td className="px-3 py-2.5 text-gray-600 whitespace-nowrap">
                       <span className="font-semibold">{calcCET(c.taxa, c.indexador, c.spreadIndexador, SELIC_ATUAL).toFixed(2)}%</span>
                       {c.indexador && c.indexador !== 'Pré-fixado' && (
@@ -453,7 +513,7 @@ export function TabContratos({ clientId }: { clientId: string }) {
             <table className="w-full text-xs">
               <thead className="sticky top-0 bg-gray-50">
                 <tr className="border-b">
-                  {['Vencimento', 'Modalidade', 'Banco', 'Contrato', 'Contratação', 'Valor Tomado', 'Parcela', 'Period.', 'Taxa', 'Valor Parcela'].map(h => (
+                  {['Vencimento', 'Modalidade', 'Banco', 'Contrato', 'Contratação', 'Valor Tomado', 'Parcela', 'Period.', 'Taxa', 'Amortização', 'Juros', 'Total Parcela', 'Saldo Devedor'].map(h => (
                     <th key={h} className="px-3 py-2 text-left font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">{h}</th>
                   ))}
                 </tr>
@@ -473,7 +533,10 @@ export function TabContratos({ clientId }: { clientId: string }) {
                       <td className="px-3 py-2 text-center text-gray-700">{p.parcelaNum}/{p.totalParcelas}</td>
                       <td className="px-3 py-2 text-gray-600">{p.periodicidade}</td>
                       <td className="px-3 py-2 text-gray-600">{(p.taxa * 100).toFixed(2)}%</td>
+                      <td className="px-3 py-2 text-gray-700">{p.amortizacao != null ? fmtBRL(p.amortizacao) : '—'}</td>
+                      <td className="px-3 py-2 text-red-600">{p.juros != null ? fmtBRL(p.juros) : '—'}</td>
                       <td className="px-3 py-2 font-bold text-gray-900">{fmtBRL(p.valorParcela)}</td>
+                      <td className="px-3 py-2 text-gray-500">{p.saldoDevedor != null ? fmtBRL(p.saldoDevedor) : '—'}</td>
                     </tr>
                   )
                 })}
