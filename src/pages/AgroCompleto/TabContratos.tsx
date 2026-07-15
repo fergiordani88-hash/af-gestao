@@ -302,9 +302,9 @@ export function TabContratos({ clientId }: { clientId: string }) {
                     </td>
                     <td className="px-3 py-2.5 font-bold text-gray-900">{fmtBRL(c.valorParcela)}</td>
                     <td className="px-3 py-2.5">
-                      <div className="flex gap-1 opacity-0 group-hover:opacity-100">
-                        <button onClick={() => setModal(c)} className="p-1.5 hover:bg-blue-50 text-blue-500 rounded"><Edit2 size={12} /></button>
-                        <button onClick={() => c.id && handleDelete(c.id)} className="p-1.5 hover:bg-red-50 text-red-400 rounded"><Trash2 size={12} /></button>
+                      <div className="flex gap-1">
+                        <button onClick={() => setModal(c)} className="p-1.5 hover:bg-blue-50 text-blue-500 rounded" title="Editar"><Edit2 size={14} /></button>
+                        <button onClick={() => c.id && handleDelete(c.id)} className="p-1.5 hover:bg-red-50 text-red-400 rounded" title="Excluir"><Trash2 size={14} /></button>
                       </div>
                     </td>
                   </tr>
