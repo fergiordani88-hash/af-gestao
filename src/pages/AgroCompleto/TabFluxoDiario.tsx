@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
-import { Edit2, X, Save } from 'lucide-react'
+import { Edit2, X, Save, FileDown } from 'lucide-react'
 import { agroApi, type FluxoItem } from '../../services/agroApi'
 import { Card } from '../../components/ui/Card'
+import { exportarFluxoDiarioPDF } from './FluxoPDF'
 
 const fmtBRL = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 })
 const fmtDate = (d: string | Date) => new Date(d).toLocaleDateString('pt-BR')
@@ -18,6 +19,7 @@ export function TabFluxoDiario({ clientId }: { clientId: string }) {
   const [filtroAno, setFiltroAno] = useState('todos')
   const [editing, setEditing] = useState<EditState | null>(null)
   const [saving, setSaving] = useState(false)
+  const [exportando, setExportando] = useState(false)
 
   const load = async () => {
     setLoading(true)
@@ -74,6 +76,18 @@ export function TabFluxoDiario({ clientId }: { clientId: string }) {
             onBlur={() => setSaldoInicial(Number(saldoInputStr.replace(/\D/g, '')) || 0)}
             className="w-32 border border-gray-200 rounded-xl px-3 py-1.5 text-sm text-right"
           />
+          <button
+            onClick={async () => {
+              setExportando(true)
+              try { await exportarFluxoDiarioPDF(filtered, saldoInicial) }
+              finally { setExportando(false) }
+            }}
+            disabled={exportando || filtered.length === 0}
+            className="flex items-center gap-1.5 bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white text-sm font-semibold rounded-xl px-3 py-1.5"
+          >
+            <FileDown size={14} />
+            {exportando ? 'Gerando...' : 'Exportar PDF'}
+          </button>
         </div>
       </div>
 

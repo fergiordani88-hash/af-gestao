@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, Legend, LineChart, Line, ComposedChart } from 'recharts'
+import { FileDown } from 'lucide-react'
 import { agroApi, type FluxoMensal } from '../../services/agroApi'
 import { Card } from '../../components/ui/Card'
+import { exportarFluxoMensalPDF } from './FluxoPDF'
 
 const fmtBRL = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 })
 const fmtK = (v: number) => `${(v / 1000).toFixed(0)}k`
@@ -12,6 +14,7 @@ export function TabFluxoMensal({ clientId }: { clientId: string }) {
   const [saldoInicial, setSaldoInicial] = useState(0)
   const [saldoStr, setSaldoStr] = useState('0')
   const [loading, setLoading] = useState(true)
+  const [exportando, setExportando] = useState(false)
 
   const load = async () => {
     setLoading(true)
@@ -50,6 +53,18 @@ export function TabFluxoMensal({ clientId }: { clientId: string }) {
             className="w-36 border border-gray-200 rounded-xl px-3 py-1.5 text-sm text-right"
             placeholder="R$ 0"
           />
+          <button
+            onClick={async () => {
+              setExportando(true)
+              try { await exportarFluxoMensalPDF(mensal, porAno, saldoInicial) }
+              finally { setExportando(false) }
+            }}
+            disabled={exportando || mensal.length === 0}
+            className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-sm font-semibold rounded-xl px-3 py-1.5"
+          >
+            <FileDown size={14} />
+            {exportando ? 'Gerando...' : 'Exportar PDF'}
+          </button>
         </div>
       </div>
 

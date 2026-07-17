@@ -35,9 +35,11 @@ export function TabDespesas({ clientId }: { clientId: string }) {
   const [showForm, setShowForm] = useState(false)
   const [form, setForm] = useState<Omit<AgroDespesa, 'id'>>(EMPTY(clientId))
   const [editId, setEditId] = useState<string | null>(null)
+  const [editDescOriginal, setEditDescOriginal] = useState('')
   const [repetir, setRepetir] = useState(false)
   const [mesesRepetir, setMesesRepetir] = useState(3)
   const [periodicidade, setPeriodicidade] = useState<'mensal' | 'anual'>('mensal')
+  const [editarTodas, setEditarTodas] = useState(false)
   const [saving, setSaving] = useState(false)
   const [filtroTipo, setFiltroTipo] = useState('todos')
 
@@ -59,6 +61,8 @@ export function TabDespesas({ clientId }: { clientId: string }) {
 
   const openEdit = (d: AgroDespesa) => {
     setEditId(d.id ?? null)
+    setEditDescOriginal(d.descricao)
+    setEditarTodas(false)
     setForm({ clientId, data: d.data.toString().slice(0, 10), tipo: d.tipo, origem: d.origem, descricao: d.descricao, valor: d.valor })
     setRepetir(false)
     setShowForm(true)
@@ -70,7 +74,15 @@ export function TabDespesas({ clientId }: { clientId: string }) {
     setSaving(true)
     try {
       if (editId) {
-        await agroApi.despesas.update(editId, { ...form, clientId })
+        if (editarTodas) {
+          const iguais = despesas.filter(d => d.descricao === editDescOriginal && d.id !== editId)
+          await agroApi.despesas.update(editId, { ...form, clientId })
+          for (const d of iguais) {
+            if (d.id) await agroApi.despesas.update(d.id, { ...form, clientId, data: d.data.toString().slice(0, 10) })
+          }
+        } else {
+          await agroApi.despesas.update(editId, { ...form, clientId })
+        }
       } else {
         const total = repetir ? mesesRepetir : 1
         for (let i = 0; i < total; i++) {
@@ -165,6 +177,22 @@ export function TabDespesas({ clientId }: { clientId: string }) {
               <input type="number" className={inp} value={form.valor || ''} onChange={e => setForm(f => ({ ...f, valor: Number(e.target.value) }))} />
             </div>
           </div>
+
+          {/* Alterar todas — só para edição */}
+          {editId && (() => {
+            const qtd = despesas.filter(d => d.descricao === editDescOriginal && d.id !== editId).length
+            return qtd > 0 ? (
+              <div className="mt-3 border border-dashed border-blue-200 rounded-xl p-3 bg-blue-50/40">
+                <label className="flex items-center gap-2 cursor-pointer select-none">
+                  <input type="checkbox" checked={editarTodas} onChange={e => setEditarTodas(e.target.checked)} className="w-4 h-4 accent-blue-600" />
+                  <Repeat2 size={14} className="text-blue-500" />
+                  <span className="text-sm font-semibold text-blue-700">
+                    Alterar também as outras {qtd} despesa{qtd !== 1 ? 's' : ''} com descrição "{editDescOriginal}" (valor, tipo, origem)
+                  </span>
+                </label>
+              </div>
+            ) : null
+          })()}
 
           {/* Repetição — só para novo lançamento */}
           {!editId && (
