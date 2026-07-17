@@ -19,7 +19,14 @@ const fmtK = (v: number) =>
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function anoFromSafra(safra: string): number {
-  return parseInt(safra.split('/')[0])
+  const parts = safra.split('/')
+  if (parts.length === 2) {
+    const firstYear = parseInt(parts[0])
+    const suffix    = parseInt(parts[1])
+    // Usa o ano de colheita (2º ano): "2025/26" → 2026, "2026/27" → 2027
+    return suffix < 100 ? Math.floor(firstYear / 100) * 100 + suffix : suffix
+  }
+  return parseInt(safra)
 }
 
 function calcProducaoRow(p: AgroProducao) {
