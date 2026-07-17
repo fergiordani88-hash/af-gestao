@@ -27,8 +27,8 @@ const styles = StyleSheet.create({
   footer: { position: 'absolute', bottom: 20, left: 30, right: 30, flexDirection: 'row', justifyContent: 'space-between', borderTop: '0.5 solid #e5e7eb', paddingTop: 6 },
   footerText: { fontSize: 7, color: '#9ca3af' },
   // Mensal
-  summaryGrid: { flexDirection: 'row', gap: 8, marginBottom: 12 },
-  summaryCard: { flex: 1, border: '0.5 solid #e5e7eb', borderRadius: 4, padding: '6 8' },
+  summaryGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 12 },
+  summaryCard: { width: '23%', border: '0.5 solid #e5e7eb', borderRadius: 4, padding: '5 7', marginBottom: 4 },
   summaryYear: { fontSize: 9, fontFamily: 'Helvetica-Bold', color: '#111827', marginBottom: 4 },
   summaryRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 2 },
   summaryLabel: { color: '#6b7280' },
