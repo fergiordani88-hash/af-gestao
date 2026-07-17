@@ -259,7 +259,7 @@ export function TabCustosFixos({ clientId }: { clientId: string }) {
                           type="date"
                           className="border border-gray-200 rounded-lg px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-green-300 focus:border-green-400"
                           defaultValue={p.dataPagamento ? p.dataPagamento.slice(0, 10) : ''}
-                          onBlur={e => handleSaveDataProd(p.id, e.target.value)}
+                          onChange={e => e.target.value && handleSaveDataProd(p.id, e.target.value)}
                         />
                         {savingProdId === p.id && <span className="text-gray-400 text-xs">salvando...</span>}
                         {!p.dataPagamento && <span className="text-amber-500 text-xs" title="Defina a data para aparecer no fluxo">⚠</span>}
