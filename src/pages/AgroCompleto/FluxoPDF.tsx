@@ -228,6 +228,8 @@ export interface ProjecaoAnoRow {
   dividasBancarias: number
   despesasNaoBancarias: number
   receitaLiquida: number
+  prejuizoAcumulado: number
+  resultadoLiquido: number
   margLiquida: number
 }
 
@@ -247,14 +249,15 @@ const COLS_PROJ = [
   { label: 'Mg. Bruta',       w: '6%' },
   { label: 'Desp. Recorr.',   w: '9%' },
   { label: 'Dív. Bancárias',  w: '9%' },
-  { label: 'Desp. N.Banc.',   w: '9%' },
-  { label: 'Rec. Líquida',    w: '9%' },
+  { label: 'Desp. N.Banc.',   w: '8%' },
+  { label: 'Prej. Acumulado', w: '8%' },
+  { label: 'Result. Líquido', w: '8%' },
   { label: 'Mg. Líq.',        w: '4%' },
 ]
 
 function ProjecaoPDFDoc({ rows, clienteNome }: { rows: ProjecaoAnoRow[]; clienteNome?: string }) {
   const now = new Date().toLocaleString('pt-BR')
-  const totalRecLiq   = rows.reduce((s, r) => s + r.receitaLiquida, 0)
+  const totalRecLiq   = rows.reduce((s, r) => s + r.resultadoLiquido, 0)
   const totalLucBruto = rows.reduce((s, r) => s + r.lucBruto, 0)
   const margBrutaMedia  = rows.reduce((s, r) => s + r.margBruta, 0) / rows.length
   const margLiqMedia    = rows.reduce((s, r) => s + r.margLiquida, 0) / rows.length
@@ -266,7 +269,7 @@ function ProjecaoPDFDoc({ rows, clienteNome }: { rows: ProjecaoAnoRow[]; cliente
         <View style={styles.header}>
           <Text style={styles.title}>Projeção Anual 10 Anos{clienteNome ? ` — ${clienteNome}` : ''}</Text>
           <Text style={styles.subtitle}>
-            Receita Líquida Total: {fmtBRL(totalRecLiq)} · Lucro Bruto Total: {fmtBRL(totalLucBruto)} · Margem Bruta Média: {fmtPct(margBrutaMedia)} · Margem Líquida Média: {fmtPct(margLiqMedia)}
+            Resultado Líquido Total: {fmtBRL(totalRecLiq)} · Lucro Bruto Total: {fmtBRL(totalLucBruto)} · Margem Bruta Média: {fmtPct(margBrutaMedia)} · Margem Líquida Média: {fmtPct(margLiqMedia)}
           </Text>
           <Text style={styles.generated}>Gerado em {now} · ● dados reais da Produção &nbsp; ○ dados projetados</Text>
         </View>
@@ -304,8 +307,9 @@ function ProjecaoPDFDoc({ rows, clienteNome }: { rows: ProjecaoAnoRow[]; cliente
                 <Text style={[styles.cell, { color: '#f97316', width: COLS_PROJ[7].w }]}>{fmtBRL(r.despesasRecorrentes)}</Text>
                 <Text style={[styles.cell, styles.red,    { width: COLS_PROJ[8].w }]}>{r.dividasBancarias > 0 ? fmtBRL(r.dividasBancarias) : '—'}</Text>
                 <Text style={[styles.cell, styles.red,    { width: COLS_PROJ[9].w }]}>{r.despesasNaoBancarias > 0 ? fmtBRL(r.despesasNaoBancarias) : '—'}</Text>
-                <Text style={[styles.cellBold, r.receitaLiquida >= 0 ? styles.green : styles.red, { width: COLS_PROJ[10].w }]}>{fmtBRL(r.receitaLiquida)}</Text>
-                <Text style={[styles.cell, r.margLiquida >= 0 ? styles.green : styles.red, { width: COLS_PROJ[11].w }]}>{fmtPct(r.margLiquida)}</Text>
+                <Text style={[styles.cell, styles.red,    { width: COLS_PROJ[10].w }]}>{r.prejuizoAcumulado > 0 ? fmtBRL(r.prejuizoAcumulado) : '—'}</Text>
+                <Text style={[styles.cellBold, r.resultadoLiquido >= 0 ? styles.green : styles.red, { width: COLS_PROJ[11].w }]}>{fmtBRL(r.resultadoLiquido)}</Text>
+                <Text style={[styles.cell, r.margLiquida >= 0 ? styles.green : styles.red, { width: COLS_PROJ[12].w }]}>{fmtPct(r.margLiquida)}</Text>
               </View>
             )
           })}
@@ -328,12 +332,13 @@ function ProjecaoPDFDoc({ rows, clienteNome }: { rows: ProjecaoAnoRow[]; cliente
               { k: 'despesasRecorrentes' as keyof ProjecaoAnoRow },
               { k: 'dividasBancarias' as keyof ProjecaoAnoRow },
               { k: 'despesasNaoBancarias' as keyof ProjecaoAnoRow },
+              { k: 'prejuizoAcumulado' as keyof ProjecaoAnoRow },
             ]).map(({ k }, i) => {
               const tot = rows.reduce((s, r) => s + (r[k] as number), 0)
               return <Text key={i} style={[styles.thCell, { width: COLS_PROJ[i + 7].w, color: '#dc2626' }]}>{fmtBRL(tot)}</Text>
             })}
-            <Text style={[styles.thCell, { width: COLS_PROJ[10].w, color: totalRecLiq >= 0 ? '#065f46' : '#dc2626' }]}>{fmtBRL(totalRecLiq)}</Text>
-            <Text style={[styles.thCell, { width: COLS_PROJ[11].w, color: margLiqMedia >= 0 ? '#065f46' : '#dc2626' }]}>{fmtPct(margLiqMedia)} m.</Text>
+            <Text style={[styles.thCell, { width: COLS_PROJ[11].w, color: totalRecLiq >= 0 ? '#065f46' : '#dc2626' }]}>{fmtBRL(totalRecLiq)}</Text>
+            <Text style={[styles.thCell, { width: COLS_PROJ[12].w, color: margLiqMedia >= 0 ? '#065f46' : '#dc2626' }]}>{fmtPct(margLiqMedia)} m.</Text>
           </View>
         </View>
 
