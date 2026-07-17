@@ -196,7 +196,7 @@ export function TabCustosFixos({ clientId }: { clientId: string }) {
     .map(p => {
       const custoPorHaReais = p.custoPorHa * (p.cotacao || 1)
       const custoTotal  = p.area * custoPorHaReais
-      const arrendTotal = p.areaArrendada * p.custoArrendHa
+      const arrendTotal = p.areaArrendada * p.custoArrendHa * (p.cotacao || 1)
       return { id: p.id!, key: `${p.cultura}-${p.safra}`, cultura: p.cultura, safra: p.safra, custoTotal, arrendTotal, dataPagamento: p.dataPagamento ?? '' }
     })
     .filter(p => p.custoTotal > 0 || p.arrendTotal > 0)

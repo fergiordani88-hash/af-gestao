@@ -39,7 +39,7 @@ function calcRow(p: AgroProducao) {
   const prodTotal        = p.area * p.produtividade
   const recBruta         = prodTotal * p.cotacao
   const custoTotal       = p.area * custoPorHaReais
-  const custoArrendTotal = p.areaArrendada * p.custoArrendHa
+  const custoArrendTotal = p.areaArrendada * p.custoArrendHa * (p.cotacao || 1)
   const recLiq           = recBruta - custoTotal - custoArrendTotal
   const custoTotalHa     = custoPorHaReais + (p.area > 0 ? custoArrendTotal / p.area : 0)
   const peHa             = p.cotacao > 0 ? custoTotalHa / p.cotacao : 0
