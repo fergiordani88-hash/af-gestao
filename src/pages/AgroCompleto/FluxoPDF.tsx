@@ -264,14 +264,14 @@ function ProjecaoPDFDoc({ rows, clienteNome }: { rows: ProjecaoAnoRow[]; cliente
 
   return (
     <Document>
-      <Page size="A4" orientation="landscape" style={styles.page}>
+      <Page size="A3" orientation="landscape" style={[styles.page, { padding: 24, fontSize: 7 }]}>
         {/* Cabeçalho */}
-        <View style={styles.header}>
-          <Text style={styles.title}>Projeção Anual 10 Anos{clienteNome ? ` — ${clienteNome}` : ''}</Text>
-          <Text style={styles.subtitle}>
+        <View style={[styles.header, { marginBottom: 10 }]}>
+          <Text style={[styles.title, { fontSize: 13 }]}>Projeção Anual 10 Anos{clienteNome ? ` — ${clienteNome}` : ''}</Text>
+          <Text style={[styles.subtitle, { fontSize: 7 }]}>
             Resultado Líquido Total: {fmtBRL(totalRecLiq)} · Lucro Bruto Total: {fmtBRL(totalLucBruto)} · Margem Bruta Média: {fmtPct(margBrutaMedia)} · Margem Líquida Média: {fmtPct(margLiqMedia)}
           </Text>
-          <Text style={styles.generated}>Gerado em {now} · ● dados reais da Produção &nbsp; ○ dados projetados</Text>
+          <Text style={[styles.generated, { fontSize: 6.5 }]}>Gerado em {now} · ● dados reais da Produção   ○ dados projetados</Text>
         </View>
 
         {/* Tabela */}
