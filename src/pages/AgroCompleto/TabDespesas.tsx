@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Plus, Trash2, TrendingDown, Repeat2 } from 'lucide-react'
+import { Plus, Trash2, TrendingDown, Repeat2, Edit2, X, Save } from 'lucide-react'
 import { agroApi, type AgroDespesa } from '../../services/agroApi'
 import { Card } from '../../components/ui/Card'
 
@@ -25,13 +25,16 @@ function addMonths(dateStr: string, n: number): string {
   return d.toISOString().slice(0, 10)
 }
 
+const EMPTY = (clientId: string): Omit<AgroDespesa, 'id'> => ({
+  clientId, data: '', tipo: 'Custo da atividade', origem: '', descricao: '', valor: 0,
+})
+
 export function TabDespesas({ clientId }: { clientId: string }) {
   const [despesas, setDespesas] = useState<AgroDespesa[]>([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
-  const [form, setForm] = useState<Omit<AgroDespesa, 'id'>>({
-    clientId, data: '', tipo: 'Custo da atividade', origem: '', descricao: '', valor: 0,
-  })
+  const [form, setForm] = useState<Omit<AgroDespesa, 'id'>>(EMPTY(clientId))
+  const [editId, setEditId] = useState<string | null>(null)
   const [repetir, setRepetir] = useState(false)
   const [mesesRepetir, setMesesRepetir] = useState(3)
   const [saving, setSaving] = useState(false)
@@ -45,22 +48,38 @@ export function TabDespesas({ clientId }: { clientId: string }) {
 
   useEffect(() => { load() }, [clientId])
 
-  const handleAdd = async () => {
+  const openNew = () => {
+    setEditId(null)
+    setForm(EMPTY(clientId))
+    setRepetir(false)
+    setShowForm(true)
+  }
+
+  const openEdit = (d: AgroDespesa) => {
+    setEditId(d.id ?? null)
+    setForm({ clientId, data: d.data.toString().slice(0, 10), tipo: d.tipo, origem: d.origem, descricao: d.descricao, valor: d.valor })
+    setRepetir(false)
+    setShowForm(true)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  const handleSave = async () => {
     if (!form.data || !form.descricao || !form.valor) return
     setSaving(true)
     try {
-      const total = repetir ? mesesRepetir : 1
-      for (let i = 0; i < total; i++) {
-        await agroApi.despesas.create({
-          ...form,
-          clientId,
-          data: i === 0 ? form.data : addMonths(form.data, i),
-        })
+      if (editId) {
+        await agroApi.despesas.update(editId, { ...form, clientId })
+      } else {
+        const total = repetir ? mesesRepetir : 1
+        for (let i = 0; i < total; i++) {
+          await agroApi.despesas.create({ ...form, clientId, data: i === 0 ? form.data : addMonths(form.data, i) })
+        }
       }
-      setForm(f => ({ ...f, data: '', origem: '', descricao: '', valor: 0 }))
+      setForm(EMPTY(clientId))
+      setShowForm(false)
+      setEditId(null)
       setRepetir(false)
       setMesesRepetir(3)
-      setShowForm(false)
       load()
     } finally { setSaving(false) }
   }
@@ -77,7 +96,6 @@ export function TabDespesas({ clientId }: { clientId: string }) {
 
   const inp = 'w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-200 focus:border-red-400'
 
-  // Preview das datas que serão criadas
   const datasPreview = repetir && form.data
     ? Array.from({ length: mesesRepetir }, (_, i) => i === 0 ? form.data : addMonths(form.data, i))
     : []
@@ -89,7 +107,7 @@ export function TabDespesas({ clientId }: { clientId: string }) {
           <h2 className="font-bold text-gray-900">Despesas — Não Bancárias</h2>
           <p className="text-xs text-gray-500 mt-0.5">Salários, custos de atividade, investimentos, cartões, etc.</p>
         </div>
-        <button onClick={() => setShowForm(!showForm)} className="flex items-center gap-2 bg-red-600 text-white rounded-xl px-4 py-2 text-sm font-semibold hover:bg-red-700">
+        <button onClick={openNew} className="flex items-center gap-2 bg-red-600 text-white rounded-xl px-4 py-2 text-sm font-semibold hover:bg-red-700">
           <Plus size={15} /> Nova Despesa
         </button>
       </div>
@@ -107,10 +125,15 @@ export function TabDespesas({ clientId }: { clientId: string }) {
         </div>
       )}
 
-      {/* Formulário inline */}
+      {/* Formulário (novo ou edição) */}
       {showForm && (
-        <Card className="p-4 border-2 border-red-100">
-          <h3 className="font-semibold text-sm text-gray-700 mb-3">Nova Despesa</h3>
+        <Card className={`p-4 border-2 ${editId ? 'border-blue-100' : 'border-red-100'}`}>
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="font-semibold text-sm text-gray-700">
+              {editId ? '✏️ Editar Despesa' : 'Nova Despesa'}
+            </h3>
+            <button onClick={() => { setShowForm(false); setEditId(null) }} className="text-gray-400 hover:text-gray-600"><X size={15} /></button>
+          </div>
           <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
             <div>
               <label className="text-xs font-semibold text-gray-500 mb-1 block">Data *</label>
@@ -136,58 +159,51 @@ export function TabDespesas({ clientId }: { clientId: string }) {
             </div>
           </div>
 
-          {/* Opção de repetição */}
-          <div className="mt-4 border border-dashed border-red-200 rounded-xl p-3 bg-red-50/40">
-            <label className="flex items-center gap-2 cursor-pointer select-none">
-              <input
-                type="checkbox"
-                checked={repetir}
-                onChange={e => setRepetir(e.target.checked)}
-                className="w-4 h-4 accent-red-600"
-              />
-              <Repeat2 size={14} className="text-red-500" />
-              <span className="text-sm font-semibold text-red-700">Repetir por vários meses</span>
-            </label>
-
-            {repetir && (
-              <div className="mt-3 flex items-center gap-4 flex-wrap">
-                <div className="flex items-center gap-2">
-                  <label className="text-xs font-semibold text-gray-600">Quantidade de meses:</label>
-                  <input
-                    type="number"
-                    min={2}
-                    max={60}
-                    value={mesesRepetir}
-                    onChange={e => setMesesRepetir(Math.max(2, Math.min(60, Number(e.target.value))))}
-                    className="w-20 border border-red-300 rounded-lg px-2 py-1 text-sm text-center"
-                  />
-                </div>
-                {datasPreview.length > 0 && (
-                  <div className="flex flex-wrap gap-1">
-                    <span className="text-xs text-gray-500 mr-1">Datas que serão criadas:</span>
-                    {datasPreview.map((d, i) => (
-                      <span key={i} className="text-xs bg-white border border-red-200 text-red-700 rounded px-1.5 py-0.5">
-                        {new Date(d + 'T12:00:00').toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' })}
-                      </span>
-                    ))}
+          {/* Repetição — só para novo lançamento */}
+          {!editId && (
+            <div className="mt-4 border border-dashed border-red-200 rounded-xl p-3 bg-red-50/40">
+              <label className="flex items-center gap-2 cursor-pointer select-none">
+                <input type="checkbox" checked={repetir} onChange={e => setRepetir(e.target.checked)} className="w-4 h-4 accent-red-600" />
+                <Repeat2 size={14} className="text-red-500" />
+                <span className="text-sm font-semibold text-red-700">Repetir por vários meses</span>
+              </label>
+              {repetir && (
+                <div className="mt-3 flex items-center gap-4 flex-wrap">
+                  <div className="flex items-center gap-2">
+                    <label className="text-xs font-semibold text-gray-600">Quantidade de meses:</label>
+                    <input
+                      type="number" min={2} max={60} value={mesesRepetir}
+                      onChange={e => setMesesRepetir(Math.max(2, Math.min(60, Number(e.target.value))))}
+                      className="w-20 border border-red-300 rounded-lg px-2 py-1 text-sm text-center"
+                    />
                   </div>
-                )}
-                <p className="text-xs text-red-600 font-semibold w-full">
-                  Serão criadas {mesesRepetir} despesas — {fmtBRL(form.valor * mesesRepetir)} no total
-                </p>
-              </div>
-            )}
-          </div>
+                  {datasPreview.length > 0 && (
+                    <div className="flex flex-wrap gap-1">
+                      <span className="text-xs text-gray-500 mr-1">Datas:</span>
+                      {datasPreview.map((d, i) => (
+                        <span key={i} className="text-xs bg-white border border-red-200 text-red-700 rounded px-1.5 py-0.5">
+                          {new Date(d + 'T12:00:00').toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' })}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  <p className="text-xs text-red-600 font-semibold w-full">
+                    {mesesRepetir} lançamentos — {fmtBRL(form.valor * mesesRepetir)} no total
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
 
           <div className="flex gap-2 mt-3">
             <button
-              onClick={handleAdd}
+              onClick={handleSave}
               disabled={saving || !form.data || !form.descricao || !form.valor}
-              className="bg-red-600 text-white rounded-xl px-4 py-2 text-sm font-semibold disabled:opacity-50 hover:bg-red-700"
+              className={`flex items-center gap-2 text-white rounded-xl px-4 py-2 text-sm font-semibold disabled:opacity-50 ${editId ? 'bg-blue-600 hover:bg-blue-700' : 'bg-red-600 hover:bg-red-700'}`}
             >
-              {saving ? 'Salvando...' : repetir ? `Criar ${mesesRepetir} lançamentos` : 'Adicionar'}
+              {saving ? 'Salvando...' : editId ? <><Save size={14} /> Salvar alterações</> : repetir ? `Criar ${mesesRepetir} lançamentos` : 'Adicionar'}
             </button>
-            <button onClick={() => { setShowForm(false); setRepetir(false) }} className="px-4 py-2 border border-gray-200 rounded-xl text-sm text-gray-600 hover:bg-gray-50">Cancelar</button>
+            <button onClick={() => { setShowForm(false); setEditId(null) }} className="px-4 py-2 border border-gray-200 rounded-xl text-sm text-gray-600 hover:bg-gray-50">Cancelar</button>
           </div>
         </Card>
       )}
@@ -218,7 +234,7 @@ export function TabDespesas({ clientId }: { clientId: string }) {
               </thead>
               <tbody className="divide-y divide-gray-50">
                 {filtered.map(d => (
-                  <tr key={d.id} className="hover:bg-gray-50/50 group">
+                  <tr key={d.id} className={`hover:bg-gray-50/50 group ${editId === d.id ? 'bg-blue-50/40' : ''}`}>
                     <td className="px-3 py-2.5 font-medium text-gray-900 whitespace-nowrap">{fmtDate(d.data)}</td>
                     <td className="px-3 py-2.5">
                       <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${TIPO_COLOR[d.tipo] ?? 'bg-gray-100 text-gray-600'}`}>{d.tipo}</span>
@@ -227,9 +243,14 @@ export function TabDespesas({ clientId }: { clientId: string }) {
                     <td className="px-3 py-2.5 text-gray-700">{d.descricao}</td>
                     <td className="px-3 py-2.5 font-bold text-red-600">{fmtBRL(d.valor)}</td>
                     <td className="px-3 py-2.5">
-                      <button onClick={() => d.id && handleDelete(d.id)} className="opacity-0 group-hover:opacity-100 p-1.5 hover:bg-red-50 text-red-400 rounded">
-                        <Trash2 size={12} />
-                      </button>
+                      <div className="flex gap-1 opacity-0 group-hover:opacity-100">
+                        <button onClick={() => openEdit(d)} className="p-1.5 hover:bg-blue-50 text-blue-400 rounded" title="Editar">
+                          <Edit2 size={12} />
+                        </button>
+                        <button onClick={() => d.id && handleDelete(d.id)} className="p-1.5 hover:bg-red-50 text-red-400 rounded" title="Excluir">
+                          <Trash2 size={12} />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}

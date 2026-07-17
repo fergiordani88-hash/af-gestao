@@ -103,6 +103,7 @@ export const agroApi = {
   despesas: {
     list:   (cid: string) => req<AgroDespesa[]>(`/despesas/${cid}`),
     create: (d: AgroDespesa) => req<AgroDespesa>('/despesas', { method: 'POST', body: JSON.stringify(d) }),
+    update: (id: string, d: Partial<AgroDespesa>) => req<AgroDespesa>(`/despesas/${id}`, { method: 'PUT', body: JSON.stringify(d) }),
     delete: (id: string) => req<void>(`/despesas/${id}`, { method: 'DELETE' }),
   },
 
