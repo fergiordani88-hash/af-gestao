@@ -418,7 +418,7 @@ export function TabProjecaoAnual({ clientId }: { clientId: string }) {
                     'Ano', 'Culturas', 'Receita Bruta', 'Custo Atividade',
                     'Arrendamento', 'Lucro Bruto', 'Marg. Bruta',
                     'Desp. Recorrentes', 'Dívidas Bancárias', 'Desp. Não Bancárias',
-                    'Prejuízo Acumulado', 'Resultado Líquido', 'Marg. Líquida',
+                    'Resultado do Ano', 'Prejuízo Acumulado', 'Resultado Líquido', 'Marg. Líquida',
                   ].map(h => (
                     <th key={h} className="px-2.5 py-2 text-left font-semibold text-gray-500 uppercase whitespace-nowrap">{h}</th>
                   ))}
@@ -451,6 +451,7 @@ export function TabProjecaoAnual({ clientId }: { clientId: string }) {
                     <td className="px-2.5 py-2.5 text-orange-500 whitespace-nowrap">{fmtBRL(r.despesasRecorrentes)}</td>
                     <td className="px-2.5 py-2.5 text-red-500 whitespace-nowrap">{r.dividasBancarias > 0 ? fmtBRL(r.dividasBancarias) : '—'}</td>
                     <td className="px-2.5 py-2.5 text-red-400 whitespace-nowrap">{r.despesasNaoBancarias > 0 ? fmtBRL(r.despesasNaoBancarias) : '—'}</td>
+                    <td className={`px-2.5 py-2.5 font-semibold whitespace-nowrap ${r.receitaLiquida >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>{fmtBRL(r.receitaLiquida)}</td>
                     <td className="px-2.5 py-2.5 text-red-600 font-semibold whitespace-nowrap">{r.prejuizoAcumulado > 0 ? fmtBRL(r.prejuizoAcumulado) : '—'}</td>
                     <td className={`px-2.5 py-2.5 font-bold whitespace-nowrap rounded ${r.resultadoLiquido >= 0 ? 'text-emerald-800 bg-emerald-50' : 'text-red-700 bg-red-50'}`}>{fmtBRL(r.resultadoLiquido)}</td>
                     <td className={`px-2.5 py-2.5 font-semibold whitespace-nowrap ${r.margLiquida >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>{fmtPct(r.margLiquida)}</td>
@@ -476,6 +477,9 @@ export function TabProjecaoAnual({ clientId }: { clientId: string }) {
                       {fmtBRL(projecao.reduce((s,r)=>s+r[k],0))}
                     </td>
                   ))}
+                  <td className="px-2.5 py-2.5 font-semibold whitespace-nowrap text-gray-700">
+                    {fmtBRL(projecao.reduce((s,r)=>s+r.receitaLiquida,0))}
+                  </td>
                   <td className="px-2.5 py-2.5 text-red-600 whitespace-nowrap">
                     {fmtBRL(projecao.reduce((s,r)=>s+r.prejuizoAcumulado,0))}
                   </td>
