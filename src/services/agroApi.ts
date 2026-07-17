@@ -42,11 +42,6 @@ export interface AgroContrato {
   indexador?: string
   spreadIndexador?: number
   sistemaAmortizacao?: string
-  usarParcelasCustom?: boolean
-}
-
-export interface AgroParcelaCustom {
-  id?: string; contratoId: string; numero: number; data: string; valor: number
 }
 
 export interface AgroParcela {
@@ -102,16 +97,6 @@ export const agroApi = {
     create:     (d: AgroContrato) => req<AgroContrato>('/contratos', { method: 'POST', body: JSON.stringify(d) }),
     update:     (id: string, d: Partial<AgroContrato>) => req<AgroContrato>(`/contratos/${id}`, { method: 'PUT', body: JSON.stringify(d) }),
     delete:     (id: string) => req<void>(`/contratos/${id}`, { method: 'DELETE' }),
-  },
-
-  // Parcelas personalizadas
-  parcelasCustom: {
-    list:   (contratoId: string) => req<AgroParcelaCustom[]>(`/parcelas-custom/${contratoId}`),
-    bulk:   (contratoId: string, parcelas: Array<{ numero: number; data: string; valor: number }>) =>
-              req<{ count: number }>(`/parcelas-custom/bulk/${contratoId}`, { method: 'POST', body: JSON.stringify(parcelas) }),
-    update: (id: string, d: { data: string; valor: number }) =>
-              req<AgroParcelaCustom>(`/parcelas-custom/${id}`, { method: 'PUT', body: JSON.stringify(d) }),
-    clear:  (contratoId: string) => req<void>(`/parcelas-custom/all/${contratoId}`, { method: 'DELETE' }),
   },
 
   // Despesas anuais (para projeção)
