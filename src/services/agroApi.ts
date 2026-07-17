@@ -73,7 +73,7 @@ export interface AgroPatrimonio {
 
 export interface FluxoItem {
   data: string; mov: string; tipo: string; origem: string; descricao: string
-  valor: number; saldoFinal: number
+  valor: number; saldoFinal: number; id?: string
 }
 
 export interface FluxoMensal {
