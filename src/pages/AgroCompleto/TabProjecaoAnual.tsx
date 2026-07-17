@@ -1,11 +1,12 @@
 import { useState, useEffect, useCallback } from 'react'
-import { TrendingUp, TrendingDown, RefreshCw, Settings2, Info, Sprout } from 'lucide-react'
+import { TrendingUp, TrendingDown, RefreshCw, Settings2, Info, Sprout, FileDown } from 'lucide-react'
 import {
   ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, Legend, ReferenceLine,
 } from 'recharts'
 import { agroApi, type AgroProducao } from '../../services/agroApi'
 import { Card } from '../../components/ui/Card'
+import { exportarProjecaoPDF } from './FluxoPDF'
 
 const fmtBRL = (v: number) =>
   v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 0, maximumFractionDigits: 0 })
@@ -166,6 +167,7 @@ export function TabProjecaoAnual({ clientId }: { clientId: string }) {
   const [despesasNaoBancariasReais, setDespesasNaoBancariasReais] = useState<Record<number, number>>({})
   const [projecao, setProjecao]   = useState<AnoRow[]>([])
   const [showPremissas, setShowPremissas] = useState(true)
+  const [exportando, setExportando] = useState(false)
 
   useEffect(() => {
     try {
@@ -255,12 +257,26 @@ export function TabProjecaoAnual({ clientId }: { clientId: string }) {
             Anos reais calculados da aba Produção · anos futuros projetados com premissas de crescimento
           </p>
         </div>
-        <button
-          onClick={() => setShowPremissas(p => !p)}
-          className="flex items-center gap-1.5 border border-gray-200 bg-white hover:bg-gray-50 rounded-xl px-3 py-2 text-sm font-medium text-gray-700"
-        >
-          <Settings2 size={14} /> {showPremissas ? 'Ocultar' : 'Editar'} premissas
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowPremissas(p => !p)}
+            className="flex items-center gap-1.5 border border-gray-200 bg-white hover:bg-gray-50 rounded-xl px-3 py-2 text-sm font-medium text-gray-700"
+          >
+            <Settings2 size={14} /> {showPremissas ? 'Ocultar' : 'Editar'} premissas
+          </button>
+          <button
+            onClick={async () => {
+              setExportando(true)
+              try { await exportarProjecaoPDF(projecao) }
+              finally { setExportando(false) }
+            }}
+            disabled={exportando || projecao.length === 0}
+            className="flex items-center gap-1.5 bg-green-700 hover:bg-green-800 disabled:opacity-50 text-white text-sm font-semibold rounded-xl px-3 py-2"
+          >
+            <FileDown size={14} />
+            {exportando ? 'Gerando...' : 'Exportar PDF'}
+          </button>
+        </div>
       </div>
 
       {/* Anos com dados reais */}

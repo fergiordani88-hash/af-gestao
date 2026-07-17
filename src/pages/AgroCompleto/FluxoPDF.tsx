@@ -211,6 +211,151 @@ function MensalPDFDoc({ mensal, porAno, saldoInicial, clienteNome }: MensalPDFPr
   )
 }
 
+// ─── Projeção 10 Anos PDF ────────────────────────────────────────────────────
+
+const fmtPct = (v: number) => `${(v * 100).toFixed(1)}%`
+
+export interface ProjecaoAnoRow {
+  ano: number
+  culturas: string[]
+  isReal: boolean
+  recBruta: number
+  custoAtiv: number
+  arrendamento: number
+  lucBruto: number
+  margBruta: number
+  despesasRecorrentes: number
+  dividasBancarias: number
+  despesasNaoBancarias: number
+  receitaLiquida: number
+  margLiquida: number
+}
+
+const projStyles = StyleSheet.create({
+  badge: { fontSize: 6, backgroundColor: '#d1fae5', color: '#065f46', paddingHorizontal: 3, paddingVertical: 1, borderRadius: 2, marginRight: 2 },
+  badgeProj: { fontSize: 6, backgroundColor: '#f3f4f6', color: '#6b7280', paddingHorizontal: 3, paddingVertical: 1, borderRadius: 2 },
+  dot: { width: 6, height: 6, borderRadius: 3, marginRight: 3, marginTop: 1 },
+})
+
+const COLS_PROJ = [
+  { label: 'Ano',             w: '5%' },
+  { label: 'Culturas',        w: '13%' },
+  { label: 'Rec. Bruta',      w: '9%' },
+  { label: 'Custo Ativ.',     w: '9%' },
+  { label: 'Arrendamento',    w: '9%' },
+  { label: 'Lucro Bruto',     w: '9%' },
+  { label: 'Mg. Bruta',       w: '6%' },
+  { label: 'Desp. Recorr.',   w: '9%' },
+  { label: 'Dív. Bancárias',  w: '9%' },
+  { label: 'Desp. N.Banc.',   w: '9%' },
+  { label: 'Rec. Líquida',    w: '9%' },
+  { label: 'Mg. Líq.',        w: '4%' },
+]
+
+function ProjecaoPDFDoc({ rows, clienteNome }: { rows: ProjecaoAnoRow[]; clienteNome?: string }) {
+  const now = new Date().toLocaleString('pt-BR')
+  const totalRecLiq   = rows.reduce((s, r) => s + r.receitaLiquida, 0)
+  const totalLucBruto = rows.reduce((s, r) => s + r.lucBruto, 0)
+  const margBrutaMedia  = rows.reduce((s, r) => s + r.margBruta, 0) / rows.length
+  const margLiqMedia    = rows.reduce((s, r) => s + r.margLiquida, 0) / rows.length
+
+  return (
+    <Document>
+      <Page size="A4" orientation="landscape" style={styles.page}>
+        {/* Cabeçalho */}
+        <View style={styles.header}>
+          <Text style={styles.title}>Projeção Anual 10 Anos{clienteNome ? ` — ${clienteNome}` : ''}</Text>
+          <Text style={styles.subtitle}>
+            Receita Líquida Total: {fmtBRL(totalRecLiq)} · Lucro Bruto Total: {fmtBRL(totalLucBruto)} · Margem Bruta Média: {fmtPct(margBrutaMedia)} · Margem Líquida Média: {fmtPct(margLiqMedia)}
+          </Text>
+          <Text style={styles.generated}>Gerado em {now} · ● dados reais da Produção &nbsp; ○ dados projetados</Text>
+        </View>
+
+        {/* Tabela */}
+        <View style={styles.table}>
+          <View style={styles.thead}>
+            {COLS_PROJ.map(c => (
+              <Text key={c.label} style={[styles.thCell, { width: c.w }]}>{c.label.toUpperCase()}</Text>
+            ))}
+          </View>
+
+          {rows.map(r => {
+            const rowStyle = r.receitaLiquida < 0 ? styles.rowNeg : styles.row
+            return (
+              <View key={r.ano} style={rowStyle}>
+                {/* Ano + indicador real/projetado */}
+                <View style={[{ width: COLS_PROJ[0].w, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 4 }]}>
+                  <View style={[projStyles.dot, { backgroundColor: r.isReal ? '#22c55e' : '#d1d5db' }]} />
+                  <Text style={[styles.cellBold, { color: '#111827', paddingHorizontal: 0 }]}>{r.ano}</Text>
+                </View>
+
+                {/* Culturas */}
+                <View style={[{ width: COLS_PROJ[1].w, flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 4, alignItems: 'center' }]}>
+                  {r.culturas.length > 0
+                    ? r.culturas.map(c => <Text key={c} style={projStyles.badge}>{c}</Text>)
+                    : <Text style={projStyles.badgeProj}>—</Text>}
+                </View>
+
+                <Text style={[styles.cell, styles.green,  { width: COLS_PROJ[2].w }]}>{fmtBRL(r.recBruta)}</Text>
+                <Text style={[styles.cell, styles.red,    { width: COLS_PROJ[3].w }]}>{fmtBRL(r.custoAtiv)}</Text>
+                <Text style={[styles.cell, styles.red,    { width: COLS_PROJ[4].w }]}>{fmtBRL(r.arrendamento)}</Text>
+                <Text style={[styles.cellBold, r.lucBruto >= 0 ? styles.green : styles.red, { width: COLS_PROJ[5].w }]}>{fmtBRL(r.lucBruto)}</Text>
+                <Text style={[styles.cell, r.margBruta >= 0.1 ? styles.green : { color: '#d97706' }, { width: COLS_PROJ[6].w }]}>{fmtPct(r.margBruta)}</Text>
+                <Text style={[styles.cell, { color: '#f97316', width: COLS_PROJ[7].w }]}>{fmtBRL(r.despesasRecorrentes)}</Text>
+                <Text style={[styles.cell, styles.red,    { width: COLS_PROJ[8].w }]}>{r.dividasBancarias > 0 ? fmtBRL(r.dividasBancarias) : '—'}</Text>
+                <Text style={[styles.cell, styles.red,    { width: COLS_PROJ[9].w }]}>{r.despesasNaoBancarias > 0 ? fmtBRL(r.despesasNaoBancarias) : '—'}</Text>
+                <Text style={[styles.cellBold, r.receitaLiquida >= 0 ? styles.green : styles.red, { width: COLS_PROJ[10].w }]}>{fmtBRL(r.receitaLiquida)}</Text>
+                <Text style={[styles.cell, r.margLiquida >= 0 ? styles.green : styles.red, { width: COLS_PROJ[11].w }]}>{fmtPct(r.margLiquida)}</Text>
+              </View>
+            )
+          })}
+
+          {/* Rodapé totais */}
+          <View style={[styles.thead, { marginTop: 2, backgroundColor: '#e5e7eb' }]}>
+            <Text style={[styles.thCell, { width: COLS_PROJ[0].w, color: '#374151' }]}>Total</Text>
+            <Text style={[styles.thCell, { width: COLS_PROJ[1].w }]}>—</Text>
+            {([
+              { k: 'recBruta' as keyof ProjecaoAnoRow },
+              { k: 'custoAtiv' as keyof ProjecaoAnoRow },
+              { k: 'arrendamento' as keyof ProjecaoAnoRow },
+              { k: 'lucBruto' as keyof ProjecaoAnoRow },
+            ]).map(({ k }, i) => {
+              const tot = rows.reduce((s, r) => s + (r[k] as number), 0)
+              return <Text key={i} style={[styles.thCell, { width: COLS_PROJ[i + 2].w, color: tot < 0 ? '#dc2626' : '#111827' }]}>{fmtBRL(tot)}</Text>
+            })}
+            <Text style={[styles.thCell, { width: COLS_PROJ[6].w }]}>{fmtPct(margBrutaMedia)} m.</Text>
+            {([
+              { k: 'despesasRecorrentes' as keyof ProjecaoAnoRow },
+              { k: 'dividasBancarias' as keyof ProjecaoAnoRow },
+              { k: 'despesasNaoBancarias' as keyof ProjecaoAnoRow },
+            ]).map(({ k }, i) => {
+              const tot = rows.reduce((s, r) => s + (r[k] as number), 0)
+              return <Text key={i} style={[styles.thCell, { width: COLS_PROJ[i + 7].w, color: '#dc2626' }]}>{fmtBRL(tot)}</Text>
+            })}
+            <Text style={[styles.thCell, { width: COLS_PROJ[10].w, color: totalRecLiq >= 0 ? '#065f46' : '#dc2626' }]}>{fmtBRL(totalRecLiq)}</Text>
+            <Text style={[styles.thCell, { width: COLS_PROJ[11].w, color: margLiqMedia >= 0 ? '#065f46' : '#dc2626' }]}>{fmtPct(margLiqMedia)} m.</Text>
+          </View>
+        </View>
+
+        <View style={styles.footer} fixed>
+          <Text style={styles.footerText}>AF Gestão & Consultoria — Projeção Anual 10 Anos</Text>
+          <Text style={styles.footerText} render={({ pageNumber, totalPages }) => `Página ${pageNumber} / ${totalPages}`} />
+        </View>
+      </Page>
+    </Document>
+  )
+}
+
+export async function exportarProjecaoPDF(rows: ProjecaoAnoRow[], clienteNome?: string) {
+  const blob = await pdf(<ProjecaoPDFDoc rows={rows} clienteNome={clienteNome} />).toBlob()
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `projecao-10-anos${clienteNome ? '-' + clienteNome.replace(/\s+/g, '-') : ''}.pdf`
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
 export async function exportarFluxoMensalPDF(
   mensal: FluxoMensal[],
   porAno: Record<string, { entradas: number; saidas: number; resultado: number }>,
