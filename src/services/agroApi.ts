@@ -62,7 +62,7 @@ export interface AgroReceita {
 }
 
 export interface AgroCustoFixo {
-  id?: string; clientId: string; categoria: string; item: string; valorMensal: number
+  id?: string; clientId: string; categoria: string; item: string; valorMensal: number; diaVencimento?: number
 }
 
 export interface AgroPatrimonio {

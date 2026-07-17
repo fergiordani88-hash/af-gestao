@@ -28,7 +28,7 @@ const CAT_COLOR: Record<string, string> = {
   'Contratos Recorrentes':'bg-gray-100 text-gray-700',
 }
 
-type EditState = { id: string; item: string; categoria: string; valorMensal: number }
+type EditState = { id: string; item: string; categoria: string; valorMensal: number; diaVencimento: number }
 
 // Itens de folha que geram provisão de 13º e férias
 const ITENS_BASE_FOLHA = ['Salários', 'Horas extras', 'Pró-labore']
@@ -71,6 +71,17 @@ function EditRow({ es, onSave, onCancel, onChange }: {
             onChange={e => onChange({ valorMensal: Number(e.target.value) })}
             onKeyDown={e => e.key === 'Enter' && onSave()}
           />
+          <div className="flex items-center gap-1">
+            <span className="text-xs text-gray-400">Dia</span>
+            <input
+              type="number"
+              min={1} max={28}
+              className="w-14 text-right border border-amber-300 rounded-lg px-2 py-1 text-xs"
+              value={es.diaVencimento}
+              onChange={e => onChange({ diaVencimento: Math.min(28, Math.max(1, Number(e.target.value))) })}
+              onKeyDown={e => e.key === 'Enter' && onSave()}
+            />
+          </div>
         </div>
       </td>
       <td className="px-4 py-2 text-right text-gray-400 text-xs">
@@ -91,7 +102,7 @@ export function TabCustosFixos({ clientId }: { clientId: string }) {
   const [loading, setLoading] = useState(true)
   const [editState, setEditState] = useState<EditState | null>(null)
   const [categoriaAberta, setCategoriaAberta] = useState<string>(CATEGORIAS[0])
-  const [novoItem, setNovoItem] = useState({ categoria: CATEGORIAS[0], item: '', valorMensal: 0 })
+  const [novoItem, setNovoItem] = useState({ categoria: CATEGORIAS[0], item: '', valorMensal: 0, diaVencimento: 5 })
   const [showNew, setShowNew] = useState(false)
   const [producoes, setProducoes] = useState<AgroProducao[]>([])
 
@@ -131,6 +142,7 @@ export function TabCustosFixos({ clientId }: { clientId: string }) {
       item: editState.item,
       categoria: editState.categoria,
       valorMensal: editState.valorMensal,
+      diaVencimento: editState.diaVencimento,
     })
     setEditState(null)
     const fresh = await agroApi.custosFixos.list(clientId)
@@ -260,7 +272,7 @@ export function TabCustosFixos({ clientId }: { clientId: string }) {
       {/* Novo item personalizado */}
       {showNew && (
         <Card className="p-4 border-2 border-amber-100">
-          <div className="grid grid-cols-4 gap-3">
+          <div className="grid grid-cols-5 gap-3">
             <div>
               <label className="text-xs font-semibold text-gray-500 mb-1 block">Categoria</label>
               <select className={inp + ' w-full'} value={novoItem.categoria} onChange={e => setNovoItem(n => ({ ...n, categoria: e.target.value }))}>
@@ -274,6 +286,10 @@ export function TabCustosFixos({ clientId }: { clientId: string }) {
             <div>
               <label className="text-xs font-semibold text-gray-500 mb-1 block">Valor Mensal (R$)</label>
               <input type="number" className={inp + ' w-full'} value={novoItem.valorMensal || ''} onChange={e => setNovoItem(n => ({ ...n, valorMensal: Number(e.target.value) }))} />
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-gray-500 mb-1 block">Dia Vencimento</label>
+              <input type="number" min={1} max={28} className={inp + ' w-full'} value={novoItem.diaVencimento} onChange={e => setNovoItem(n => ({ ...n, diaVencimento: Math.min(28, Math.max(1, Number(e.target.value))) }))} />
             </div>
           </div>
           <div className="flex gap-2 mt-3">
@@ -316,6 +332,7 @@ export function TabCustosFixos({ clientId }: { clientId: string }) {
                       <thead>
                         <tr className="bg-gray-50 border-b">
                           <th className="px-4 py-2 text-left font-semibold text-gray-500 uppercase">Item</th>
+                          <th className="px-4 py-2 text-center font-semibold text-gray-500 uppercase">Venc.</th>
                           <th className="px-4 py-2 text-right font-semibold text-gray-500 uppercase">Mensal (R$)</th>
                           <th className="px-4 py-2 text-right font-semibold text-gray-500 uppercase">Anual (R$)</th>
                           <th className="px-4 py-2 w-20"></th>
@@ -343,12 +360,15 @@ export function TabCustosFixos({ clientId }: { clientId: string }) {
                                       </span>
                                     )}
                                   </td>
+                                  <td className="px-4 py-2.5 text-center text-gray-500 text-xs">
+                                    dia {(item as any).diaVencimento ?? 5}
+                                  </td>
                                   <td className="px-4 py-2.5 text-right font-semibold text-gray-900">{fmtBRL(item.valorMensal)}</td>
                                   <td className="px-4 py-2.5 text-right text-gray-600">{fmtBRL(item.valorMensal * 12)}</td>
                                   <td className="px-4 py-2.5">
                                     <div className="flex gap-1 justify-end opacity-0 group-hover:opacity-100">
                                       <button
-                                        onClick={() => setEditState({ id: item.id!, item: item.item, categoria: item.categoria, valorMensal: item.valorMensal })}
+                                        onClick={() => setEditState({ id: item.id!, item: item.item, categoria: item.categoria, valorMensal: item.valorMensal, diaVencimento: (item as any).diaVencimento ?? 5 })}
                                         className="p-1.5 text-blue-400 hover:bg-blue-50 rounded"
                                         title="Editar"
                                       >
@@ -367,7 +387,7 @@ export function TabCustosFixos({ clientId }: { clientId: string }) {
                       </tbody>
                       <tfoot>
                         <tr className="bg-gray-50 border-t font-bold">
-                          <td className="px-4 py-2">Total {cat}</td>
+                          <td className="px-4 py-2" colSpan={2}>Total {cat}</td>
                           <td className="px-4 py-2 text-right">{fmtBRL(catTotal)}</td>
                           <td className="px-4 py-2 text-right">{fmtBRL(catTotal * 12)}</td>
                           <td></td>
