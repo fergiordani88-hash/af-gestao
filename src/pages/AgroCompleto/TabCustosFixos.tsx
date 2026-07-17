@@ -105,6 +105,7 @@ export function TabCustosFixos({ clientId }: { clientId: string }) {
   const [novoItem, setNovoItem] = useState({ categoria: CATEGORIAS[0], item: '', valorMensal: 0, diaVencimento: 5 })
   const [showNew, setShowNew] = useState(false)
   const [producoes, setProducoes] = useState<AgroProducao[]>([])
+  const [savingProdId, setSavingProdId] = useState<string | null>(null)
 
   // Recalcula e sincroniza "Provisão 13°/férias" a partir da folha base
   const syncProvisao = async (custosAtuais: AgroCustoFixo[]) => {
@@ -133,8 +134,19 @@ export function TabCustosFixos({ clientId }: { clientId: string }) {
     } finally { setLoading(false) }
   }
 
+  const loadProducoes = () => agroApi.producao.list(clientId).then(setProducoes)
+
   useEffect(() => { load() }, [clientId])
-  useEffect(() => { agroApi.producao.list(clientId).then(setProducoes) }, [clientId])
+  useEffect(() => { loadProducoes() }, [clientId])
+
+  const handleSaveDataProd = async (prod: AgroProducao, dataPagamento: string) => {
+    if (!prod.id) return
+    setSavingProdId(prod.id)
+    try {
+      await agroApi.producao.update(prod.id, { dataPagamento: dataPagamento || undefined })
+      await loadProducoes()
+    } finally { setSavingProdId(null) }
+  }
 
   const handleSaveEdit = async () => {
     if (!editState) return
@@ -185,7 +197,7 @@ export function TabCustosFixos({ clientId }: { clientId: string }) {
       const custoPorHaReais = p.custoPorHa * (p.cotacao || 1)
       const custoTotal  = p.area * custoPorHaReais
       const arrendTotal = p.areaArrendada * p.custoArrendHa
-      return { key: `${p.cultura}-${p.safra}`, cultura: p.cultura, safra: p.safra, custoTotal, arrendTotal }
+      return { id: p.id!, key: `${p.cultura}-${p.safra}`, cultura: p.cultura, safra: p.safra, custoTotal, arrendTotal, dataPagamento: p.dataPagamento ?? '' }
     })
     .filter(p => p.custoTotal > 0 || p.arrendTotal > 0)
 
@@ -226,6 +238,7 @@ export function TabCustosFixos({ clientId }: { clientId: string }) {
                 <tr className="bg-gray-50 border-b">
                   <th className="px-4 py-2 text-left font-semibold text-gray-500 uppercase">Cultura</th>
                   <th className="px-4 py-2 text-left font-semibold text-gray-500 uppercase">Safra</th>
+                  <th className="px-4 py-2 text-center font-semibold text-gray-500 uppercase">Data Pagamento</th>
                   <th className="px-4 py-2 text-right font-semibold text-gray-500 uppercase">Custo Produção</th>
                   <th className="px-4 py-2 text-right font-semibold text-gray-500 uppercase">Arrendamento</th>
                   <th className="px-4 py-2 text-right font-semibold text-gray-500 uppercase">Total</th>
@@ -236,6 +249,18 @@ export function TabCustosFixos({ clientId }: { clientId: string }) {
                   <tr key={p.key} className="hover:bg-gray-50/50">
                     <td className="px-4 py-2.5 font-semibold text-gray-900">{p.cultura}</td>
                     <td className="px-4 py-2.5 text-gray-600">{p.safra}</td>
+                    <td className="px-4 py-2.5 text-center">
+                      <div className="flex items-center justify-center gap-1">
+                        <input
+                          type="date"
+                          className="border border-gray-200 rounded-lg px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-green-300 focus:border-green-400"
+                          value={p.dataPagamento ? p.dataPagamento.slice(0, 10) : ''}
+                          onChange={e => handleSaveDataProd({ id: p.id, clientId, cultura: p.cultura, safra: p.safra, tipo: '', ordem: '', cotacao: 0, area: 0, produtividade: 0, custoPorHa: 0, areaArrendada: 0, custoArrendHa: 0 }, e.target.value)}
+                        />
+                        {savingProdId === p.id && <span className="text-gray-400 text-xs">...</span>}
+                        {!p.dataPagamento && <span className="text-amber-500 text-xs" title="Defina a data para aparecer no fluxo">⚠</span>}
+                      </div>
+                    </td>
                     <td className="px-4 py-2.5 text-right text-red-600">{fmtBRL(p.custoTotal)}</td>
                     <td className="px-4 py-2.5 text-right text-orange-600">{fmtBRL(p.arrendTotal)}</td>
                     <td className="px-4 py-2.5 text-right font-bold text-gray-900">{fmtBRL(p.custoTotal + p.arrendTotal)}</td>
@@ -244,7 +269,7 @@ export function TabCustosFixos({ clientId }: { clientId: string }) {
               </tbody>
               <tfoot>
                 <tr className="bg-green-50 border-t font-bold">
-                  <td className="px-4 py-2" colSpan={4}>Total Custos de Produção</td>
+                  <td className="px-4 py-2" colSpan={5}>Total Custos de Produção</td>
                   <td className="px-4 py-2 text-right text-green-800">{fmtBRL(totalCustoProducao)}</td>
                 </tr>
               </tfoot>
