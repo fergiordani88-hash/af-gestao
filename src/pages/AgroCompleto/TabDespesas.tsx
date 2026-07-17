@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Plus, Trash2, TrendingDown } from 'lucide-react'
+import { Plus, Trash2, TrendingDown, Repeat2 } from 'lucide-react'
 import { agroApi, type AgroDespesa } from '../../services/agroApi'
 import { Card } from '../../components/ui/Card'
 
@@ -19,6 +19,12 @@ const TIPO_COLOR: Record<string, string> = {
   'Outros':             'bg-slate-100 text-slate-700',
 }
 
+function addMonths(dateStr: string, n: number): string {
+  const d = new Date(dateStr + 'T12:00:00')
+  d.setMonth(d.getMonth() + n)
+  return d.toISOString().slice(0, 10)
+}
+
 export function TabDespesas({ clientId }: { clientId: string }) {
   const [despesas, setDespesas] = useState<AgroDespesa[]>([])
   const [loading, setLoading] = useState(true)
@@ -26,6 +32,8 @@ export function TabDespesas({ clientId }: { clientId: string }) {
   const [form, setForm] = useState<Omit<AgroDespesa, 'id'>>({
     clientId, data: '', tipo: 'Custo da atividade', origem: '', descricao: '', valor: 0,
   })
+  const [repetir, setRepetir] = useState(false)
+  const [mesesRepetir, setMesesRepetir] = useState(3)
   const [saving, setSaving] = useState(false)
   const [filtroTipo, setFiltroTipo] = useState('todos')
 
@@ -41,8 +49,17 @@ export function TabDespesas({ clientId }: { clientId: string }) {
     if (!form.data || !form.descricao || !form.valor) return
     setSaving(true)
     try {
-      await agroApi.despesas.create({ ...form, clientId })
+      const total = repetir ? mesesRepetir : 1
+      for (let i = 0; i < total; i++) {
+        await agroApi.despesas.create({
+          ...form,
+          clientId,
+          data: i === 0 ? form.data : addMonths(form.data, i),
+        })
+      }
       setForm(f => ({ ...f, data: '', origem: '', descricao: '', valor: 0 }))
+      setRepetir(false)
+      setMesesRepetir(3)
       setShowForm(false)
       load()
     } finally { setSaving(false) }
@@ -59,6 +76,11 @@ export function TabDespesas({ clientId }: { clientId: string }) {
   const porTipo = TIPOS.map(t => ({ tipo: t, total: despesas.filter(d => d.tipo === t).reduce((s, d) => s + d.valor, 0) })).filter(t => t.total > 0)
 
   const inp = 'w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-200 focus:border-red-400'
+
+  // Preview das datas que serão criadas
+  const datasPreview = repetir && form.data
+    ? Array.from({ length: mesesRepetir }, (_, i) => i === 0 ? form.data : addMonths(form.data, i))
+    : []
 
   return (
     <div className="space-y-5">
@@ -90,22 +112,82 @@ export function TabDespesas({ clientId }: { clientId: string }) {
         <Card className="p-4 border-2 border-red-100">
           <h3 className="font-semibold text-sm text-gray-700 mb-3">Nova Despesa</h3>
           <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
-            <div><label className="text-xs font-semibold text-gray-500 mb-1 block">Data *</label><input type="date" className={inp} value={form.data} onChange={e => setForm(f => ({ ...f, data: e.target.value }))} /></div>
-            <div><label className="text-xs font-semibold text-gray-500 mb-1 block">Tipo *</label>
+            <div>
+              <label className="text-xs font-semibold text-gray-500 mb-1 block">Data *</label>
+              <input type="date" className={inp} value={form.data} onChange={e => setForm(f => ({ ...f, data: e.target.value }))} />
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-gray-500 mb-1 block">Tipo *</label>
               <select className={inp} value={form.tipo} onChange={e => setForm(f => ({ ...f, tipo: e.target.value }))}>
                 {TIPOS.map(t => <option key={t}>{t}</option>)}
               </select>
             </div>
-            <div><label className="text-xs font-semibold text-gray-500 mb-1 block">Origem</label><input className={inp} value={form.origem} onChange={e => setForm(f => ({ ...f, origem: e.target.value }))} placeholder="Ex: Posto, Fornecedor" /></div>
-            <div className="md:col-span-2"><label className="text-xs font-semibold text-gray-500 mb-1 block">Descrição *</label><input className={inp} value={form.descricao} onChange={e => setForm(f => ({ ...f, descricao: e.target.value }))} placeholder="Ex: Compra de diesel" /></div>
-            <div><label className="text-xs font-semibold text-gray-500 mb-1 block">Valor (R$) *</label><input type="number" className={inp} value={form.valor || ''} onChange={e => setForm(f => ({ ...f, valor: Number(e.target.value) }))} /></div>
+            <div>
+              <label className="text-xs font-semibold text-gray-500 mb-1 block">Origem</label>
+              <input className={inp} value={form.origem} onChange={e => setForm(f => ({ ...f, origem: e.target.value }))} placeholder="Ex: Posto, Fornecedor" />
+            </div>
+            <div className="md:col-span-2">
+              <label className="text-xs font-semibold text-gray-500 mb-1 block">Descrição *</label>
+              <input className={inp} value={form.descricao} onChange={e => setForm(f => ({ ...f, descricao: e.target.value }))} placeholder="Ex: Salários março" />
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-gray-500 mb-1 block">Valor (R$) *</label>
+              <input type="number" className={inp} value={form.valor || ''} onChange={e => setForm(f => ({ ...f, valor: Number(e.target.value) }))} />
+            </div>
           </div>
+
+          {/* Opção de repetição */}
+          <div className="mt-4 border border-dashed border-red-200 rounded-xl p-3 bg-red-50/40">
+            <label className="flex items-center gap-2 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={repetir}
+                onChange={e => setRepetir(e.target.checked)}
+                className="w-4 h-4 accent-red-600"
+              />
+              <Repeat2 size={14} className="text-red-500" />
+              <span className="text-sm font-semibold text-red-700">Repetir por vários meses</span>
+            </label>
+
+            {repetir && (
+              <div className="mt-3 flex items-center gap-4 flex-wrap">
+                <div className="flex items-center gap-2">
+                  <label className="text-xs font-semibold text-gray-600">Quantidade de meses:</label>
+                  <input
+                    type="number"
+                    min={2}
+                    max={60}
+                    value={mesesRepetir}
+                    onChange={e => setMesesRepetir(Math.max(2, Math.min(60, Number(e.target.value))))}
+                    className="w-20 border border-red-300 rounded-lg px-2 py-1 text-sm text-center"
+                  />
+                </div>
+                {datasPreview.length > 0 && (
+                  <div className="flex flex-wrap gap-1">
+                    <span className="text-xs text-gray-500 mr-1">Datas que serão criadas:</span>
+                    {datasPreview.map((d, i) => (
+                      <span key={i} className="text-xs bg-white border border-red-200 text-red-700 rounded px-1.5 py-0.5">
+                        {new Date(d + 'T12:00:00').toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' })}
+                      </span>
+                    ))}
+                  </div>
+                )}
+                <p className="text-xs text-red-600 font-semibold w-full">
+                  Serão criadas {mesesRepetir} despesas — {fmtBRL(form.valor * mesesRepetir)} no total
+                </p>
+              </div>
+            )}
+          </div>
+
           <div className="flex gap-2 mt-3">
-            <button onClick={handleAdd} disabled={saving || !form.data || !form.descricao || !form.valor}
-              className="bg-red-600 text-white rounded-xl px-4 py-2 text-sm font-semibold disabled:opacity-50 hover:bg-red-700">
-              {saving ? 'Salvando...' : 'Adicionar'}
+            <button
+              onClick={handleAdd}
+              disabled={saving || !form.data || !form.descricao || !form.valor}
+              className="bg-red-600 text-white rounded-xl px-4 py-2 text-sm font-semibold disabled:opacity-50 hover:bg-red-700"
+            >
+              {saving ? 'Salvando...' : repetir ? `Criar ${mesesRepetir} lançamentos` : 'Adicionar'}
             </button>
-            <button onClick={() => setShowForm(false)} className="px-4 py-2 border border-gray-200 rounded-xl text-sm text-gray-600 hover:bg-gray-50">Cancelar</button>
+            <button onClick={() => { setShowForm(false); setRepetir(false) }} className="px-4 py-2 border border-gray-200 rounded-xl text-sm text-gray-600 hover:bg-gray-50">Cancelar</button>
           </div>
         </Card>
       )}

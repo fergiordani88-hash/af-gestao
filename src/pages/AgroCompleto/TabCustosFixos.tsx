@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Plus, Trash2, Save, DollarSign, Sprout } from 'lucide-react'
+import { Plus, Trash2, Save, DollarSign, Sprout, Edit2, X } from 'lucide-react'
 import { agroApi, type AgroCustoFixo, type AgroProducao } from '../../services/agroApi'
 import { Card } from '../../components/ui/Card'
 
@@ -28,11 +28,60 @@ const CAT_COLOR: Record<string, string> = {
   'Contratos Recorrentes':'bg-gray-100 text-gray-700',
 }
 
+type EditState = { id: string; item: string; categoria: string; valorMensal: number }
+
+// Linha da tabela em modo edição
+function EditRow({ es, onSave, onCancel, onChange }: {
+  es: EditState
+  onSave: () => void
+  onCancel: () => void
+  onChange: (patch: Partial<EditState>) => void
+}) {
+  return (
+    <>
+      <td className="px-4 py-2" colSpan={2}>
+        <div className="flex gap-2 items-center">
+          <select
+            className="border border-amber-300 rounded-lg px-2 py-1 text-xs"
+            value={es.categoria}
+            onChange={e => onChange({ categoria: e.target.value })}
+          >
+            {CATEGORIAS.map(c => <option key={c}>{c}</option>)}
+          </select>
+          <input
+            autoFocus
+            className="flex-1 border border-amber-300 rounded-lg px-2 py-1 text-xs"
+            value={es.item}
+            onChange={e => onChange({ item: e.target.value })}
+            placeholder="Nome do item"
+            onKeyDown={e => e.key === 'Enter' && onSave()}
+          />
+          <input
+            type="number"
+            className="w-28 text-right border border-amber-300 rounded-lg px-2 py-1 text-xs"
+            value={es.valorMensal || ''}
+            onChange={e => onChange({ valorMensal: Number(e.target.value) })}
+            onKeyDown={e => e.key === 'Enter' && onSave()}
+          />
+        </div>
+      </td>
+      <td className="px-4 py-2 text-right text-gray-400 text-xs">
+        {fmtBRL((es.valorMensal || 0) * 12)}/ano
+      </td>
+      <td className="px-4 py-2">
+        <div className="flex gap-1 justify-end">
+          <button onClick={onSave} className="p-1.5 text-green-600 hover:bg-green-50 rounded" title="Salvar"><Save size={12} /></button>
+          <button onClick={onCancel} className="p-1.5 text-gray-400 hover:bg-gray-100 rounded" title="Cancelar"><X size={12} /></button>
+        </div>
+      </td>
+    </>
+  )
+}
+
 export function TabCustosFixos({ clientId }: { clientId: string }) {
   const [custos, setCustos] = useState<AgroCustoFixo[]>([])
   const [loading, setLoading] = useState(true)
-  const [editId, setEditId] = useState<string | null>(null)
-  const [editVal, setEditVal] = useState(0)
+  const [editState, setEditState] = useState<EditState | null>(null)
   const [categoriaAberta, setCategoriaAberta] = useState<string>(CATEGORIAS[0])
   const [novoItem, setNovoItem] = useState({ categoria: CATEGORIAS[0], item: '', valorMensal: 0 })
   const [showNew, setShowNew] = useState(false)
@@ -47,13 +96,19 @@ export function TabCustosFixos({ clientId }: { clientId: string }) {
   useEffect(() => { load() }, [clientId])
   useEffect(() => { agroApi.producao.list(clientId).then(setProducoes) }, [clientId])
 
-  const handleSaveEdit = async (id: string) => {
-    await agroApi.custosFixos.update(id, { valorMensal: editVal })
-    setEditId(null)
+  const handleSaveEdit = async () => {
+    if (!editState) return
+    await agroApi.custosFixos.update(editState.id, {
+      item: editState.item,
+      categoria: editState.categoria,
+      valorMensal: editState.valorMensal,
+    })
+    setEditState(null)
     load()
   }
 
   const handleDelete = async (id: string) => {
+    if (!confirm('Excluir este item?')) return
     await agroApi.custosFixos.delete(id)
     load()
   }
@@ -87,10 +142,8 @@ export function TabCustosFixos({ clientId }: { clientId: string }) {
     .filter(p => p.custoTotal > 0 || p.arrendTotal > 0)
 
   const totalCustoProducao = custosDeProducao.reduce((s, p) => s + p.custoTotal + p.arrendTotal, 0)
-
   const totalMensal = custos.reduce((s, c) => s + c.valorMensal, 0)
   const totalAnual = totalMensal * 12
-
   const custoPorCategoria = CATEGORIAS.map(cat => ({
     cat,
     items: custos.filter(c => c.categoria === cat),
@@ -106,11 +159,9 @@ export function TabCustosFixos({ clientId }: { clientId: string }) {
           <h2 className="font-bold text-gray-900">Custos Fixos</h2>
           <p className="text-xs text-gray-500 mt-0.5">Todos os custos recorrentes por categoria — mensal e anual</p>
         </div>
-        <div className="flex gap-2">
-          <button onClick={() => setShowNew(!showNew)} className="flex items-center gap-2 border border-gray-200 text-gray-700 rounded-xl px-3 py-2 text-sm font-semibold hover:bg-gray-50">
-            <Plus size={14} /> Item personalizado
-          </button>
-        </div>
+        <button onClick={() => setShowNew(!showNew)} className="flex items-center gap-2 border border-gray-200 text-gray-700 rounded-xl px-3 py-2 text-sm font-semibold hover:bg-gray-50">
+          <Plus size={14} /> Item personalizado
+        </button>
       </div>
 
       {/* Custos de Produção derivados */}
@@ -235,40 +286,41 @@ export function TabCustosFixos({ clientId }: { clientId: string }) {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-50">
-                        {items.map(item => (
-                          <tr key={item.id} className="hover:bg-gray-50/50 group">
-                            <td className="px-4 py-2.5 text-gray-700">{item.item}</td>
-                            <td className="px-4 py-2.5 text-right">
-                              {editId === item.id ? (
-                                <input
-                                  autoFocus
-                                  type="number"
-                                  value={editVal}
-                                  onChange={e => setEditVal(Number(e.target.value))}
-                                  onBlur={() => item.id && handleSaveEdit(item.id)}
-                                  onKeyDown={e => e.key === 'Enter' && item.id && handleSaveEdit(item.id)}
-                                  className="w-28 text-right border border-amber-300 rounded-lg px-2 py-1 text-sm"
+                        {items.map(item => {
+                          const isEditing = editState?.id === item.id
+                          return (
+                            <tr key={item.id} className="hover:bg-gray-50/50 group">
+                              {isEditing && editState ? (
+                                <EditRow
+                                  es={editState}
+                                  onSave={handleSaveEdit}
+                                  onCancel={() => setEditState(null)}
+                                  onChange={patch => setEditState(s => s ? { ...s, ...patch } : s)}
                                 />
                               ) : (
-                                <button
-                                  onClick={() => { setEditId(item.id ?? null); setEditVal(item.valorMensal) }}
-                                  className="font-semibold text-gray-900 hover:text-amber-600 hover:underline"
-                                >
-                                  {fmtBRL(item.valorMensal)}
-                                </button>
+                                <>
+                                  <td className="px-4 py-2.5 text-gray-700">{item.item}</td>
+                                  <td className="px-4 py-2.5 text-right font-semibold text-gray-900">{fmtBRL(item.valorMensal)}</td>
+                                  <td className="px-4 py-2.5 text-right text-gray-600">{fmtBRL(item.valorMensal * 12)}</td>
+                                  <td className="px-4 py-2.5">
+                                    <div className="flex gap-1 justify-end opacity-0 group-hover:opacity-100">
+                                      <button
+                                        onClick={() => setEditState({ id: item.id!, item: item.item, categoria: item.categoria, valorMensal: item.valorMensal })}
+                                        className="p-1.5 text-blue-400 hover:bg-blue-50 rounded"
+                                        title="Editar"
+                                      >
+                                        <Edit2 size={12} />
+                                      </button>
+                                      <button onClick={() => item.id && handleDelete(item.id)} className="p-1.5 text-red-400 hover:bg-red-50 rounded" title="Excluir">
+                                        <Trash2 size={12} />
+                                      </button>
+                                    </div>
+                                  </td>
+                                </>
                               )}
-                            </td>
-                            <td className="px-4 py-2.5 text-right text-gray-600">{fmtBRL(item.valorMensal * 12)}</td>
-                            <td className="px-4 py-2.5">
-                              <div className="flex gap-1 justify-end opacity-0 group-hover:opacity-100">
-                                {editId === item.id && (
-                                  <button onClick={() => item.id && handleSaveEdit(item.id)} className="p-1.5 text-af-green hover:bg-af-green-pale rounded"><Save size={12} /></button>
-                                )}
-                                <button onClick={() => item.id && handleDelete(item.id)} className="p-1.5 text-red-400 hover:bg-red-50 rounded"><Trash2 size={12} /></button>
-                              </div>
-                            </td>
-                          </tr>
-                        ))}
+                            </tr>
+                          )
+                        })}
                       </tbody>
                       <tfoot>
                         <tr className="bg-gray-50 border-t font-bold">
