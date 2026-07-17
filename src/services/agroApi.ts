@@ -39,9 +39,14 @@ export interface AgroContrato {
   numeroContrato?: string; dataContratacao: string; valorTomado: number
   totalParcelas: number; parcelaAtual: number; periodicidade: string
   taxa: number; vencimento: string; valorParcela: number; obs?: string
-  indexador?: string         // "Pré-fixado" | "CDI" | "SELIC" | "IPCA" | "TR"
-  spreadIndexador?: number   // spread adicional sobre o indexador (ex: 0.02 = 2%)
-  sistemaAmortizacao?: string // "Price" | "SAC"
+  indexador?: string
+  spreadIndexador?: number
+  sistemaAmortizacao?: string
+  usarParcelasCustom?: boolean
+}
+
+export interface AgroParcelaCustom {
+  id?: string; contratoId: string; numero: number; data: string; valor: number
 }
 
 export interface AgroParcela {
@@ -98,6 +103,20 @@ export const agroApi = {
     update:     (id: string, d: Partial<AgroContrato>) => req<AgroContrato>(`/contratos/${id}`, { method: 'PUT', body: JSON.stringify(d) }),
     delete:     (id: string) => req<void>(`/contratos/${id}`, { method: 'DELETE' }),
   },
+
+  // Parcelas personalizadas
+  parcelasCustom: {
+    list:   (contratoId: string) => req<AgroParcelaCustom[]>(`/parcelas-custom/${contratoId}`),
+    bulk:   (contratoId: string, parcelas: Array<{ numero: number; data: string; valor: number }>) =>
+              req<{ count: number }>(`/parcelas-custom/bulk/${contratoId}`, { method: 'POST', body: JSON.stringify(parcelas) }),
+    update: (id: string, d: { data: string; valor: number }) =>
+              req<AgroParcelaCustom>(`/parcelas-custom/${id}`, { method: 'PUT', body: JSON.stringify(d) }),
+    clear:  (contratoId: string) => req<void>(`/parcelas-custom/all/${contratoId}`, { method: 'DELETE' }),
+  },
+
+  // Despesas anuais (para projeção)
+  despesasAnuais: (cid: string) =>
+    req<Record<number, { custoAtiv: number; despAdmin: number; total: number }>>(`/despesas-anuais/${cid}`),
 
   // Despesas
   despesas: {

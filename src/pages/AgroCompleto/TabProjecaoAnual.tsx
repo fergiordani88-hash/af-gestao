@@ -64,12 +64,18 @@ function calcProjecao(
   base: DRERural,
   p: Premissas,
   cronoPorAno: Record<string, number>,
+  despesasAnuais?: Record<number, { custoAtiv: number; despAdmin: number; total: number }>,
 ): AnoRow[] {
   const c = base.calculado
   if (!c) return []
 
-  const baseSafraAno = parseInt(base.safra.split('/')[0]) // ex: "2026/27" → 2026
+  const baseSafraAno = parseInt(base.safra.split('/')[0])
   const rows: AnoRow[] = []
+
+  // Base de custos: usa despesas reais quando DRE não tem valores
+  const despAno = despesasAnuais ? (despesasAnuais[baseSafraAno] ?? despesasAnuais[baseSafraAno - 1] ?? null) : null
+  const baseCustoAtiv = c.custoAtiv > 0 ? c.custoAtiv : (despAno?.custoAtiv ?? 0)
+  const baseDespAdmin = c.despAdmin > 0 ? c.despAdmin : (despAno?.despAdmin ?? 0)
 
   for (let i = 0; i <= 10; i++) {
     const yr = baseSafraAno + i
@@ -93,15 +99,14 @@ function calcProjecao(
 
     const recBruta = sojaVol * sojaPreco + milhoVol * milhoPreco + feijaoVol * feijaoPreco + recOutras
 
-    // Custo da atividade cresce com área + inflação
-    const custoAtiv = (c.custoAtiv || 0) * gareaFactor * gcusto
-    // Arrendamento indexado ao preço da soja (geralmente pago em sacas)
+    // Custo da atividade: usa base real (DRE ou despesas cadastradas), cresce com área + inflação
+    const custoAtiv = baseCustoAtiv * gareaFactor * gcusto
     const arrendamento = (c.arrendamento || 0) * gareaFactor * gsojaPreco
 
     const lucBruto  = recBruta - custoAtiv - arrendamento
     const margBruta = recBruta > 0 ? lucBruto / recBruta : 0
 
-    const despAdmin  = (c.despAdmin || 0) * gadmin
+    const despAdmin  = baseDespAdmin * gadmin
     const ebitda     = lucBruto - despAdmin
     const margEbitda = recBruta > 0 ? ebitda / recBruta : 0
 
@@ -141,6 +146,7 @@ export function TabProjecaoAnual({ clientId }: { clientId: string }) {
   const [safrasDisp, setSafrasDisp] = useState<string[]>([])
   const [premissas, setPremissas] = useState<Premissas>(DEFAULT_PREMISSAS)
   const [cronoPorAno, setCronoPorAno] = useState<Record<string, number>>({})
+  const [despesasAnuais, setDespesasAnuais] = useState<Record<number, { custoAtiv: number; despAdmin: number; total: number }>>({})
   const [projecao, setProjecao] = useState<AnoRow[]>([])
   const [showPremissas, setShowPremissas] = useState(true)
 
@@ -159,10 +165,10 @@ export function TabProjecaoAnual({ clientId }: { clientId: string }) {
     Promise.all([
       historicoApi.listarDRERural(clientId),
       agroApi.contratos.cronograma(clientId).catch(() => null),
-    ]).then(([dres, crono]) => {
+      agroApi.despesasAnuais(clientId).catch(() => ({})),
+    ]).then(([dres, crono, despAnuais]) => {
       if (dres.length > 0) {
         const sorted = [...dres].sort((a, b) => b.safra.localeCompare(a.safra))
-        // Prioriza 26/27; senão pega a mais recente com dados calculados
         const preferred = sorted.find(d => d.safra === '2026/27') ?? sorted.find(d => d.calculado) ?? sorted[0]
         setBaseDRE(preferred)
         setBaseSafra(preferred.safra)
@@ -172,11 +178,11 @@ export function TabProjecaoAnual({ clientId }: { clientId: string }) {
         const mapa: Record<string, number> = {}
         for (const [ano, v] of Object.entries(crono.porAno)) {
           const vv = v as any
-          // Usa juros reais (SAC/CDI) quando disponível; fallback: 35% do total
           mapa[ano] = vv.juros > 0 ? vv.juros : vv.total * 0.35
         }
         setCronoPorAno(mapa)
       }
+      if (despAnuais) setDespesasAnuais(despAnuais as any)
     }).finally(() => setLoading(false))
   }, [clientId])
 
@@ -190,8 +196,8 @@ export function TabProjecaoAnual({ clientId }: { clientId: string }) {
   // Recalcula projeção sempre que base ou premissas mudam
   useEffect(() => {
     if (!baseDRE) return
-    setProjecao(calcProjecao(baseDRE, premissas, cronoPorAno))
-  }, [baseDRE, premissas, cronoPorAno])
+    setProjecao(calcProjecao(baseDRE, premissas, cronoPorAno, despesasAnuais))
+  }, [baseDRE, premissas, cronoPorAno, despesasAnuais])
 
   const set = (k: keyof Premissas, v: number) => {
     setPremissas(prev => {
@@ -289,9 +295,20 @@ export function TabProjecaoAnual({ clientId }: { clientId: string }) {
             </div>
           ))}
         </div>
-        <p className="text-xs text-gray-400 mt-2 flex items-center gap-1">
-          <Info size={11} /> Receitas e custos carregados automaticamente da DRE Rural salva
-        </p>
+        {(() => {
+          const baseSafraAnoLocal = parseInt(baseDRE.safra.split('/')[0])
+          const despAno = despesasAnuais[baseSafraAnoLocal] ?? despesasAnuais[baseSafraAnoLocal - 1]
+          const usandoDespesas = despAno && (c.custoAtiv === 0 || c.despAdmin === 0)
+          return usandoDespesas ? (
+            <p className="text-xs text-amber-600 mt-2 flex items-center gap-1">
+              <Info size={11} /> Custo da atividade e despesas admin. carregados das <strong>despesas reais cadastradas</strong> ({fmtBRL(despAno.custoAtiv + despAno.despAdmin)}/ano)
+            </p>
+          ) : (
+            <p className="text-xs text-gray-400 mt-2 flex items-center gap-1">
+              <Info size={11} /> Receitas e custos carregados automaticamente da DRE Rural salva
+            </p>
+          )
+        })()}
       </div>
 
       {/* Premissas */}

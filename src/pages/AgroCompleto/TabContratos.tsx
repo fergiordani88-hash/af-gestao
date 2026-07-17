@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
-import { Plus, Trash2, Edit2, X, ChevronDown, ChevronUp, AlertTriangle, FileUp, Loader2, TableProperties, Filter, Download, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react'
-import { agroApi, type AgroContrato, type AgroParcela } from '../../services/agroApi'
+import { Plus, Trash2, Edit2, X, ChevronDown, ChevronUp, AlertTriangle, FileUp, Loader2, TableProperties, Filter, Download, ArrowUpDown, ArrowUp, ArrowDown, PencilLine, Save, RotateCcw } from 'lucide-react'
+import { agroApi, type AgroContrato, type AgroParcela, type AgroParcelaCustom } from '../../services/agroApi'
 import { Card } from '../../components/ui/Card'
 import { clsx } from 'clsx'
 
@@ -10,7 +10,7 @@ const fmtBRL = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', cur
 const fmtDate = (d: string | Date) => new Date(d).toLocaleDateString('pt-BR')
 
 const MODALIDADES = ['Capital de giro', 'Rotativo', 'Repactuação', 'Custeio', 'Investimento', 'Investimento CDI', 'BNDES Finame', 'BNDES', 'FCO', 'CPR', 'Moderfrota', 'Outros']
-const PERIODICIDADES = ['Mensal', 'Semestral', 'Anual', 'Trimestral', 'Único']
+const PERIODICIDADES = ['Mensal', 'Semestral', 'Anual', 'Trimestral', 'Único', 'Livre']
 
 const INDEXADORES = ['Pré-fixado', 'CDI', 'SELIC', 'IPCA', 'TR']
 
@@ -245,6 +245,150 @@ function ContratoModal({ contrato, clientId, onClose, onSaved, prefill }: {
   )
 }
 
+// ─── Editor de Parcelas Personalizadas ────────────────────────────────────────
+function ParcelasCustomEditor({
+  contrato, onSaved, onClose,
+}: {
+  contrato: AgroContrato
+  onSaved: () => void
+  onClose: () => void
+}) {
+  const [rows, setRows] = useState<Array<{ numero: number; data: string; valor: number }>>([])
+  const [saving, setSaving] = useState(false)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    if (!contrato.id) return
+    if (contrato.usarParcelasCustom) {
+      agroApi.parcelasCustom.list(contrato.id).then(r => {
+        setRows(r.map(p => ({ numero: p.numero, data: p.data.toString().slice(0, 10), valor: p.valor })))
+        setLoading(false)
+      })
+    } else {
+      // Pré-preenche com o número de parcelas restantes do contrato
+      const restantes = contrato.totalParcelas - (contrato.parcelaAtual - 1)
+      const base = new Date(contrato.vencimento)
+      const geradas = Array.from({ length: restantes }, (_, i) => {
+        const d = new Date(base)
+        d.setMonth(d.getMonth() + i)
+        return {
+          numero: contrato.parcelaAtual + i,
+          data: d.toISOString().slice(0, 10),
+          valor: contrato.valorParcela,
+        }
+      })
+      setRows(geradas)
+      setLoading(false)
+    }
+  }, [contrato.id])
+
+  const addRow = () => {
+    const last = rows[rows.length - 1]
+    const nextData = last ? (() => {
+      const d = new Date(last.data + 'T12:00:00')
+      d.setMonth(d.getMonth() + 1)
+      return d.toISOString().slice(0, 10)
+    })() : new Date().toISOString().slice(0, 10)
+    setRows(r => [...r, { numero: (last?.numero ?? 0) + 1, data: nextData, valor: last?.valor ?? 0 }])
+  }
+
+  const removeRow = (i: number) => setRows(r => r.filter((_, idx) => idx !== i))
+
+  const updateRow = (i: number, field: 'data' | 'valor', val: string | number) => {
+    setRows(r => r.map((row, idx) => idx === i ? { ...row, [field]: val } : row))
+  }
+
+  const handleSave = async () => {
+    if (!contrato.id || rows.length === 0) return
+    setSaving(true)
+    try {
+      await agroApi.parcelasCustom.bulk(contrato.id, rows)
+      onSaved()
+      onClose()
+    } finally { setSaving(false) }
+  }
+
+  const handleClear = async () => {
+    if (!contrato.id || !contrato.usarParcelasCustom) return
+    if (!confirm('Remover cronograma personalizado e voltar ao cálculo automático?')) return
+    await agroApi.parcelasCustom.clear(contrato.id)
+    onSaved()
+    onClose()
+  }
+
+  const total = rows.reduce((s, r) => s + Number(r.valor), 0)
+  const inp = 'border border-gray-200 rounded-lg px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-300'
+
+  return (
+    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col">
+        <div className="flex items-center justify-between px-5 py-4 border-b">
+          <div>
+            <h3 className="font-bold text-gray-900">Cronograma Personalizado</h3>
+            <p className="text-xs text-gray-500">{contrato.banco} · {contrato.modalidade} · {fmtBRL(contrato.valorTomado)}</p>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-5">
+          {loading ? <div className="text-center py-10 text-gray-400 text-sm">Carregando...</div> : (
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="border-b">
+                  <th className="pb-2 text-left font-semibold text-gray-500 pr-3">Nº</th>
+                  <th className="pb-2 text-left font-semibold text-gray-500 pr-3">Data Pagamento</th>
+                  <th className="pb-2 text-left font-semibold text-gray-500 pr-3">Valor (R$)</th>
+                  <th className="pb-2" />
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {rows.map((row, i) => (
+                  <tr key={i}>
+                    <td className="py-1.5 pr-3 text-gray-400 font-medium">{row.numero}</td>
+                    <td className="py-1.5 pr-3">
+                      <input type="date" className={inp} value={row.data}
+                        onChange={e => updateRow(i, 'data', e.target.value)} />
+                    </td>
+                    <td className="py-1.5 pr-3">
+                      <input type="number" className={inp + ' w-32 text-right'} value={row.valor}
+                        onChange={e => updateRow(i, 'valor', Number(e.target.value))} />
+                    </td>
+                    <td className="py-1.5">
+                      <button onClick={() => removeRow(i)} className="p-1 text-red-400 hover:bg-red-50 rounded">
+                        <X size={11} />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+
+        <div className="px-5 py-4 border-t bg-gray-50 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <button onClick={addRow} className="flex items-center gap-1.5 text-xs border border-gray-200 bg-white px-3 py-1.5 rounded-lg hover:bg-gray-50">
+              <Plus size={12} /> Adicionar parcela
+            </button>
+            {contrato.usarParcelasCustom && (
+              <button onClick={handleClear} className="flex items-center gap-1.5 text-xs text-amber-600 border border-amber-200 bg-amber-50 px-3 py-1.5 rounded-lg hover:bg-amber-100">
+                <RotateCcw size={12} /> Voltar ao automático
+              </button>
+            )}
+          </div>
+          <div className="flex items-center gap-3">
+            <span className="text-xs text-gray-600 font-semibold">Total: {fmtBRL(total)}</span>
+            <button onClick={handleSave} disabled={saving || rows.length === 0}
+              className="flex items-center gap-2 bg-blue-600 text-white rounded-xl px-4 py-2 text-sm font-semibold hover:bg-blue-700 disabled:opacity-50">
+              <Save size={13} /> {saving ? 'Salvando...' : `Salvar ${rows.length} parcelas`}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export function TabContratos({ clientId }: { clientId: string }) {
   const [contratos, setContratos] = useState<AgroContrato[]>([])
   const [cronograma, setCronograma] = useState<{ parcelas: AgroParcela[]; porAno: Record<string, { parcelas: number; total: number }>; totalEndividamento: number; totalFuturo: number }>()
@@ -258,6 +402,7 @@ export function TabContratos({ clientId }: { clientId: string }) {
   const fileRef = useRef<HTMLInputElement>(null)
   const [anoExpandido, setAnoExpandido] = useState<string | null>(null)
   const [contratoExpandido, setContratoExpandido] = useState<string | null>(null)
+  const [parcelasEditor, setParcelasEditor] = useState<AgroContrato | null>(null)
 
   // Filtros
   const [showFilters, setShowFilters] = useState(false)
@@ -696,6 +841,7 @@ export function TabContratos({ clientId }: { clientId: string }) {
                     <td className="px-3 py-2.5">
                       <div className="flex gap-1">
                         <button onClick={() => setContratoExpandido(contratoExpandido === c.id ? null : c.id ?? null)} className="p-1.5 hover:bg-gray-100 text-gray-500 rounded" title="Tabela de amortização"><TableProperties size={14} /></button>
+                        <button onClick={() => setParcelasEditor(c)} className={`p-1.5 rounded ${c.usarParcelasCustom ? 'bg-amber-100 text-amber-600 hover:bg-amber-200' : 'hover:bg-gray-100 text-gray-400'}`} title={c.usarParcelasCustom ? 'Cronograma personalizado ativo' : 'Personalizar cronograma'}><PencilLine size={14} /></button>
                         <button onClick={() => setModal(c)} className="p-1.5 hover:bg-blue-50 text-blue-500 rounded" title="Editar"><Edit2 size={14} /></button>
                         <button onClick={() => c.id && handleDelete(c.id)} className="p-1.5 hover:bg-red-50 text-red-400 rounded" title="Excluir"><Trash2 size={14} /></button>
                       </div>
@@ -863,6 +1009,14 @@ export function TabContratos({ clientId }: { clientId: string }) {
             </table>
           </div>
         </Card>
+      )}
+
+      {parcelasEditor && (
+        <ParcelasCustomEditor
+          contrato={parcelasEditor}
+          onClose={() => setParcelasEditor(null)}
+          onSaved={() => { load(); setParcelasEditor(null) }}
+        />
       )}
 
       {modal && (
