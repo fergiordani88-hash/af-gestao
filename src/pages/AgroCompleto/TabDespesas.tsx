@@ -37,6 +37,7 @@ export function TabDespesas({ clientId }: { clientId: string }) {
   const [editId, setEditId] = useState<string | null>(null)
   const [repetir, setRepetir] = useState(false)
   const [mesesRepetir, setMesesRepetir] = useState(3)
+  const [periodicidade, setPeriodicidade] = useState<'mensal' | 'anual'>('mensal')
   const [saving, setSaving] = useState(false)
   const [filtroTipo, setFiltroTipo] = useState('todos')
 
@@ -52,6 +53,7 @@ export function TabDespesas({ clientId }: { clientId: string }) {
     setEditId(null)
     setForm(EMPTY(clientId))
     setRepetir(false)
+    setPeriodicidade('mensal')
     setShowForm(true)
   }
 
@@ -72,7 +74,8 @@ export function TabDespesas({ clientId }: { clientId: string }) {
       } else {
         const total = repetir ? mesesRepetir : 1
         for (let i = 0; i < total; i++) {
-          await agroApi.despesas.create({ ...form, clientId, data: i === 0 ? form.data : addMonths(form.data, i) })
+          const salto = periodicidade === 'anual' ? i * 12 : i
+          await agroApi.despesas.create({ ...form, clientId, data: i === 0 ? form.data : addMonths(form.data, salto) })
         }
       }
       setForm(EMPTY(clientId))
@@ -80,6 +83,7 @@ export function TabDespesas({ clientId }: { clientId: string }) {
       setEditId(null)
       setRepetir(false)
       setMesesRepetir(3)
+      setPeriodicidade('mensal')
       load()
     } finally { setSaving(false) }
   }
@@ -97,7 +101,10 @@ export function TabDespesas({ clientId }: { clientId: string }) {
   const inp = 'w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-200 focus:border-red-400'
 
   const datasPreview = repetir && form.data
-    ? Array.from({ length: mesesRepetir }, (_, i) => i === 0 ? form.data : addMonths(form.data, i))
+    ? Array.from({ length: mesesRepetir }, (_, i) => {
+        const salto = periodicidade === 'anual' ? i * 12 : i
+        return i === 0 ? form.data : addMonths(form.data, salto)
+      })
     : []
 
   return (
@@ -170,10 +177,23 @@ export function TabDespesas({ clientId }: { clientId: string }) {
               {repetir && (
                 <div className="mt-3 flex items-center gap-4 flex-wrap">
                   <div className="flex items-center gap-2">
-                    <label className="text-xs font-semibold text-gray-600">Quantidade de meses:</label>
+                    <label className="text-xs font-semibold text-gray-600">Periodicidade:</label>
+                    <select
+                      value={periodicidade}
+                      onChange={e => setPeriodicidade(e.target.value as 'mensal' | 'anual')}
+                      className="border border-red-300 rounded-lg px-2 py-1 text-sm"
+                    >
+                      <option value="mensal">Mensal</option>
+                      <option value="anual">Anual</option>
+                    </select>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <label className="text-xs font-semibold text-gray-600">
+                      Quantidade ({periodicidade === 'anual' ? 'anos' : 'meses'}):
+                    </label>
                     <input
-                      type="number" min={2} max={60} value={mesesRepetir}
-                      onChange={e => setMesesRepetir(Math.max(2, Math.min(60, Number(e.target.value))))}
+                      type="number" min={2} max={periodicidade === 'anual' ? 20 : 60} value={mesesRepetir}
+                      onChange={e => setMesesRepetir(Math.max(2, Math.min(periodicidade === 'anual' ? 20 : 60, Number(e.target.value))))}
                       className="w-20 border border-red-300 rounded-lg px-2 py-1 text-sm text-center"
                     />
                   </div>
@@ -182,7 +202,7 @@ export function TabDespesas({ clientId }: { clientId: string }) {
                       <span className="text-xs text-gray-500 mr-1">Datas:</span>
                       {datasPreview.map((d, i) => (
                         <span key={i} className="text-xs bg-white border border-red-200 text-red-700 rounded px-1.5 py-0.5">
-                          {new Date(d + 'T12:00:00').toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' })}
+                          {new Date(d + 'T12:00:00').toLocaleDateString('pt-BR', periodicidade === 'anual' ? { year: 'numeric' } : { month: 'short', year: '2-digit' })}
                         </span>
                       ))}
                     </div>
@@ -201,7 +221,7 @@ export function TabDespesas({ clientId }: { clientId: string }) {
               disabled={saving || !form.data || !form.descricao || !form.valor}
               className={`flex items-center gap-2 text-white rounded-xl px-4 py-2 text-sm font-semibold disabled:opacity-50 ${editId ? 'bg-blue-600 hover:bg-blue-700' : 'bg-red-600 hover:bg-red-700'}`}
             >
-              {saving ? 'Salvando...' : editId ? <><Save size={14} /> Salvar alterações</> : repetir ? `Criar ${mesesRepetir} lançamentos` : 'Adicionar'}
+              {saving ? 'Salvando...' : editId ? <><Save size={14} /> Salvar alterações</> : repetir ? `Criar ${mesesRepetir} lançamentos (${periodicidade})` : 'Adicionar'}
             </button>
             <button onClick={() => { setShowForm(false); setEditId(null) }} className="px-4 py-2 border border-gray-200 rounded-xl text-sm text-gray-600 hover:bg-gray-50">Cancelar</button>
           </div>
