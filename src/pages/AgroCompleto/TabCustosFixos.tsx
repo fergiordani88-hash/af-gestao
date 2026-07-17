@@ -30,6 +30,14 @@ const CAT_COLOR: Record<string, string> = {
 
 type EditState = { id: string; item: string; categoria: string; valorMensal: number }
 
+// Itens de folha que geram provisão de 13º e férias
+const ITENS_BASE_FOLHA = ['Salários', 'Horas extras', 'Pró-labore']
+
+// Alíquotas de provisão (mensal sobre salário base)
+const ALIQ_13 = 1 / 12          // 8,33%
+const ALIQ_FERIAS = (1 / 12) * (4 / 3) // 11,11% (férias + 1/3)
+const ALIQ_TOTAL = ALIQ_13 + ALIQ_FERIAS // 19,44%
+
 // Linha da tabela em modo edição
 function EditRow({ es, onSave, onCancel, onChange }: {
   es: EditState
@@ -87,10 +95,31 @@ export function TabCustosFixos({ clientId }: { clientId: string }) {
   const [showNew, setShowNew] = useState(false)
   const [producoes, setProducoes] = useState<AgroProducao[]>([])
 
+  // Recalcula e sincroniza "Provisão 13°/férias" a partir da folha base
+  const syncProvisao = async (custosAtuais: AgroCustoFixo[]) => {
+    const folhaBase = custosAtuais
+      .filter(c => c.categoria === 'Folha de Pagamento' && ITENS_BASE_FOLHA.includes(c.item))
+      .reduce((s, c) => s + c.valorMensal, 0)
+
+    const valorProvisao = Math.round(folhaBase * ALIQ_TOTAL * 100) / 100
+    const existente = custosAtuais.find(c => c.categoria === 'Folha de Pagamento' && c.item === 'Provisão 13°/férias')
+
+    if (existente?.id) {
+      if (Math.abs(existente.valorMensal - valorProvisao) > 0.01) {
+        await agroApi.custosFixos.update(existente.id, { valorMensal: valorProvisao })
+      }
+    } else if (valorProvisao > 0) {
+      await agroApi.custosFixos.create({ clientId, categoria: 'Folha de Pagamento', item: 'Provisão 13°/férias', valorMensal: valorProvisao })
+    }
+  }
+
   const load = async () => {
     setLoading(true)
-    try { setCustos(await agroApi.custosFixos.list(clientId)) }
-    finally { setLoading(false) }
+    try {
+      const data = await agroApi.custosFixos.list(clientId)
+      await syncProvisao(data)
+      setCustos(await agroApi.custosFixos.list(clientId))
+    } finally { setLoading(false) }
   }
 
   useEffect(() => { load() }, [clientId])
@@ -104,13 +133,18 @@ export function TabCustosFixos({ clientId }: { clientId: string }) {
       valorMensal: editState.valorMensal,
     })
     setEditState(null)
-    load()
+    const fresh = await agroApi.custosFixos.list(clientId)
+    await syncProvisao(fresh)
+    setCustos(fresh)
+    setLoading(false)
   }
 
   const handleDelete = async (id: string) => {
     if (!confirm('Excluir este item?')) return
     await agroApi.custosFixos.delete(id)
-    load()
+    const fresh = await agroApi.custosFixos.list(clientId)
+    await syncProvisao(fresh)
+    setCustos(fresh)
   }
 
   const handleAdd = async () => {
@@ -118,7 +152,9 @@ export function TabCustosFixos({ clientId }: { clientId: string }) {
     await agroApi.custosFixos.create({ ...novoItem, clientId })
     setNovoItem(n => ({ ...n, item: '', valorMensal: 0 }))
     setShowNew(false)
-    load()
+    const fresh = await agroApi.custosFixos.list(clientId)
+    await syncProvisao(fresh)
+    setCustos(fresh)
   }
 
   const handleAddPadrao = async (cat: string) => {
@@ -299,7 +335,14 @@ export function TabCustosFixos({ clientId }: { clientId: string }) {
                                 />
                               ) : (
                                 <>
-                                  <td className="px-4 py-2.5 text-gray-700">{item.item}</td>
+                                  <td className="px-4 py-2.5 text-gray-700">
+                                    <span>{item.item}</span>
+                                    {item.item === 'Provisão 13°/férias' && (
+                                      <span className="ml-2 text-xs bg-orange-100 text-orange-600 px-1.5 py-0.5 rounded-full font-medium" title="13°: 8,33% + Férias+1/3: 11,11% sobre Salários, Horas extras e Pró-labore">
+                                        auto 19,44%
+                                      </span>
+                                    )}
+                                  </td>
                                   <td className="px-4 py-2.5 text-right font-semibold text-gray-900">{fmtBRL(item.valorMensal)}</td>
                                   <td className="px-4 py-2.5 text-right text-gray-600">{fmtBRL(item.valorMensal * 12)}</td>
                                   <td className="px-4 py-2.5">
