@@ -106,7 +106,6 @@ export function TabCustosFixos({ clientId }: { clientId: string }) {
   const [showNew, setShowNew] = useState(false)
   const [producoes, setProducoes] = useState<AgroProducao[]>([])
   const [savingProdId, setSavingProdId] = useState<string | null>(null)
-  const [datasLocais, setDatasLocais] = useState<Record<string, string>>({})
 
   // Recalcula e sincroniza "Provisão 13°/férias" a partir da folha base
   const syncProvisao = async (custosAtuais: AgroCustoFixo[]) => {
@@ -138,18 +137,17 @@ export function TabCustosFixos({ clientId }: { clientId: string }) {
   const loadProducoes = async () => {
     const data = await agroApi.producao.list(clientId)
     setProducoes(data)
-    const map: Record<string, string> = {}
-    data.forEach(p => { if (p.id && p.dataPagamento) map[p.id] = p.dataPagamento.slice(0, 10) })
-    setDatasLocais(map)
   }
 
   useEffect(() => { load() }, [clientId])
   useEffect(() => { loadProducoes() }, [clientId])
 
   const handleSaveDataProd = async (id: string, dataPagamento: string) => {
+    if (!dataPagamento) return
     setSavingProdId(id)
     try {
-      await agroApi.producao.update(id, { dataPagamento: dataPagamento || undefined })
+      await agroApi.producao.update(id, { dataPagamento })
+      await loadProducoes()
     } finally { setSavingProdId(null) }
   }
 
@@ -257,14 +255,14 @@ export function TabCustosFixos({ clientId }: { clientId: string }) {
                     <td className="px-4 py-2.5 text-center">
                       <div className="flex items-center justify-center gap-1">
                         <input
+                          key={p.id + '-' + (p.dataPagamento ?? '')}
                           type="date"
                           className="border border-gray-200 rounded-lg px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-green-300 focus:border-green-400"
-                          value={datasLocais[p.id] ?? ''}
-                          onChange={e => setDatasLocais(prev => ({ ...prev, [p.id]: e.target.value }))}
-                          onBlur={e => e.target.value && handleSaveDataProd(p.id, e.target.value)}
+                          defaultValue={p.dataPagamento ? p.dataPagamento.slice(0, 10) : ''}
+                          onBlur={e => handleSaveDataProd(p.id, e.target.value)}
                         />
                         {savingProdId === p.id && <span className="text-gray-400 text-xs">salvando...</span>}
-                        {!datasLocais[p.id] && <span className="text-amber-500 text-xs" title="Defina a data para aparecer no fluxo">⚠</span>}
+                        {!p.dataPagamento && <span className="text-amber-500 text-xs" title="Defina a data para aparecer no fluxo">⚠</span>}
                       </div>
                     </td>
                     <td className="px-4 py-2.5 text-right text-red-600">{fmtBRL(p.custoTotal)}</td>
