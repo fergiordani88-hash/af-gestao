@@ -1,7 +1,13 @@
 import { useState, useEffect } from 'react'
-import { Plus, Trash2, TrendingUp, Sprout } from 'lucide-react'
+import { Plus, Trash2, TrendingUp, Sprout, Repeat2 } from 'lucide-react'
 import { agroApi, type AgroReceita, type AgroProducao } from '../../services/agroApi'
 import { Card } from '../../components/ui/Card'
+
+function addMonths(dateStr: string, n: number): string {
+  const d = new Date(dateStr + 'T12:00:00')
+  d.setMonth(d.getMonth() + n)
+  return d.toISOString().slice(0, 10)
+}
 
 const fmtBRL = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 })
 const fmtDate = (d: string | Date) => new Date(d).toLocaleDateString('pt-BR')
@@ -26,6 +32,9 @@ export function TabReceitas({ clientId }: { clientId: string }) {
     clientId, data: '', origem: '', tipo: 'Recebimento', descricao: '', valor: 0,
   })
   const [saving, setSaving] = useState(false)
+  const [repetir, setRepetir] = useState(false)
+  const [qtdRepetir, setQtdRepetir] = useState(3)
+  const [periodicidade, setPeriodicidade] = useState<'mensal' | 'anual'>('mensal')
   const [producoes, setProducoes] = useState<AgroProducao[]>([])
   const [suggDates, setSuggDates] = useState<Record<string, string>>({})
   const [confirmingKey, setConfirmingKey] = useState<string | null>(null)
@@ -43,9 +52,16 @@ export function TabReceitas({ clientId }: { clientId: string }) {
     if (!form.data || !form.descricao || !form.valor) return
     setSaving(true)
     try {
-      await agroApi.receitas.create({ ...form, clientId })
+      const total = repetir ? qtdRepetir : 1
+      for (let i = 0; i < total; i++) {
+        const salto = periodicidade === 'anual' ? i * 12 : i
+        await agroApi.receitas.create({ ...form, clientId, data: i === 0 ? form.data : addMonths(form.data, salto) })
+      }
       setForm(f => ({ ...f, data: '', origem: '', descricao: '', valor: 0 }))
       setShowForm(false)
+      setRepetir(false)
+      setQtdRepetir(3)
+      setPeriodicidade('mensal')
       load()
     } finally { setSaving(false) }
   }
@@ -159,10 +175,53 @@ export function TabReceitas({ clientId }: { clientId: string }) {
             <div className="md:col-span-2"><label className="text-xs font-semibold text-gray-500 mb-1 block">Descrição *</label><input className={inp} value={form.descricao} onChange={e => setForm(f => ({ ...f, descricao: e.target.value }))} placeholder="Ex: 50.000 sacas de soja" /></div>
             <div><label className="text-xs font-semibold text-gray-500 mb-1 block">Valor (R$) *</label><input type="number" className={inp} value={form.valor || ''} onChange={e => setForm(f => ({ ...f, valor: Number(e.target.value) }))} /></div>
           </div>
+          {/* Repetição */}
+          <div className="mt-4 border border-dashed border-emerald-200 rounded-xl p-3 bg-emerald-50/40">
+            <label className="flex items-center gap-2 cursor-pointer select-none">
+              <input type="checkbox" checked={repetir} onChange={e => setRepetir(e.target.checked)} className="w-4 h-4 accent-emerald-600" />
+              <Repeat2 size={14} className="text-emerald-500" />
+              <span className="text-sm font-semibold text-emerald-700">Repetir por vários meses ou anos</span>
+            </label>
+            {repetir && (
+              <div className="mt-3 flex items-center gap-4 flex-wrap">
+                <div className="flex items-center gap-2">
+                  <label className="text-xs font-semibold text-gray-600">Periodicidade:</label>
+                  <select value={periodicidade} onChange={e => setPeriodicidade(e.target.value as 'mensal' | 'anual')}
+                    className="border border-emerald-300 rounded-lg px-2 py-1 text-sm">
+                    <option value="mensal">Mensal</option>
+                    <option value="anual">Anual</option>
+                  </select>
+                </div>
+                <div className="flex items-center gap-2">
+                  <label className="text-xs font-semibold text-gray-600">Quantidade ({periodicidade === 'anual' ? 'anos' : 'meses'}):</label>
+                  <input type="number" min={2} max={periodicidade === 'anual' ? 20 : 60} value={qtdRepetir}
+                    onChange={e => setQtdRepetir(Math.max(2, Math.min(periodicidade === 'anual' ? 20 : 60, Number(e.target.value))))}
+                    className="w-20 border border-emerald-300 rounded-lg px-2 py-1 text-sm text-center" />
+                </div>
+                {form.data && (
+                  <div className="flex flex-wrap gap-1">
+                    <span className="text-xs text-gray-500 mr-1">Datas:</span>
+                    {Array.from({ length: qtdRepetir }, (_, i) => {
+                      const salto = periodicidade === 'anual' ? i * 12 : i
+                      return i === 0 ? form.data : addMonths(form.data, salto)
+                    }).map((d, i) => (
+                      <span key={i} className="text-xs bg-white border border-emerald-200 text-emerald-700 rounded px-1.5 py-0.5">
+                        {new Date(d + 'T12:00:00').toLocaleDateString('pt-BR', periodicidade === 'anual' ? { year: 'numeric' } : { month: 'short', year: '2-digit' })}
+                      </span>
+                    ))}
+                  </div>
+                )}
+                <p className="text-xs text-emerald-600 font-semibold w-full">
+                  {qtdRepetir} lançamentos — {(form.valor * qtdRepetir).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} no total
+                </p>
+              </div>
+            )}
+          </div>
+
           <div className="flex gap-2 mt-3">
             <button onClick={handleAdd} disabled={saving || !form.data || !form.descricao || !form.valor}
               className="bg-emerald-600 text-white rounded-xl px-4 py-2 text-sm font-semibold disabled:opacity-50">
-              {saving ? 'Salvando...' : 'Adicionar'}
+              {saving ? 'Salvando...' : repetir ? `Criar ${qtdRepetir} lançamentos (${periodicidade})` : 'Adicionar'}
             </button>
             <button onClick={() => setShowForm(false)} className="px-4 py-2 border border-gray-200 rounded-xl text-sm text-gray-600">Cancelar</button>
           </div>
