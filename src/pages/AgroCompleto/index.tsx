@@ -59,7 +59,7 @@ export function AgroCompleto() {
       case 'custos':       return <TabCustosFixos clientId={clientId} />
       case 'fluxo-diario': return <TabFluxoDiario clientId={clientId} />
       case 'fluxo-mensal': return <TabFluxoMensal clientId={clientId} />
-      case 'patrimonio':   return <TabPatrimonio clientId={clientId} />
+      case 'patrimonio':   return <TabPatrimonio clientId={clientId} clienteNome={client?.name} />
     }
   }
 

@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
-import { Plus, Trash2, Edit2, X, Shield } from 'lucide-react'
+import { Plus, Trash2, Edit2, X, Shield, FileDown } from 'lucide-react'
 import { agroApi, type AgroPatrimonio } from '../../services/agroApi'
 import { Card } from '../../components/ui/Card'
+import { exportarPatrimonioPDF } from './FluxoPDF'
 
 const fmtBRL = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
@@ -108,10 +109,11 @@ function PatrimonioModal({ item, clientId, onClose, onSaved }: {
   )
 }
 
-export function TabPatrimonio({ clientId }: { clientId: string }) {
+export function TabPatrimonio({ clientId, clienteNome }: { clientId: string; clienteNome?: string }) {
   const [items, setItems] = useState<AgroPatrimonio[]>([])
   const [loading, setLoading] = useState(true)
   const [modal, setModal] = useState<AgroPatrimonio | 'new' | null>(null)
+  const [exportando, setExportando] = useState(false)
 
   const load = async () => {
     setLoading(true)
@@ -145,9 +147,23 @@ export function TabPatrimonio({ clientId }: { clientId: string }) {
           <h2 className="font-bold text-gray-900">Relação Patrimonial</h2>
           <p className="text-xs text-gray-500 mt-0.5">Máquinas, equipamentos, veículos, imóveis e rebanho — com ônus</p>
         </div>
-        <button onClick={() => setModal('new')} className="flex items-center gap-2 bg-orange-500 text-white rounded-xl px-4 py-2 text-sm font-semibold hover:bg-orange-600">
-          <Plus size={15} /> Novo Bem
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={async () => {
+              setExportando(true)
+              try { await exportarPatrimonioPDF(items, clienteNome) }
+              finally { setExportando(false) }
+            }}
+            disabled={exportando || items.length === 0}
+            className="flex items-center gap-1.5 bg-orange-600 hover:bg-orange-700 disabled:opacity-50 text-white text-sm font-semibold rounded-xl px-3 py-2"
+          >
+            <FileDown size={14} />
+            {exportando ? 'Gerando...' : 'Exportar PDF'}
+          </button>
+          <button onClick={() => setModal('new')} className="flex items-center gap-2 bg-orange-500 text-white rounded-xl px-4 py-2 text-sm font-semibold hover:bg-orange-600">
+            <Plus size={15} /> Novo Bem
+          </button>
+        </div>
       </div>
 
       {/* Resumo patrimonial */}

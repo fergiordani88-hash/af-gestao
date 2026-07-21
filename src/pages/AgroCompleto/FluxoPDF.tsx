@@ -1,5 +1,5 @@
 import { Document, Page, Text, View, StyleSheet, pdf } from '@react-pdf/renderer'
-import type { FluxoItem, FluxoMensal } from '../../services/agroApi'
+import type { FluxoItem, FluxoMensal, AgroPatrimonio } from '../../services/agroApi'
 
 const fmtBRL = (v: number) =>
   v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2 })
@@ -360,6 +360,123 @@ export async function exportarProjecaoPDF(rows: ProjecaoAnoRow[], clienteNome?: 
   const a = document.createElement('a')
   a.href = url
   a.download = `projecao-10-anos${clienteNome ? '-' + clienteNome.replace(/\s+/g, '-') : ''}.pdf`
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+// ─── Patrimônio PDF ───────────────────────────────────────────────────────────
+
+const CATEGORIAS_ORDEM = ['Máquinas', 'Equipamentos', 'Veículos', 'Imóveis rurais', 'Imóveis urbanos', 'Rebanho', 'Outros']
+
+function PatrimonioPDFDoc({ items, clienteNome }: { items: AgroPatrimonio[]; clienteNome?: string }) {
+  const now = new Date().toLocaleString('pt-BR')
+  const totalPatrimonio = items.reduce((s, i) => s + i.valorAvaliado, 0)
+  const totalOnus = items.reduce((s, i) => s + (i.possuiOnus ? (i.valorOnus ?? 0) : 0), 0)
+  const totalLivre = totalPatrimonio - totalOnus
+
+  const porCategoria = CATEGORIAS_ORDEM.map(cat => ({
+    cat,
+    items: items.filter(i => i.categoria === cat),
+  })).filter(c => c.items.length > 0)
+
+  return (
+    <Document>
+      <Page size="A4" orientation="landscape" style={styles.page}>
+        <View style={styles.header}>
+          <Text style={styles.title}>Relação Patrimonial{clienteNome ? ` — ${clienteNome}` : ''}</Text>
+          <Text style={styles.subtitle}>{items.length} bens cadastrados</Text>
+          <Text style={styles.generated}>Gerado em {now}</Text>
+        </View>
+
+        {/* Resumo */}
+        <View style={{ flexDirection: 'row', gap: 8, marginBottom: 14 }}>
+          {[
+            { label: 'Total Patrimonial', value: fmtBRL(totalPatrimonio), color: '#c2410c' },
+            { label: 'Total com Ônus', value: fmtBRL(totalOnus), color: '#dc2626' },
+            { label: 'Valor Livre', value: fmtBRL(totalLivre), color: '#059669' },
+          ].map(k => (
+            <View key={k.label} style={{ flex: 1, border: '0.5 solid #e5e7eb', borderRadius: 4, padding: '6 10' }}>
+              <Text style={{ fontSize: 7, color: '#6b7280', marginBottom: 2 }}>{k.label}</Text>
+              <Text style={{ fontFamily: 'Helvetica-Bold', fontSize: 10, color: k.color }}>{k.value}</Text>
+            </View>
+          ))}
+        </View>
+
+        {/* Tabela por categoria */}
+        {porCategoria.map(({ cat, items: catItems }) => {
+          const catTotal = catItems.reduce((s, i) => s + i.valorAvaliado, 0)
+          const catOnus = catItems.reduce((s, i) => s + (i.possuiOnus ? (i.valorOnus ?? 0) : 0), 0)
+          return (
+            <View key={cat} style={{ marginBottom: 10 }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', backgroundColor: '#fff7ed', padding: '4 6', borderRadius: 3, marginBottom: 2 }}>
+                <Text style={{ fontFamily: 'Helvetica-Bold', fontSize: 8, color: '#c2410c' }}>{cat} ({catItems.length} bens)</Text>
+                <Text style={{ fontFamily: 'Helvetica-Bold', fontSize: 8, color: '#c2410c' }}>{fmtBRL(catTotal)}</Text>
+              </View>
+              <View style={styles.thead}>
+                {['Descrição', 'Identificação', 'Valor Avaliado', 'Ônus', 'Tipo Ônus', 'Credor', 'Valor Ônus', 'Valor Livre', 'Obs.'].map((h, i) => (
+                  <Text key={h} style={[styles.thCell, { flex: [3, 2, 2, 1, 2, 2, 2, 2, 2][i] }]}>{h}</Text>
+                ))}
+              </View>
+              {catItems.map((item, idx) => {
+                const livre = item.valorAvaliado - (item.possuiOnus ? (item.valorOnus ?? 0) : 0)
+                return (
+                  <View key={idx} style={item.possuiOnus ? styles.rowNeg : styles.row}>
+                    <Text style={[styles.cellBold, { flex: 3, color: '#111827' }]}>{item.descricao}</Text>
+                    <Text style={[styles.cell, styles.gray, { flex: 2 }]}>{item.identificacao || '—'}</Text>
+                    <Text style={[styles.cellBold, { flex: 2, color: '#111827' }]}>{fmtBRL(item.valorAvaliado)}</Text>
+                    <Text style={[styles.cell, { flex: 1, color: item.possuiOnus ? '#dc2626' : '#059669' }]}>{item.possuiOnus ? 'Sim' : 'Não'}</Text>
+                    <Text style={[styles.cell, styles.gray, { flex: 2 }]}>{item.tipoOnus || '—'}</Text>
+                    <Text style={[styles.cell, styles.gray, { flex: 2 }]}>{item.credor || '—'}</Text>
+                    <Text style={[styles.cell, styles.red, { flex: 2 }]}>{item.possuiOnus ? fmtBRL(item.valorOnus ?? 0) : '—'}</Text>
+                    <Text style={[styles.cellBold, styles.green, { flex: 2 }]}>{fmtBRL(livre)}</Text>
+                    <Text style={[styles.cell, styles.gray, { flex: 2 }]}>{item.obs || '—'}</Text>
+                  </View>
+                )
+              })}
+              {/* subtotal da categoria */}
+              <View style={{ flexDirection: 'row', backgroundColor: '#f9fafb', padding: '3 4', borderTop: '0.5 solid #e5e7eb' }}>
+                <Text style={[styles.cellBold, { flex: 3, color: '#374151' }]}>Subtotal {cat}</Text>
+                <Text style={[styles.cell, { flex: 2 }]}></Text>
+                <Text style={[styles.cellBold, { flex: 2, color: '#111827' }]}>{fmtBRL(catTotal)}</Text>
+                <Text style={[styles.cell, { flex: 1 }]}></Text>
+                <Text style={[styles.cell, { flex: 2 }]}></Text>
+                <Text style={[styles.cell, { flex: 2 }]}></Text>
+                <Text style={[styles.cellBold, styles.red, { flex: 2 }]}>{catOnus > 0 ? fmtBRL(catOnus) : '—'}</Text>
+                <Text style={[styles.cellBold, styles.green, { flex: 2 }]}>{fmtBRL(catTotal - catOnus)}</Text>
+                <Text style={[styles.cell, { flex: 2 }]}></Text>
+              </View>
+            </View>
+          )
+        })}
+
+        {/* Total geral */}
+        <View style={{ flexDirection: 'row', backgroundColor: '#fff7ed', padding: '5 6', borderRadius: 4, marginTop: 4 }}>
+          <Text style={[styles.cellBold, { flex: 3, color: '#c2410c', fontSize: 9 }]}>TOTAL GERAL</Text>
+          <Text style={[styles.cell, { flex: 2 }]}></Text>
+          <Text style={[styles.cellBold, { flex: 2, color: '#c2410c', fontSize: 9 }]}>{fmtBRL(totalPatrimonio)}</Text>
+          <Text style={[styles.cell, { flex: 1 }]}></Text>
+          <Text style={[styles.cell, { flex: 2 }]}></Text>
+          <Text style={[styles.cell, { flex: 2 }]}></Text>
+          <Text style={[styles.cellBold, styles.red, { flex: 2, fontSize: 9 }]}>{fmtBRL(totalOnus)}</Text>
+          <Text style={[styles.cellBold, styles.green, { flex: 2, fontSize: 9 }]}>{fmtBRL(totalLivre)}</Text>
+          <Text style={[styles.cell, { flex: 2 }]}></Text>
+        </View>
+
+        <View style={styles.footer}>
+          <Text style={styles.footerText}>AF Gestão — Relação Patrimonial</Text>
+          <Text style={styles.footerText}>{now}</Text>
+        </View>
+      </Page>
+    </Document>
+  )
+}
+
+export async function exportarPatrimonioPDF(items: AgroPatrimonio[], clienteNome?: string) {
+  const blob = await pdf(<PatrimonioPDFDoc items={items} clienteNome={clienteNome} />).toBlob()
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `patrimonio${clienteNome ? '-' + clienteNome.replace(/\s+/g, '-') : ''}.pdf`
   a.click()
   URL.revokeObjectURL(url)
 }
