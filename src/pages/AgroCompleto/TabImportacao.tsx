@@ -89,6 +89,7 @@ export function TabImportacao({ clientId }: { clientId: string }) {
       const producao   = result.producao.filter(p => p._sel).map(({ _sel, ...p }) => p)
       const res = await agroApi.cadastroImport.confirm({ clientId, patrimonio, producao })
       setDoneResult(res)
+      if (res.erros && res.erros.length > 0) console.error('Erros de importação:', res.erros)
       setStep('done')
     } catch (e: any) {
       setError(e.message ?? 'Erro ao confirmar importação')
@@ -116,6 +117,12 @@ export function TabImportacao({ clientId }: { clientId: string }) {
           ))}
         </div>
         <p className="text-sm text-gray-500 mt-4">Acesse as abas Patrimônio e Produção para verificar os dados importados.</p>
+        {doneResult.erros && doneResult.erros.length > 0 && (
+          <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 max-w-lg text-left">
+            <p className="text-xs font-bold text-red-700 mb-1">Erros ({doneResult.erros.length}):</p>
+            {doneResult.erros.map((e: string, i: number) => <p key={i} className="text-xs text-red-600">{e}</p>)}
+          </div>
+        )}
         <button onClick={() => { setStep('upload'); setResult(null); setDoneResult(null); setFileName(null) }}
           className="mt-2 px-5 py-2 bg-af-green text-white rounded-xl text-sm font-semibold hover:bg-af-green/90">
           Nova importação
