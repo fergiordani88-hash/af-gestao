@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import {
   Sprout, CreditCard, TrendingDown, TrendingUp, DollarSign,
-  BarChart2, Calendar, Shield, ChevronDown, ChevronUp, ClipboardList
+  BarChart2, Calendar, Shield, ChevronDown, ChevronUp, ClipboardList, Upload
 } from 'lucide-react'
 import { AppLayout } from '../../components/Layout/AppLayout'
 import { useStore } from '../../store/useStore'
@@ -17,14 +17,16 @@ import { TabPatrimonio } from './TabPatrimonio'
 import { TabDRERural } from './TabDRERural'
 import { TabQuestionarioAgro } from './TabQuestionarioAgro'
 import { TabProjecaoAnual } from './TabProjecaoAnual'
+import { TabImportacao } from './TabImportacao'
 import { clsx } from 'clsx'
 
-type TabId = 'producao' | 'dre-rural' | 'contratos' | 'despesas' | 'receitas' | 'custos' | 'fluxo-diario' | 'fluxo-mensal' | 'patrimonio' | 'questionario' | 'projecao-anual'
+type TabId = 'producao' | 'dre-rural' | 'contratos' | 'despesas' | 'receitas' | 'custos' | 'fluxo-diario' | 'fluxo-mensal' | 'patrimonio' | 'questionario' | 'projecao-anual' | 'importacao'
 
 const TABS: { id: TabId; label: string; icon: React.ElementType; color: string }[] = [
+  { id: 'importacao',     label: 'Importar Cadastro',      icon: Upload,       color: 'text-af-green' },
   { id: 'producao',       label: 'Produção',               icon: Sprout,       color: 'text-green-600' },
   { id: 'dre-rural',      label: 'DRE Rural',              icon: BarChart2,    color: 'text-emerald-700' },
-  { id: 'projecao-anual', label: 'Projeção 10 Anos',        icon: TrendingUp,   color: 'text-violet-600' },
+  { id: 'projecao-anual', label: 'Projeção 10 Anos',       icon: TrendingUp,   color: 'text-violet-600' },
   { id: 'contratos',      label: 'Contratos & Cronograma', icon: CreditCard,   color: 'text-blue-600' },
   { id: 'despesas',       label: 'Despesas',               icon: TrendingDown, color: 'text-red-600' },
   { id: 'receitas',       label: 'Receitas',               icon: TrendingUp,   color: 'text-emerald-600' },
@@ -49,6 +51,7 @@ export function AgroCompleto() {
   const renderTab = () => {
     if (!clientId) return null
     switch (activeTab) {
+      case 'importacao':   return <TabImportacao clientId={clientId} />
       case 'producao':     return <TabProducao clientId={clientId} />
       case 'dre-rural':    return <TabDRERural clientId={clientId} />
       case 'questionario':   return <TabQuestionarioAgro clientId={clientId} nomeCliente={client?.name} />

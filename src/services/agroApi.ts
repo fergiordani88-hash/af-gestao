@@ -140,4 +140,22 @@ export const agroApi = {
     req<{ fluxo: FluxoItem[]; saldoInicial: number; saldoFinal: number }>(`/fluxo-diario/${cid}?saldoInicial=${saldoInicial}`),
   fluxoMensal: (cid: string, saldoInicial = 0) =>
     req<{ mensal: FluxoMensal[]; porAno: Record<string, { entradas: number; saidas: number; resultado: number }>; saldoFinal: number }>(`/fluxo-mensal/${cid}?saldoInicial=${saldoInicial}`),
+
+  // Importação de cadastro via PDF
+  cadastroImport: {
+    preview: async (form: FormData) => {
+      const token = tok()
+      const res = await fetch(`${BASE}/agro/cadastro/preview`, {
+        method: 'POST',
+        headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: form,
+      })
+      if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error ?? `HTTP ${res.status}`) }
+      return res.json()
+    },
+    confirm: (body: { clientId: string; patrimonio: any[]; producao: any[] }) =>
+      req<{ patrimonioImportado: number; patrimonioErros: number; producaoImportada: number; producaoErros: number }>(
+        '/cadastro/confirm', { method: 'POST', body: JSON.stringify(body) }
+      ),
+  },
 }
