@@ -59,9 +59,8 @@ function taxaPeriodo(c: Cenario): number {
 }
 
 function numPeriodos(c: Cenario): number {
-  if (c.periodicidade === 'mensal')    return c.prazoMeses
-  if (c.periodicidade === 'semestral') return Math.round(c.prazoMeses / 6)
-  return Math.round(c.prazoMeses / 12)
+  // prazoMeses agora armazena diretamente o número de parcelas
+  return Math.max(1, Math.round(c.prazoMeses))
 }
 
 function mesesPorPeriodo(c: Cenario): number {
@@ -188,10 +187,18 @@ function CenarioPanel({
       {/* Prazo + Taxa */}
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="text-xs font-semibold text-gray-600 mb-1 block">Prazo total (meses)</label>
-          <input type="number" min={1} max={360} value={c.prazoMeses}
+          <label className="text-xs font-semibold text-gray-600 mb-1 block">Número de parcelas</label>
+          <input type="number" min={1} max={600} value={c.prazoMeses}
             onChange={e => set('prazoMeses', +e.target.value)} className={inp} />
-          <p className="text-xs text-gray-400 mt-0.5">{n} {c.periodicidade === 'mensal' ? 'parcelas mensais' : c.periodicidade === 'semestral' ? 'parcelas semestrais' : 'parcelas anuais'}</p>
+          <p className="text-xs text-gray-400 mt-0.5">
+            {n} {c.periodicidade === 'mensal' ? 'parcelas mensais' : c.periodicidade === 'semestral' ? 'parcelas semestrais' : 'parcelas anuais'}
+            {' '}={' '}
+            {c.periodicidade === 'mensal'
+              ? n >= 12 ? `${(n / 12).toFixed(n % 12 === 0 ? 0 : 1)} anos` : `${n} meses`
+              : c.periodicidade === 'semestral'
+              ? `${(n / 2).toFixed(n % 2 === 0 ? 0 : 1)} anos`
+              : `${n} anos`}
+          </p>
         </div>
         <div>
           <label className="text-xs font-semibold text-gray-600 mb-1 block">Data da 1ª parcela (carência)</label>
