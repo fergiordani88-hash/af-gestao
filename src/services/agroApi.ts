@@ -43,6 +43,7 @@ export interface AgroContrato {
   indexador?: string
   spreadIndexador?: number
   sistemaAmortizacao?: string
+  tomador?: string
 }
 
 export interface AgroParcela {

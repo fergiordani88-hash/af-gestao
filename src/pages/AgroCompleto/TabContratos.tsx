@@ -30,6 +30,7 @@ const EMPTY: Omit<AgroContrato, 'id'> = {
   dataContratacao: '', valorTomado: 0, totalParcelas: 1, parcelaAtual: 1,
   periodicidade: 'Mensal', taxa: 0, vencimento: '', valorParcela: 0, obs: '',
   indexador: 'Pré-fixado', spreadIndexador: 0, sistemaAmortizacao: 'Price',
+  tomador: '',
 }
 
 // Calcula PMT (Price): parcela constante
@@ -226,6 +227,10 @@ function ContratoModal({ contrato, clientId, onClose, onSaved, prefill }: {
             <label className={lbl}>Valor da Parcela (R$) {form.sistemaAmortizacao === 'SAC' ? '— 1ª parcela' : ''}</label>
             <input type="number" className={inp} value={form.valorParcela || ''} onChange={e => set('valorParcela', Number(e.target.value))} /></div>
           <div className="col-span-2">
+            <label className={lbl}>Tomador / Devedor</label>
+            <input className={inp} value={form.tomador ?? ''} onChange={e => set('tomador', e.target.value)} placeholder="Nome do tomador real (em branco = cliente principal)" />
+          </div>
+          <div className="col-span-2">
             <label className={lbl}>Observações</label>
             <input className={inp} value={form.obs ?? ''} onChange={e => set('obs', e.target.value)} placeholder="Garantias, condições especiais, etc." />
           </div>
@@ -263,13 +268,14 @@ export function TabContratos({ clientId }: { clientId: string }) {
   const [showFilters, setShowFilters] = useState(false)
   const [filterBanco, setFilterBanco] = useState('')
   const [filterModalidade, setFilterModalidade] = useState('')
+  const [filterTomador, setFilterTomador] = useState('')
   const [filterValorMin, setFilterValorMin] = useState('')
   const [filterValorMax, setFilterValorMax] = useState('')
   const [filterCETMax, setFilterCETMax] = useState('')
   const [filterVencAte, setFilterVencAte] = useState('')
 
   // Ordenação
-  type SortKey = 'modalidade' | 'banco' | 'numeroContrato' | 'dataContratacao' | 'valorTomado' | 'totalParcelas' | 'parcelaAtual' | 'periodicidade' | 'sistemaAmortizacao' | 'cet' | 'vencimento' | 'valorParcela'
+  type SortKey = 'modalidade' | 'banco' | 'numeroContrato' | 'dataContratacao' | 'valorTomado' | 'totalParcelas' | 'parcelaAtual' | 'periodicidade' | 'sistemaAmortizacao' | 'cet' | 'vencimento' | 'valorParcela' | 'tomador'
   const [sortKey, setSortKey] = useState<SortKey | null>(null)
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
 
@@ -282,6 +288,7 @@ export function TabContratos({ clientId }: { clientId: string }) {
     .filter(c => {
       if (filterBanco && !c.banco.toLowerCase().includes(filterBanco.toLowerCase())) return false
       if (filterModalidade && c.modalidade !== filterModalidade) return false
+      if (filterTomador && !(c.tomador ?? '').toLowerCase().includes(filterTomador.toLowerCase())) return false
       if (filterValorMin && c.valorTomado < Number(filterValorMin)) return false
       if (filterValorMax && c.valorTomado > Number(filterValorMax)) return false
       if (filterCETMax && calcCET(c.taxa, c.indexador, c.spreadIndexador) > Number(filterCETMax)) return false
@@ -307,7 +314,7 @@ export function TabContratos({ clientId }: { clientId: string }) {
       return 0
     })
 
-  const filtrosAtivos = [filterBanco, filterModalidade, filterValorMin, filterValorMax, filterCETMax, filterVencAte].filter(Boolean).length
+  const filtrosAtivos = [filterBanco, filterModalidade, filterTomador, filterValorMin, filterValorMax, filterCETMax, filterVencAte].filter(Boolean).length
 
   function exportarCronogramaCSV() {
     if (!cronograma || cronograma.parcelas.length === 0) return
@@ -340,11 +347,12 @@ export function TabContratos({ clientId }: { clientId: string }) {
   }
 
   function exportarCSV() {
-    const header = ['Modalidade', 'Banco', 'Contrato', 'Contratação', 'Vencimento', 'Valor Tomado', 'Total Parc.', 'Parc. Atual', 'Periodicidade', 'Amortização', 'Taxa Nominal (%aa)', 'Indexador', 'Spread (%)', 'CET (%aa)', 'Parc. Nominal', 'Obs']
+    const header = ['Modalidade', 'Banco', 'Contrato', 'Tomador', 'Contratação', 'Vencimento', 'Valor Tomado', 'Total Parc.', 'Parc. Atual', 'Periodicidade', 'Amortização', 'Taxa Nominal (%aa)', 'Indexador', 'Spread (%)', 'CET (%aa)', 'Parc. Nominal', 'Obs']
     const rows = contratosFiltrados.map(c => [
       c.modalidade,
       c.banco,
       c.numeroContrato ?? '',
+      c.tomador ?? '',
       c.dataContratacao,
       c.vencimento,
       c.valorTomado,
@@ -425,6 +433,7 @@ export function TabContratos({ clientId }: { clientId: string }) {
     indexador:          normalizeIndexador(data.indexador),
     spreadIndexador:    data.spreadIndexador ?? 0,
     sistemaAmortizacao: data.sistemaAmortizacao === 'SAC' ? 'SAC' : 'Price',
+    tomador:            data.tomador ?? '',
   })
 
   const handleImportPdf = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -521,7 +530,7 @@ export function TabContratos({ clientId }: { clientId: string }) {
       {/* Painel de Filtros */}
       {showFilters && (
         <div className="bg-white border border-gray-200 rounded-xl p-4">
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-3">
             <div>
               <label className="block text-xs font-semibold text-gray-500 mb-1">Banco</label>
               <input
@@ -542,6 +551,16 @@ export function TabContratos({ clientId }: { clientId: string }) {
                 <option value="">Todas</option>
                 {MODALIDADES.map(m => <option key={m}>{m}</option>)}
               </select>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 mb-1">Tomador</label>
+              <input
+                type="text"
+                value={filterTomador}
+                onChange={e => setFilterTomador(e.target.value)}
+                placeholder="Nome do tomador"
+                className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-af-green/30"
+              />
             </div>
             <div>
               <label className="block text-xs font-semibold text-gray-500 mb-1">Valor Tomado Mín. (R$)</label>
@@ -587,7 +606,7 @@ export function TabContratos({ clientId }: { clientId: string }) {
             <div className="mt-3 flex items-center gap-3">
               <span className="text-xs text-gray-500">{contratosFiltrados.length} de {contratos.length} contrato(s)</span>
               <button
-                onClick={() => { setFilterBanco(''); setFilterModalidade(''); setFilterValorMin(''); setFilterValorMax(''); setFilterCETMax(''); setFilterVencAte('') }}
+                onClick={() => { setFilterBanco(''); setFilterModalidade(''); setFilterTomador(''); setFilterValorMin(''); setFilterValorMax(''); setFilterCETMax(''); setFilterVencAte('') }}
                 className="text-xs text-red-500 hover:underline"
               >
                 Limpar filtros
@@ -625,6 +644,7 @@ export function TabContratos({ clientId }: { clientId: string }) {
                   {([
                     { label: 'Modalidade',      key: 'modalidade' },
                     { label: 'Banco',           key: 'banco' },
+                    { label: 'Tomador',         key: 'tomador' },
                     { label: 'Contrato',        key: 'numeroContrato' },
                     { label: 'Contratação',     key: 'dataContratacao' },
                     { label: 'Valor Tomado',    key: 'valorTomado' },
@@ -661,6 +681,11 @@ export function TabContratos({ clientId }: { clientId: string }) {
                   <tr key={c.id} className="hover:bg-gray-50/50 group">
                     <td className="px-3 py-2.5 font-medium text-gray-900 whitespace-nowrap">{c.modalidade}</td>
                     <td className="px-3 py-2.5 text-gray-700">{c.banco}</td>
+                    <td className="px-3 py-2.5 text-gray-600">
+                      {c.tomador ? (
+                        <span className="bg-blue-50 text-blue-700 text-xs px-2 py-0.5 rounded-full font-medium whitespace-nowrap">{c.tomador}</span>
+                      ) : <span className="text-gray-300">—</span>}
+                    </td>
                     <td className="px-3 py-2.5 text-gray-500">{c.numeroContrato ?? '—'}</td>
                     <td className="px-3 py-2.5 text-gray-600 whitespace-nowrap">{fmtDate(c.dataContratacao)}</td>
                     <td className="px-3 py-2.5 font-semibold text-gray-900">{fmtBRL(c.valorTomado)}</td>
@@ -703,7 +728,7 @@ export function TabContratos({ clientId }: { clientId: string }) {
                   </tr>
                   {contratoExpandido === c.id && (
                     <tr key={`exp-${c.id}`}>
-                      <td colSpan={14} className="px-4 py-3 bg-blue-50/40 border-b border-blue-100">
+                      <td colSpan={15} className="px-4 py-3 bg-blue-50/40 border-b border-blue-100">
                         <div className="text-xs font-semibold text-blue-700 mb-2 flex items-center gap-2">
                           <TableProperties size={13} />
                           Tabela de Amortização — {c.banco} {c.numeroContrato ?? ''} ({c.sistemaAmortizacao ?? 'Price'})
@@ -780,17 +805,20 @@ export function TabContratos({ clientId }: { clientId: string }) {
                       <table className="w-full text-xs">
                         <thead>
                           <tr className="border-b border-gray-100">
-                            {['Vencimento', 'Modalidade', 'Banco', 'Contrato', 'Parcela', 'Amortização', 'Juros', 'Total Parcela', 'Saldo Devedor'].map(h => (
+                            {['Vencimento', 'Modalidade', 'Banco', 'Tomador', 'Contrato', 'Parcela', 'Amortização', 'Juros', 'Total Parcela', 'Saldo Devedor'].map(h => (
                               <th key={h} className="py-1.5 text-left text-gray-400 font-semibold uppercase">{h}</th>
                             ))}
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-50">
-                          {parcelasAno.map((p, i) => (
+                          {parcelasAno.map((p, i) => {
+                            const ct = contratos.find(c => c.id === p.contratoId)
+                            return (
                             <tr key={i} className="hover:bg-gray-50/50">
                               <td className="py-1.5 font-medium text-gray-900 whitespace-nowrap">{fmtDate(p.vencimento)}</td>
                               <td className="py-1.5 text-gray-700">{p.modalidade}</td>
                               <td className="py-1.5 text-gray-600">{p.banco}</td>
+                              <td className="py-1.5 text-gray-600">{ct?.tomador ? <span className="bg-blue-50 text-blue-700 text-xs px-1.5 py-0.5 rounded-full">{ct.tomador}</span> : '—'}</td>
                               <td className="py-1.5 text-gray-500">{p.contrato || '—'}</td>
                               <td className="py-1.5 text-gray-600">{p.parcelaNum}/{p.totalParcelas}</td>
                               <td className="py-1.5 text-gray-700">{p.amortizacao != null ? fmtBRL(p.amortizacao) : '—'}</td>
@@ -798,7 +826,7 @@ export function TabContratos({ clientId }: { clientId: string }) {
                               <td className="py-1.5 font-semibold text-gray-900">{fmtBRL(p.valorParcela)}</td>
                               <td className="py-1.5 text-gray-500">{p.saldoDevedor != null ? fmtBRL(p.saldoDevedor) : '—'}</td>
                             </tr>
-                          ))}
+                          )})}
                         </tbody>
                       </table>
                     </div>
@@ -832,7 +860,7 @@ export function TabContratos({ clientId }: { clientId: string }) {
             <table className="w-full text-xs">
               <thead className="sticky top-0 bg-gray-50">
                 <tr className="border-b">
-                  {['Vencimento', 'Modalidade', 'Banco', 'Contrato', 'Contratação', 'Valor Tomado', 'Parcela', 'Period.', 'Taxa', 'Amortização', 'Juros', 'Total Parcela', 'Saldo Devedor'].map(h => (
+                  {['Vencimento', 'Modalidade', 'Banco', 'Tomador', 'Contrato', 'Contratação', 'Valor Tomado', 'Parcela', 'Period.', 'Taxa', 'Amortização', 'Juros', 'Total Parcela', 'Saldo Devedor'].map(h => (
                     <th key={h} className="px-3 py-2 text-left font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">{h}</th>
                   ))}
                 </tr>
@@ -841,11 +869,13 @@ export function TabContratos({ clientId }: { clientId: string }) {
                 {cronograma.parcelas.map((p, i) => {
                   const venc = new Date(p.vencimento)
                   const vencida = venc < new Date()
+                  const ct = contratos.find(c => c.id === p.contratoId)
                   return (
                     <tr key={i} className={clsx('hover:bg-gray-50/50', vencida && 'bg-red-50/30')}>
                       <td className={clsx('px-3 py-2 font-medium whitespace-nowrap', vencida ? 'text-red-600' : 'text-gray-900')}>{fmtDate(p.vencimento)}</td>
                       <td className="px-3 py-2 text-gray-700">{p.modalidade}</td>
                       <td className="px-3 py-2 text-gray-700">{p.banco}</td>
+                      <td className="px-3 py-2 text-gray-600">{ct?.tomador ? <span className="bg-blue-50 text-blue-700 text-xs px-1.5 py-0.5 rounded-full whitespace-nowrap">{ct.tomador}</span> : '—'}</td>
                       <td className="px-3 py-2 text-gray-500">{p.contrato || '—'}</td>
                       <td className="px-3 py-2 text-gray-500 whitespace-nowrap">{fmtDate(p.dataContratacao)}</td>
                       <td className="px-3 py-2 text-gray-700">{fmtBRL(p.valorTomado)}</td>
