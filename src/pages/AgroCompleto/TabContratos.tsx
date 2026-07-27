@@ -136,6 +136,10 @@ function ContratoModal({ contrato, clientId, onClose, onSaved, prefill }: {
             <label className={lbl}>Nº do Contrato</label>
             <input className={inp} value={form.numeroContrato ?? ''} onChange={e => set('numeroContrato', e.target.value)} placeholder="Ex: 842709" />
           </div>
+          <div className="col-span-2">
+            <label className={lbl}>Tomador / Devedor</label>
+            <input className={inp} value={form.tomador ?? ''} onChange={e => set('tomador', e.target.value)} placeholder="Nome do tomador real — deixe em branco se for o próprio cliente" />
+          </div>
           <div>
             <label className={lbl}>Data de Contratação *</label>
             <input type="date" className={inp} value={form.dataContratacao?.toString().split('T')[0] ?? ''} onChange={e => set('dataContratacao', e.target.value)} />
@@ -226,10 +230,6 @@ function ContratoModal({ contrato, clientId, onClose, onSaved, prefill }: {
           <div>
             <label className={lbl}>Valor da Parcela (R$) {form.sistemaAmortizacao === 'SAC' ? '— 1ª parcela' : ''}</label>
             <input type="number" className={inp} value={form.valorParcela || ''} onChange={e => set('valorParcela', Number(e.target.value))} /></div>
-          <div className="col-span-2">
-            <label className={lbl}>Tomador / Devedor</label>
-            <input className={inp} value={form.tomador ?? ''} onChange={e => set('tomador', e.target.value)} placeholder="Nome do tomador real (em branco = cliente principal)" />
-          </div>
           <div className="col-span-2">
             <label className={lbl}>Observações</label>
             <input className={inp} value={form.obs ?? ''} onChange={e => set('obs', e.target.value)} placeholder="Garantias, condições especiais, etc." />
