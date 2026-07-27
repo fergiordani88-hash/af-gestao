@@ -380,8 +380,11 @@ export function TabContratos({ clientId }: { clientId: string }) {
     URL.revokeObjectURL(url)
   }
 
+  const [loadError, setLoadError] = useState('')
+
   const load = async () => {
     setLoading(true)
+    setLoadError('')
     try {
       const [c, cr] = await Promise.all([
         agroApi.contratos.list(clientId),
@@ -389,6 +392,8 @@ export function TabContratos({ clientId }: { clientId: string }) {
       ])
       setContratos(c)
       setCronograma(cr)
+    } catch (e: any) {
+      setLoadError(e?.message ?? 'Erro ao carregar contratos')
     } finally { setLoading(false) }
   }
 
@@ -521,6 +526,11 @@ export function TabContratos({ clientId }: { clientId: string }) {
           </button>
         </div>
       </div>
+      {loadError && (
+        <div className="flex items-center gap-2 text-sm px-4 py-2 bg-red-50 border border-red-200 rounded-xl text-red-700">
+          <AlertTriangle size={14} /> Erro ao carregar: {loadError}
+        </div>
+      )}
       {importMsg && (
         <div className="flex items-center gap-2 text-sm px-4 py-2 bg-blue-50 border border-blue-200 rounded-xl text-blue-700">
           <AlertTriangle size={14} /> {importMsg}
@@ -632,6 +642,37 @@ export function TabContratos({ clientId }: { clientId: string }) {
           ))}
         </div>
       )}
+
+      {/* Resumo por Tomador — aparece só quando há contratos com tomador diferente */}
+      {(() => {
+        const tomadores = Array.from(new Set(contratos.filter(c => c.tomador).map(c => c.tomador!)))
+        if (!tomadores.length) return null
+        const semTomador = contratos.filter(c => !c.tomador)
+        return (
+          <div className="bg-white border border-gray-100 rounded-xl p-4">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Endividamento por Tomador</p>
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+              {tomadores.map(t => {
+                const cts = contratos.filter(c => c.tomador === t)
+                return (
+                  <div key={t} className="border border-blue-100 bg-blue-50/40 rounded-xl p-3">
+                    <p className="text-xs font-semibold text-blue-700 mb-1 truncate" title={t}>{t}</p>
+                    <p className="text-sm font-bold text-gray-900">{fmtBRL(cts.reduce((s, c) => s + c.valorTomado, 0))}</p>
+                    <p className="text-xs text-gray-500 mt-0.5">{cts.length} contrato(s)</p>
+                  </div>
+                )
+              })}
+              {semTomador.length > 0 && (
+                <div className="border border-gray-100 bg-gray-50 rounded-xl p-3">
+                  <p className="text-xs font-semibold text-gray-500 mb-1">Cliente principal</p>
+                  <p className="text-sm font-bold text-gray-900">{fmtBRL(semTomador.reduce((s, c) => s + c.valorTomado, 0))}</p>
+                  <p className="text-xs text-gray-500 mt-0.5">{semTomador.length} contrato(s)</p>
+                </div>
+              )}
+            </div>
+          </div>
+        )
+      })()}
 
       {/* Lista de contratos cadastrados */}
       <Card>
