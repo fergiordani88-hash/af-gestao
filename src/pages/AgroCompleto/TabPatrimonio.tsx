@@ -1,10 +1,117 @@
-import { useState, useEffect } from 'react'
-import { Plus, Trash2, Edit2, X, Shield, FileDown } from 'lucide-react'
+import { useState, useEffect, useRef } from 'react'
+import { Plus, Trash2, Edit2, X, Shield, FileDown, Upload, CheckSquare, Square } from 'lucide-react'
 import { agroApi, type AgroPatrimonio } from '../../services/agroApi'
 import { Card } from '../../components/ui/Card'
 import { exportarPatrimonioPDF } from './FluxoPDF'
 
 const fmtBRL = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 })
+
+// ── Modal de importação em massa ──────────────────────────────────────────────
+function BulkImportModal({ clientId, items, onClose, onSaved }: {
+  clientId: string
+  items: Partial<AgroPatrimonio>[]
+  onClose: () => void
+  onSaved: () => void
+}) {
+  const [sel, setSel] = useState<boolean[]>(items.map(() => true))
+  const [importing, setImporting] = useState(false)
+  const [done, setDone] = useState<{ ok: number; err: number } | null>(null)
+
+  const toggleAll = () => {
+    const allOn = sel.every(Boolean)
+    setSel(sel.map(() => !allOn))
+  }
+
+  const handleImport = async () => {
+    setImporting(true)
+    const selected = items.filter((_, i) => sel[i])
+    const results = await Promise.allSettled(
+      selected.map(p => agroApi.patrimonio.create({ ...p, clientId } as AgroPatrimonio))
+    )
+    const ok = results.filter(r => r.status === 'fulfilled').length
+    setDone({ ok, err: results.length - ok })
+    setImporting(false)
+    if (ok > 0) onSaved()
+  }
+
+  const selectedCount = sel.filter(Boolean).length
+
+  return (
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col">
+        <div className="flex items-center justify-between px-6 py-4 border-b shrink-0">
+          <h2 className="text-lg font-bold text-gray-900">Importar Patrimônio</h2>
+          <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-lg"><X size={16} /></button>
+        </div>
+
+        {done ? (
+          <div className="flex-1 flex flex-col items-center justify-center gap-4 p-8">
+            <div className="text-5xl">{done.err === 0 ? '✅' : '⚠️'}</div>
+            <p className="text-lg font-bold text-gray-900">{done.ok} bens importados com sucesso</p>
+            {done.err > 0 && <p className="text-sm text-red-500">{done.err} itens com erro</p>}
+            <button onClick={onClose} className="bg-orange-500 hover:bg-orange-600 text-white font-semibold rounded-xl px-6 py-2.5 text-sm">
+              Fechar
+            </button>
+          </div>
+        ) : (
+          <>
+            <div className="flex-1 overflow-y-auto">
+              <table className="w-full text-xs">
+                <thead className="sticky top-0 bg-gray-50">
+                  <tr>
+                    <th className="px-3 py-2 text-left w-8">
+                      <button onClick={toggleAll} className="text-gray-500 hover:text-gray-700">
+                        {sel.every(Boolean) ? <CheckSquare size={14} /> : <Square size={14} />}
+                      </button>
+                    </th>
+                    {['Categoria', 'Descrição', 'Identificação', 'Valor Avaliado', 'Ônus', 'Credor', 'Valor Ônus'].map(h => (
+                      <th key={h} className="px-3 py-2 text-left font-semibold text-gray-500 uppercase whitespace-nowrap">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {items.map((p, i) => (
+                    <tr key={i} className={sel[i] ? 'bg-white' : 'bg-gray-50 opacity-50'}>
+                      <td className="px-3 py-2">
+                        <button onClick={() => setSel(s => s.map((v, j) => j === i ? !v : v))} className="text-orange-500">
+                          {sel[i] ? <CheckSquare size={14} /> : <Square size={14} />}
+                        </button>
+                      </td>
+                      <td className="px-3 py-2">{p.categoria}</td>
+                      <td className="px-3 py-2 font-medium">{p.descricao}</td>
+                      <td className="px-3 py-2 text-gray-500">{p.identificacao || '—'}</td>
+                      <td className="px-3 py-2 font-semibold">{fmtBRL(p.valorAvaliado ?? 0)}</td>
+                      <td className="px-3 py-2">
+                        <span className={`px-1.5 py-0.5 rounded-full text-xs font-medium ${p.possuiOnus ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                          {p.possuiOnus ? 'Sim' : 'Não'}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2 text-gray-500">{p.credor || '—'}</td>
+                      <td className="px-3 py-2 text-red-500">{p.possuiOnus ? fmtBRL(p.valorOnus ?? 0) : '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="px-6 py-4 border-t flex items-center justify-between shrink-0">
+              <p className="text-sm text-gray-500">{selectedCount} de {items.length} bens selecionados</p>
+              <div className="flex gap-3">
+                <button onClick={onClose} className="px-4 py-2 border border-gray-200 rounded-xl text-sm text-gray-600">Cancelar</button>
+                <button
+                  onClick={handleImport}
+                  disabled={importing || selectedCount === 0}
+                  className="flex items-center gap-2 bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white font-semibold rounded-xl px-5 py-2 text-sm"
+                >
+                  {importing ? 'Importando...' : `Importar ${selectedCount} bens`}
+                </button>
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
 
 const CATEGORIAS = ['Máquinas', 'Equipamentos', 'Veículos', 'Imóveis rurais', 'Imóveis urbanos', 'Rebanho', 'Outros']
 const CAT_ICON: Record<string, string> = {
@@ -114,6 +221,9 @@ export function TabPatrimonio({ clientId, clienteNome }: { clientId: string; cli
   const [loading, setLoading] = useState(true)
   const [modal, setModal] = useState<AgroPatrimonio | 'new' | null>(null)
   const [exportando, setExportando] = useState(false)
+  const [bulkItems, setBulkItems] = useState<Partial<AgroPatrimonio>[] | null>(null)
+  const [importando, setImportando] = useState(false)
+  const fileRef = useRef<HTMLInputElement>(null)
 
   const load = async () => {
     setLoading(true)
@@ -127,6 +237,35 @@ export function TabPatrimonio({ clientId, clienteNome }: { clientId: string; cli
     if (!confirm('Excluir este bem?')) return
     await agroApi.patrimonio.delete(id)
     load()
+  }
+
+  const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setImportando(true)
+    try {
+      const form = new FormData()
+      form.append('pdf', file)
+      const result = await agroApi.cadastroImport.preview(form)
+      const pat: Partial<AgroPatrimonio>[] = (result.patrimonio ?? []).map((p: any) => ({
+        categoria: p.categoria ?? 'Outros',
+        descricao: p.descricao ?? '',
+        identificacao: p.identificacao,
+        valorAvaliado: p.valorAvaliado ?? 0,
+        possuiOnus: p.possuiOnus ?? false,
+        tipoOnus: p.tipoOnus,
+        credor: p.credor,
+        valorOnus: p.valorOnus ?? 0,
+        obs: p.obs,
+      }))
+      if (pat.length === 0) { alert('Nenhum bem patrimonial encontrado no arquivo.'); return }
+      setBulkItems(pat)
+    } catch (err: any) {
+      alert('Erro ao processar arquivo: ' + (err.message ?? err))
+    } finally {
+      setImportando(false)
+      if (fileRef.current) fileRef.current.value = ''
+    }
   }
 
   const totalPatrimonio = items.reduce((s, i) => s + i.valorAvaliado, 0)
@@ -159,6 +298,15 @@ export function TabPatrimonio({ clientId, clienteNome }: { clientId: string; cli
           >
             <FileDown size={14} />
             {exportando ? 'Gerando...' : 'Exportar PDF'}
+          </button>
+          <input ref={fileRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleImportFile} />
+          <button
+            onClick={() => fileRef.current?.click()}
+            disabled={importando}
+            className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-sm font-semibold rounded-xl px-3 py-2"
+          >
+            <Upload size={14} />
+            {importando ? 'Processando...' : 'Importar Excel'}
           </button>
           <button onClick={() => setModal('new')} className="flex items-center gap-2 bg-orange-500 text-white rounded-xl px-4 py-2 text-sm font-semibold hover:bg-orange-600">
             <Plus size={15} /> Novo Bem
@@ -246,6 +394,15 @@ export function TabPatrimonio({ clientId, clienteNome }: { clientId: string; cli
           clientId={clientId}
           onClose={() => setModal(null)}
           onSaved={() => { load(); setModal(null) }}
+        />
+      )}
+
+      {bulkItems && (
+        <BulkImportModal
+          clientId={clientId}
+          items={bulkItems}
+          onClose={() => setBulkItems(null)}
+          onSaved={() => { load(); setBulkItems(null) }}
         />
       )}
     </div>
