@@ -2,10 +2,11 @@ import { useState, useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import {
   Sprout, CreditCard, TrendingDown, TrendingUp, DollarSign,
-  BarChart2, Calendar, Shield, ChevronDown, ChevronUp, ClipboardList, Upload
+  BarChart2, Calendar, Shield, ChevronDown, ChevronUp, ClipboardList, Upload, LayoutDashboard
 } from 'lucide-react'
 import { AppLayout } from '../../components/Layout/AppLayout'
 import { useStore } from '../../store/useStore'
+import { TabResumo } from './TabResumo'
 import { TabProducao } from './TabProducao'
 import { TabContratos } from './TabContratos'
 import { TabDespesas } from './TabDespesas'
@@ -20,9 +21,10 @@ import { TabProjecaoAnual } from './TabProjecaoAnual'
 import { TabImportacao } from './TabImportacao'
 import { clsx } from 'clsx'
 
-type TabId = 'producao' | 'dre-rural' | 'contratos' | 'despesas' | 'receitas' | 'custos' | 'fluxo-diario' | 'fluxo-mensal' | 'patrimonio' | 'questionario' | 'projecao-anual' | 'importacao'
+type TabId = 'resumo' | 'producao' | 'dre-rural' | 'contratos' | 'despesas' | 'receitas' | 'custos' | 'fluxo-diario' | 'fluxo-mensal' | 'patrimonio' | 'questionario' | 'projecao-anual' | 'importacao'
 
 const TABS: { id: TabId; label: string; icon: React.ElementType; color: string }[] = [
+  { id: 'resumo',         label: 'Resumo Executivo',       icon: LayoutDashboard, color: 'text-af-green' },
   { id: 'importacao',     label: 'Importar Cadastro',      icon: Upload,       color: 'text-af-green' },
   { id: 'producao',       label: 'Produção',               icon: Sprout,       color: 'text-green-600' },
   { id: 'dre-rural',      label: 'DRE Rural',              icon: BarChart2,    color: 'text-emerald-700' },
@@ -41,7 +43,7 @@ export function AgroCompleto() {
   const { clients } = useStore()
   const [searchParams] = useSearchParams()
   const [clientId, setClientId] = useState(searchParams.get('clientId') ?? '')
-  const [activeTab, setActiveTab] = useState<TabId>('producao')
+  const [activeTab, setActiveTab] = useState<TabId>('resumo')
   const [menuOpen, setMenuOpen] = useState(false)
 
   const client = clients.find(c => c.id === clientId)
@@ -51,6 +53,7 @@ export function AgroCompleto() {
   const renderTab = () => {
     if (!clientId) return null
     switch (activeTab) {
+      case 'resumo':       return <TabResumo clientId={clientId} clienteNome={client?.name} clienteCidade={client ? `${client.city}/${client.state}` : undefined} />
       case 'importacao':   return <TabImportacao clientId={clientId} />
       case 'producao':     return <TabProducao clientId={clientId} />
       case 'dre-rural':    return <TabDRERural clientId={clientId} />
