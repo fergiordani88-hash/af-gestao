@@ -1,8 +1,30 @@
 import { useState, useEffect } from 'react'
-import { Plus, Trash2, Save, Sprout, Info, Copy, CheckSquare } from 'lucide-react'
-import { agroApi, type AgroProducao } from '../../services/agroApi'
+import { Plus, Trash2, Save, Sprout, Info, Copy, CheckSquare, ChevronDown, ChevronUp, PieChart } from 'lucide-react'
+import { agroApi, type AgroProducao, type CustoItem } from '../../services/agroApi'
 import { pjBenchmarkApi } from '../../services/benchmarkApi'
 import { Card } from '../../components/ui/Card'
+
+// ── Categorias de custo padrão ────────────────────────────────────────────────
+const CATEGORIAS_CUSTO = [
+  'Sementes',
+  'Fertilizantes (N-P-K)',
+  'Defensivos',
+  'Combustível / Operações',
+  'Mão de obra',
+  'Seguro / PROAGRO',
+  'Armazenagem / Frete',
+  'Outros',
+]
+
+function custoItensPadrao(custoPorHa: number): CustoItem[] {
+  // Distribuição típica de soja MT — apenas como ponto de partida
+  const dist: Record<string, number> = {
+    'Sementes': 0.12, 'Fertilizantes (N-P-K)': 0.32, 'Defensivos': 0.28,
+    'Combustível / Operações': 0.13, 'Mão de obra': 0.05,
+    'Seguro / PROAGRO': 0.04, 'Armazenagem / Frete': 0.04, 'Outros': 0.02,
+  }
+  return CATEGORIAS_CUSTO.map(cat => ({ categoria: cat, valorHa: +(custoPorHa * (dist[cat] ?? 0)).toFixed(2) }))
+}
 
 const fmtBRL = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
@@ -55,74 +77,160 @@ function calcRow(p: AgroProducao) {
 
 interface RowProps {
   item: AgroProducao
-  onChange: (field: keyof AgroProducao, val: number | string) => void
+  onChange: (field: keyof AgroProducao, val: number | string | CustoItem[]) => void
   onSave: () => void
   onDelete: () => void
   dirty: boolean
+  colSpan: number
 }
 
-function ProducaoRow({ item, onChange, onSave, onDelete, dirty }: RowProps) {
+function ProducaoRow({ item, onChange, onSave, onDelete, dirty, colSpan }: RowProps) {
   const c = calcRow(item)
   const inp = 'w-full border-0 bg-transparent text-right text-sm focus:outline-none focus:bg-gray-50 rounded px-1 py-0.5'
+  const [showCusto, setShowCusto] = useState(false)
+
+  const itens: CustoItem[] = item.custoItens && item.custoItens.length > 0
+    ? item.custoItens
+    : custoItensPadrao(item.custoPorHa)
+
+  const totalItens = itens.reduce((s, it) => s + it.valorHa, 0)
+
+  const handleItemChange = (idx: number, val: number) => {
+    const next = itens.map((it, i) => i === idx ? { ...it, valorHa: val } : it)
+    const total = next.reduce((s, it) => s + it.valorHa, 0)
+    onChange('custoItens', next)
+    onChange('custoPorHa', +total.toFixed(2))
+  }
 
   return (
-    <tr className="border-b border-gray-50 hover:bg-gray-50/50">
-      <td className="px-3 py-2 text-sm font-medium text-gray-700 whitespace-nowrap">{item.cultura}</td>
-      {[
-        ['cotacao', item.cotacao],
-        ['area', item.area],
-        ['produtividade', item.produtividade],
-        ['custoPorHa', item.custoPorHa],
-      ].map(([field, val]) => (
-        <td key={String(field)} className="px-1 py-1">
-          <input
-            type="number"
-            value={val as number || ''}
-            onChange={e => onChange(field as keyof AgroProducao, Number(e.target.value))}
-            className={inp}
-            placeholder="0"
-          />
+    <>
+      <tr className="border-b border-gray-50 hover:bg-gray-50/50">
+        <td className="px-3 py-2 text-sm font-medium text-gray-700 whitespace-nowrap">{item.cultura}</td>
+        {[
+          ['cotacao', item.cotacao],
+          ['area', item.area],
+          ['produtividade', item.produtividade],
+        ].map(([field, val]) => (
+          <td key={String(field)} className="px-1 py-1">
+            <input
+              type="number"
+              value={val as number || ''}
+              onChange={e => onChange(field as keyof AgroProducao, Number(e.target.value))}
+              className={inp}
+              placeholder="0"
+            />
+          </td>
+        ))}
+        {/* custoPorHa com botão de breakdown */}
+        <td className="px-1 py-1">
+          <div className="flex items-center gap-1">
+            <input
+              type="number"
+              value={item.custoPorHa || ''}
+              onChange={e => onChange('custoPorHa', Number(e.target.value))}
+              className={inp}
+              placeholder="0"
+            />
+            <button
+              onClick={() => setShowCusto(v => !v)}
+              className={`flex-shrink-0 p-1 rounded transition-colors ${showCusto ? 'text-blue-600 bg-blue-50' : 'text-gray-400 hover:text-blue-500'}`}
+              title="Detalhar custo por componente"
+            >
+              <PieChart size={12} />
+            </button>
+          </div>
         </td>
-      ))}
-      <td className="px-3 py-2 text-sm text-right text-blue-600 font-medium whitespace-nowrap" title="Calculado: sacas × cotação">
-        {fmtBRL(c.custoPorHaReais)}
-      </td>
-      {[
-        ['areaArrendada', item.areaArrendada],
-        ['custoArrendHa', item.custoArrendHa],
-      ].map(([field, val]) => (
-        <td key={String(field)} className="px-1 py-1">
-          <input
-            type="number"
-            value={val as number || ''}
-            onChange={e => onChange(field as keyof AgroProducao, Number(e.target.value))}
-            className={inp}
-            placeholder="0"
-          />
+        <td className="px-3 py-2 text-sm text-right text-blue-600 font-medium whitespace-nowrap" title="Calculado: sacas × cotação">
+          {fmtBRL(c.custoPorHaReais)}
         </td>
-      ))}
-      <td className="px-3 py-2 text-sm text-right text-gray-600">{c.prodTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-      <td className="px-3 py-2 text-sm text-right font-semibold text-gray-900">{fmtBRL(c.recBruta)}</td>
-      <td className="px-3 py-2 text-sm text-right text-red-500">{fmtBRL(c.custoTotal + c.custoArrendTotal)}</td>
-      <td className={`px-3 py-2 text-sm text-right font-bold ${c.recLiq >= 0 ? 'text-af-green' : 'text-red-600'}`}>{fmtBRL(c.recLiq)}</td>
-      <td className="px-3 py-2 text-sm text-right text-gray-600">{fmtBRL(c.rentabilidadeHa)}/ha</td>
-      <td className="px-3 py-2 text-sm text-right text-gray-500">{c.custoPorSaca.toFixed(1)} sc</td>
-      <td className="px-3 py-2 text-sm text-right text-gray-500">{c.peHa.toFixed(1)} sc</td>
-      <td className={`px-3 py-2 text-sm text-right font-semibold ${c.superavitSc >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>{c.superavitSc >= 0 ? '+' : ''}{c.superavitSc.toFixed(1)} sc</td>
-      <td className={`px-3 py-2 text-sm text-right ${c.riscoQueda ? 'text-red-500 font-semibold' : 'text-emerald-600'}`}>{c.quedaPrecoZero.toFixed(0)}%</td>
-      <td className={`px-3 py-2 text-sm text-right font-semibold ${c.margemPct >= 15 ? 'text-emerald-600' : 'text-red-500'}`}>{c.margemPct.toFixed(1)}%</td>
-      <td className="px-3 py-2">
-        <div className="flex gap-1">
-          <button
-            onClick={onSave}
-            disabled={!dirty}
-            className={`p-1 rounded transition-colors ${dirty ? 'text-af-green hover:bg-af-green-pale cursor-pointer' : 'text-gray-300 cursor-default'}`}
-            title={dirty ? 'Salvar alterações' : 'Sem alterações'}
-          ><Save size={13} /></button>
-          <button onClick={onDelete} className="p-1 text-red-400 hover:bg-red-50 rounded" title="Excluir cultura"><Trash2 size={13} /></button>
-        </div>
-      </td>
-    </tr>
+        {[
+          ['areaArrendada', item.areaArrendada],
+          ['custoArrendHa', item.custoArrendHa],
+        ].map(([field, val]) => (
+          <td key={String(field)} className="px-1 py-1">
+            <input
+              type="number"
+              value={val as number || ''}
+              onChange={e => onChange(field as keyof AgroProducao, Number(e.target.value))}
+              className={inp}
+              placeholder="0"
+            />
+          </td>
+        ))}
+        <td className="px-3 py-2 text-sm text-right text-gray-600">{c.prodTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+        <td className="px-3 py-2 text-sm text-right font-semibold text-gray-900">{fmtBRL(c.recBruta)}</td>
+        <td className="px-3 py-2 text-sm text-right text-red-500">{fmtBRL(c.custoTotal + c.custoArrendTotal)}</td>
+        <td className={`px-3 py-2 text-sm text-right font-bold ${c.recLiq >= 0 ? 'text-af-green' : 'text-red-600'}`}>{fmtBRL(c.recLiq)}</td>
+        <td className="px-3 py-2 text-sm text-right text-gray-600">{fmtBRL(c.rentabilidadeHa)}/ha</td>
+        <td className="px-3 py-2 text-sm text-right text-gray-500">{c.custoPorSaca.toFixed(1)} sc</td>
+        <td className="px-3 py-2 text-sm text-right text-gray-500">{c.peHa.toFixed(1)} sc</td>
+        <td className={`px-3 py-2 text-sm text-right font-semibold ${c.superavitSc >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>{c.superavitSc >= 0 ? '+' : ''}{c.superavitSc.toFixed(1)} sc</td>
+        <td className={`px-3 py-2 text-sm text-right ${c.riscoQueda ? 'text-red-500 font-semibold' : 'text-emerald-600'}`}>{c.quedaPrecoZero.toFixed(0)}%</td>
+        <td className={`px-3 py-2 text-sm text-right font-semibold ${c.margemPct >= 15 ? 'text-emerald-600' : 'text-red-500'}`}>{c.margemPct.toFixed(1)}%</td>
+        <td className="px-3 py-2">
+          <div className="flex gap-1">
+            <button
+              onClick={onSave}
+              disabled={!dirty}
+              className={`p-1 rounded transition-colors ${dirty ? 'text-af-green hover:bg-af-green-pale cursor-pointer' : 'text-gray-300 cursor-default'}`}
+              title={dirty ? 'Salvar alterações' : 'Sem alterações'}
+            ><Save size={13} /></button>
+            <button onClick={onDelete} className="p-1 text-red-400 hover:bg-red-50 rounded" title="Excluir cultura"><Trash2 size={13} /></button>
+          </div>
+        </td>
+      </tr>
+
+      {/* Painel de custo itemizado */}
+      {showCusto && (
+        <tr className="bg-blue-50/50 border-b border-blue-100">
+          <td colSpan={colSpan} className="px-4 py-3">
+            <div className="flex items-center gap-2 mb-2">
+              <PieChart size={13} className="text-blue-600" />
+              <p className="text-xs font-bold text-blue-800">Custo Itemizado — {item.cultura} · Safra atual</p>
+              <span className="text-xs text-gray-400">(valores em sc/ha · atualiza o campo Custo/ha automaticamente)</span>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              {itens.map((it, i) => {
+                const pct = totalItens > 0 ? (it.valorHa / totalItens * 100).toFixed(0) : '0'
+                return (
+                  <div key={it.categoria} className="bg-white rounded-lg border border-blue-100 px-3 py-2">
+                    <div className="flex items-center justify-between mb-1">
+                      <p className="text-xs font-semibold text-gray-700 truncate">{it.categoria}</p>
+                      <span className="text-xs text-gray-400 ml-1">{pct}%</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <input
+                        type="number"
+                        step={0.1}
+                        value={it.valorHa || ''}
+                        onChange={e => handleItemChange(i, +e.target.value)}
+                        className="w-full text-sm text-right border border-gray-200 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-300"
+                        placeholder="0"
+                      />
+                      <span className="text-xs text-gray-400 whitespace-nowrap">sc</span>
+                    </div>
+                    <p className="text-xs text-gray-400 mt-0.5 text-right">
+                      {item.cotacao > 0 ? `R$ ${(it.valorHa * item.cotacao).toLocaleString('pt-BR', { maximumFractionDigits: 0 })}/ha` : '—'}
+                    </p>
+                  </div>
+                )
+              })}
+            </div>
+            <div className="mt-2 flex items-center justify-between">
+              <p className="text-xs text-gray-500">
+                Total: <strong className="text-gray-800">{totalItens.toFixed(2)} sc/ha</strong>
+                {item.cotacao > 0 && <span className="ml-2 text-gray-400">= R$ {(totalItens * item.cotacao).toLocaleString('pt-BR', { maximumFractionDigits: 0 })}/ha</span>}
+              </p>
+              {Math.abs(totalItens - item.custoPorHa) > 0.05 && (
+                <p className="text-xs text-amber-600 font-semibold">
+                  ⚠ Soma ({totalItens.toFixed(2)}) ≠ Custo/ha ({item.custoPorHa.toFixed(2)}) — salve para sincronizar
+                </p>
+              )}
+            </div>
+          </td>
+        </tr>
+      )}
+    </>
   )
 }
 
@@ -307,7 +415,7 @@ function SafraBlock({ safra, tipo, rows, clientId, onDeleteRows, onAddRows, onRe
         <table className="w-full text-xs">
           <thead>
             <tr className="bg-gray-50 border-b border-gray-100">
-              {['Cultura', 'Cotação (R$/sc)', 'Área (ha)', 'Produt. (sc/ha)', 'Custo/ha (sc)', 'Custo/ha (R$)', 'Área Arren. (ha)', 'Custo Arren/ha', 'Prod. Total (sc)', 'Rec. Bruta', 'Custo Total', 'Resultado', 'R$/ha', 'Custo/saca', 'PE (sc/ha)', 'Supráv./Déf.', 'Queda máx.', 'Margem', ''].map(h => (
+              {['Cultura', 'Cotação (R$/sc)', 'Área (ha)', 'Produt. (sc/ha)', 'Custo/ha (sc) 🔍', 'Custo/ha (R$)', 'Área Arren. (ha)', 'Custo Arren/ha', 'Prod. Total (sc)', 'Rec. Bruta', 'Custo Total', 'Resultado', 'R$/ha', 'Custo/saca', 'PE (sc/ha)', 'Supráv./Déf.', 'Queda máx.', 'Margem', ''].map(h => (
                 <th key={h} className="px-3 py-2 text-left font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">{h}</th>
               ))}
             </tr>
@@ -317,10 +425,11 @@ function SafraBlock({ safra, tipo, rows, clientId, onDeleteRows, onAddRows, onRe
               <ProducaoRow
                 key={row.id ?? idx}
                 item={row}
-                onChange={(f, v) => handleChange(idx, f, v)}
+                onChange={(f, v) => handleChange(idx, f, v as any)}
                 onSave={() => handleSave(idx)}
                 onDelete={() => handleDeleteCultura(idx)}
                 dirty={!!row.dirty}
+                colSpan={19}
               />
             ))}
           </tbody>
@@ -616,6 +725,88 @@ export function TabProducao({ clientId }: { clientId: string }) {
           <p className="text-gray-400 text-xs mt-1">Clique nos botões acima para adicionar</p>
         </div>
       )}
+
+      {/* ── Histórico Comparativo de Safras ─────────────────────────────────── */}
+      {safrasHistoricas.filter(s => s.rows.length > 0).length >= 2 && (() => {
+        const safrasComDados = safrasHistoricas.filter(s => s.rows.length > 0)
+        const resumo = safrasComDados.map(s => {
+          const principal = s.rows.find(r => r.ordem === 'principal') ?? s.rows.reduce<AgroProducao | undefined>((m, r) => (!m || r.area > m.area) ? r : m, undefined)
+          const area = principal?.area ?? 0
+          const recBruta  = s.rows.reduce((sum, r) => sum + calcRow(r).recBruta, 0)
+          const custo     = s.rows.reduce((sum, r) => sum + calcRow(r).custoTotal + calcRow(r).custoArrendTotal, 0)
+          const resultado = recBruta - custo
+          const margem    = recBruta > 0 ? resultado / recBruta * 100 : 0
+          const custoHa   = area > 0 ? custo / area : 0
+          const recHa     = area > 0 ? recBruta / area : 0
+          return { safra: s.safra, area, recBruta, custo, resultado, margem, custoHa, recHa }
+        })
+        const melhorMargem = Math.max(...resumo.map(r => r.margem))
+        return (
+          <div className="mt-6 mb-6">
+            <h3 className="font-bold text-gray-900 mb-1 flex items-center gap-2">
+              <ChevronUp size={16} className="text-blue-500" />
+              Histórico Comparativo de Safras
+            </h3>
+            <p className="text-xs text-gray-400 mb-4">Evolução de receita, custo e margem entre as safras cadastradas</p>
+            <Card>
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="bg-gray-50 border-b">
+                      {['Safra', 'Área (ha)', 'Receita Bruta', 'Custo Total', 'Resultado', 'Margem', 'Receita/ha', 'Custo/ha', 'Variação Resultado'].map(h => (
+                        <th key={h} className="px-3 py-2 text-left font-semibold text-gray-500 uppercase whitespace-nowrap">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-50">
+                    {resumo.map((r, i) => {
+                      const prev = i > 0 ? resumo[i - 1] : null
+                      const varRes = prev && prev.resultado !== 0 ? ((r.resultado - prev.resultado) / Math.abs(prev.resultado)) * 100 : null
+                      return (
+                        <tr key={r.safra} className={`hover:bg-gray-50/50 ${r.margem === melhorMargem ? 'bg-emerald-50/30' : ''}`}>
+                          <td className="px-3 py-2.5 font-bold text-gray-900 whitespace-nowrap">
+                            {r.safra}
+                            {r.margem === melhorMargem && <span className="ml-1 text-xs text-emerald-600 font-normal">★ melhor</span>}
+                          </td>
+                          <td className="px-3 py-2.5 text-gray-600">{r.area.toLocaleString('pt-BR', { maximumFractionDigits: 0 })} ha</td>
+                          <td className="px-3 py-2.5 text-emerald-700 font-semibold">{fmtBRL(r.recBruta)}</td>
+                          <td className="px-3 py-2.5 text-red-500">{fmtBRL(r.custo)}</td>
+                          <td className={`px-3 py-2.5 font-bold ${r.resultado >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>{fmtBRL(r.resultado)}</td>
+                          <td className={`px-3 py-2.5 font-semibold ${r.margem >= 20 ? 'text-emerald-600' : r.margem >= 10 ? 'text-amber-600' : 'text-red-500'}`}>{r.margem.toFixed(1)}%</td>
+                          <td className="px-3 py-2.5 text-gray-600">{fmtBRL(r.recHa)}</td>
+                          <td className="px-3 py-2.5 text-gray-600">{fmtBRL(r.custoHa)}</td>
+                          <td className="px-3 py-2.5">
+                            {varRes !== null ? (
+                              <span className={`font-semibold ${varRes >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+                                {varRes >= 0 ? '▲' : '▼'} {Math.abs(varRes).toFixed(0)}%
+                              </span>
+                            ) : <span className="text-gray-300">—</span>}
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                  <tfoot>
+                    <tr className="bg-gray-100 border-t-2 border-gray-300 font-bold text-xs">
+                      <td className="px-3 py-2 text-gray-700">Média</td>
+                      <td className="px-3 py-2 text-gray-500">{(resumo.reduce((s, r) => s + r.area, 0) / resumo.length).toLocaleString('pt-BR', { maximumFractionDigits: 0 })} ha</td>
+                      <td className="px-3 py-2 text-emerald-700">{fmtBRL(resumo.reduce((s, r) => s + r.recBruta, 0) / resumo.length)}</td>
+                      <td className="px-3 py-2 text-red-500">{fmtBRL(resumo.reduce((s, r) => s + r.custo, 0) / resumo.length)}</td>
+                      <td className={`px-3 py-2 ${resumo.reduce((s, r) => s + r.resultado, 0) >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>
+                        {fmtBRL(resumo.reduce((s, r) => s + r.resultado, 0) / resumo.length)}
+                      </td>
+                      <td className="px-3 py-2 text-gray-700">{(resumo.reduce((s, r) => s + r.margem, 0) / resumo.length).toFixed(1)}%</td>
+                      <td className="px-3 py-2 text-gray-600">{fmtBRL(resumo.reduce((s, r) => s + r.recHa, 0) / resumo.length)}</td>
+                      <td className="px-3 py-2 text-gray-600">{fmtBRL(resumo.reduce((s, r) => s + r.custoHa, 0) / resumo.length)}</td>
+                      <td className="px-3 py-2 text-gray-400">—</td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            </Card>
+          </div>
+        )
+      })()}
 
       {Object.keys(bmCache).length > 0 && (
         <div className="mt-6">

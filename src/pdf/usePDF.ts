@@ -3,6 +3,7 @@ import { createElement } from 'react'
 import { DiagnosticoPJPDF,  type DiagPJData   } from './DiagnosticoPJPDF'
 import { DiagnosticoAgroPDF, type DiagAgroData } from './DiagnosticoAgroPDF'
 import { PropostaComercialPDF, type PropostaData } from './PropostaComercialPDF'
+import { RelatorioCompletoAgroPDF, type RelatorioCompletoAgroData } from './RelatorioCompletoAgroPDF'
 
 function slugify(s: string) {
   return s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
@@ -32,5 +33,10 @@ export const usePDF = () => ({
   exportProposta: async (data: PropostaData) => {
     const el = createElement(PropostaComercialPDF, { data })
     await downloadPDF(el, `proposta-${slugify(data.clientName)}.pdf`)
+  },
+
+  exportRelatorioAgro: async (data: RelatorioCompletoAgroData) => {
+    const el = createElement(RelatorioCompletoAgroPDF, { data })
+    await downloadPDF(el, `relatorio-agro-${slugify(data.clientName)}-${data.safra.replace('/', '-')}.pdf`)
   },
 })

@@ -28,11 +28,17 @@ async function req<T>(path: string, opts: RequestInit = {}): Promise<T> {
 }
 
 // ── Types ──────────────────────────────────────────────────────
+export interface CustoItem {
+  categoria: string   // 'Sementes' | 'Fertilizantes' | 'Defensivos' | etc.
+  valorHa: number     // sacas/ha (mesma unidade que custoPorHa)
+}
+
 export interface AgroProducao {
   id?: string; clientId: string; safra: string; tipo: string
   cultura: string; ordem: string; cotacao: number; area: number
   produtividade: number; custoPorHa: number; areaArrendada: number; custoArrendHa: number
   dataPagamento?: string
+  custoItens?: CustoItem[]
 }
 
 export interface AgroContrato {
@@ -44,6 +50,7 @@ export interface AgroContrato {
   spreadIndexador?: number
   sistemaAmortizacao?: string
   tomador?: string
+  cronograma?: { numeroParcela: number; dataVencimento: string; valor: number; pago?: boolean }[]
 }
 
 export interface AgroParcela {

@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react'
 import {
   Sprout, CreditCard, Shield, TrendingUp, TrendingDown,
-  MapPin, BarChart2, AlertTriangle, CheckCircle, Info, Activity
+  MapPin, BarChart2, AlertTriangle, CheckCircle, Info, Activity, FileDown
 } from 'lucide-react'
 import { agroApi, type AgroProducao, type AgroPatrimonio, type AgroParcela } from '../../services/agroApi'
+import { usePDF } from '../../pdf/usePDF'
+import { useStore } from '../../store/useStore'
 
 const fmtBRL = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 0, maximumFractionDigits: 0 })
 const fmtN   = (v: number, d = 2) => v.toLocaleString('pt-BR', { minimumFractionDigits: d, maximumFractionDigits: d })
@@ -102,13 +104,16 @@ const SAFRAS = ['2025/26', '2026/27']
 export function TabResumo({ clientId, clienteNome, clienteCidade }: {
   clientId: string; clienteNome?: string; clienteCidade?: string
 }) {
+  const pdf = usePDF()
   const [producao,  setProducao]  = useState<AgroProducao[]>([])
   const [patrimonio, setPatrimonio] = useState<AgroPatrimonio[]>([])
   const [parcelas,  setParcelas]  = useState<AgroParcela[]>([])
+  const [contratos, setContratos] = useState<any[]>([])
   const [totalEndividamento, setTotalEndividamento] = useState(0)
   const [saldoCaixa, setSaldoCaixa] = useState<number | null>(null)
   const [loading, setLoading] = useState(true)
   const [safra, setSafra] = useState('2025/26')
+  const [exportando, setExportando] = useState(false)
 
   useEffect(() => {
     setLoading(true)
@@ -117,12 +122,14 @@ export function TabResumo({ clientId, clienteNome, clienteCidade }: {
       agroApi.patrimonio.list(clientId),
       agroApi.contratos.cronograma(clientId),
       agroApi.fluxoDiario(clientId, 0),
-    ]).then(([prod, pat, crono, fluxo]) => {
+      agroApi.contratos.list(clientId),
+    ]).then(([prod, pat, crono, fluxo, contr]) => {
       setProducao(prod)
       setPatrimonio(pat)
       setParcelas(crono.parcelas)
       setTotalEndividamento(crono.totalEndividamento)
       setSaldoCaixa(fluxo.saldoFinal)
+      setContratos(contr)
     }).catch(console.error).finally(() => setLoading(false))
   }, [clientId])
 
@@ -185,8 +192,120 @@ export function TabResumo({ clientId, clienteNome, clienteCidade }: {
   const atencoes = scores.filter(s => s === 'atencao').length
   const ratingGeral: Status = riscos > 0 ? 'risco' : atencoes > 1 ? 'atencao' : 'ok'
   const ratingLabel = ratingGeral === 'ok' ? 'Situação Saudável' : ratingGeral === 'atencao' ? 'Requer Atenção' : 'Alto Risco'
+  const ratingColor = ratingGeral === 'ok' ? '#1B5E20' : ratingGeral === 'atencao' ? '#E65100' : '#B71C1C'
 
   const hasProducao = prodSafra.length > 0
+
+  // ── Exportar Relatório Completo PDF ────────────────────────────
+  const handleExportarRelatorio = async () => {
+    setExportando(true)
+    try {
+      // Busca dados adicionais para o relatório (projeção e cenários)
+      const [custosFixos, despesas] = await Promise.all([
+        agroApi.custosFixos.list(clientId).catch(() => [] as any[]),
+        agroApi.despesas.list(clientId).catch(() => [] as any[]),
+      ])
+      const custosFixosAnuais = custosFixos.reduce((s: number, cf: any) => s + cf.valorMensal, 0) * 12
+      const dividasPorAno: Record<string, number> = {}
+      for (const p of parcelas) {
+        const ano = String(new Date(p.vencimento).getFullYear())
+        dividasPorAno[ano] = (dividasPorAno[ano] ?? 0) + p.valorParcela
+      }
+
+      // Projeção base simples (cenário base, sem ajustes)
+      const prodPorAno: Record<number, AgroProducao[]> = {}
+      for (const p of producao) {
+        const ano = parseInt(p.safra.split('/')[0]) + 1
+        if (!prodPorAno[ano]) prodPorAno[ano] = []
+        prodPorAno[ano].push(p)
+      }
+      const ultimoAno = Math.max(...Object.keys(prodPorAno).map(Number), 2025)
+      const baseProds = prodPorAno[ultimoAno] ?? prodSafra
+
+      const projecaoAnos = Array.from({ length: 10 }, (_, i) => {
+        const ano = 2026 + i
+        let recBruta = 0, custo = 0
+        if (prodPorAno[ano]) {
+          for (const p of prodPorAno[ano]) { recBruta += p.area * p.produtividade * p.cotacao; custo += p.area * p.custoPorHa * p.cotacao }
+        } else {
+          const g = Math.pow(1.02, i)
+          for (const p of baseProds) { recBruta += p.area * p.produtividade * p.cotacao * g; custo += p.area * p.custoPorHa * p.cotacao * g }
+        }
+        const lucBruto = recBruta - custo
+        const dividas = dividasPorAno[String(ano)] ?? 0
+        const resultadoLiquido = lucBruto - custosFixosAnuais - dividas
+        return { ano, recBruta, resultadoLiquido }
+      })
+
+      // Cenários do localStorage
+      let cenariosRaw: any[] = []
+      try {
+        const raw = localStorage.getItem(`cenarios-v1-${clientId}`)
+        if (raw) cenariosRaw = JSON.parse(raw)
+      } catch {}
+
+      const cenarios = cenariosRaw.length > 0 ? cenariosRaw.map(c => {
+        const fP = 1 + c.varPreco / 100, fPr = 1 + c.varProdut / 100, fA = 1 + c.varArea / 100, fC = 1 + c.varCusto / 100
+        const rows = projecaoAnos.map((r, i) => {
+          const g = Math.pow(1.02, i)
+          let rec = 0, cst = 0
+          for (const p of baseProds) {
+            rec += p.area * fA * p.produtividade * fPr * p.cotacao * fP * g
+            cst += p.area * fA * p.custoPorHa * fC * p.cotacao * fP * g
+          }
+          const div = dividasPorAno[String(2026 + i)] ?? 0
+          return { resultadoLiquido: rec - cst - custosFixosAnuais - div }
+        })
+        const tot = rows.reduce((s, r) => s + r.resultadoLiquido, 0)
+        const pos = rows.filter(r => r.resultadoLiquido > 0).length
+        const marg = rows.reduce((s, r) => s + r.resultadoLiquido, 0) / (rows.reduce((s, r) => s + r.resultadoLiquido + custosFixosAnuais, 0) || 1)
+        return {
+          nome: c.nome,
+          resultadoTotal10Anos: tot,
+          anosPositivos: pos,
+          margLiquidaMedia: marg,
+          veredicto: tot < 0 || pos < 4 ? 'Inviável — revisar estrutura' : pos < 7 ? 'Atenção — risco elevado' : marg >= 0.15 ? 'Saudável — expandir' : 'Viável — manter',
+        }
+      }) : []
+
+      await pdf.exportRelatorioAgro({
+        clientName:    clienteNome ?? 'Produtor',
+        clientCity:    clienteCidade,
+        consultorName: 'AF Gestão & Consultoria',
+        safra,
+        dataGeracao:   new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' }),
+        culturas:      prodSafra.map(p => ({ ...p, custoItens: p.custoItens })),
+        areaTotal,
+        areaArrendada,
+        contratos:     contratos.map((c: any) => ({
+          banco: c.banco, modalidade: c.modalidade, valorTomado: c.valorTomado,
+          valorParcela: c.valorParcela, taxa: c.taxa, vencimento: c.vencimento,
+          totalParcelas: c.totalParcelas, parcelaAtual: c.parcelaAtual,
+        })),
+        totalEndividamento,
+        servicoAnual,
+        saldoDevedor: totalEndividamento,
+        patrimonio:    patrimonio.map(p => ({
+          categoria: p.categoria, descricao: p.descricao,
+          valorAvaliado: p.valorAvaliado, possuiOnus: p.possuiOnus, valorOnus: p.valorOnus,
+        })),
+        patrimonioGruto,
+        totalOnus,
+        margem,
+        alavancagem,
+        solvencia,
+        endivReceita,
+        capPagamento,
+        ratingLabel,
+        ratingColor,
+        cenarios,
+        projecao10Anos: projecaoAnos.reduce((s, r) => s + r.resultadoLiquido, 0),
+        projecaoAnos,
+      })
+    } finally {
+      setExportando(false)
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -212,7 +331,7 @@ export function TabResumo({ clientId, clienteNome, clienteCidade }: {
             )}
           </div>
         </div>
-        <div className="text-right">
+        <div className="text-right flex flex-col items-end gap-2">
           <div className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-bold border-2 ${
             ratingGeral === 'ok' ? 'bg-green-100 text-green-800 border-green-200' :
             ratingGeral === 'atencao' ? 'bg-amber-100 text-amber-800 border-amber-200' :
@@ -221,7 +340,15 @@ export function TabResumo({ clientId, clienteNome, clienteCidade }: {
             {ratingGeral === 'ok' ? <CheckCircle size={14} /> : <AlertTriangle size={14} />}
             {ratingLabel}
           </div>
-          <p className="text-xs text-green-200 mt-1">Rating geral do produtor</p>
+          <p className="text-xs text-green-200">Rating geral do produtor</p>
+          <button
+            onClick={handleExportarRelatorio}
+            disabled={exportando}
+            className="flex items-center gap-1.5 bg-white/15 hover:bg-white/25 disabled:opacity-50 text-white text-xs font-semibold rounded-lg px-3 py-1.5 border border-white/30 transition-colors"
+          >
+            <FileDown size={13} />
+            {exportando ? 'Gerando PDF...' : 'Exportar Relatório Completo'}
+          </button>
         </div>
       </div>
 

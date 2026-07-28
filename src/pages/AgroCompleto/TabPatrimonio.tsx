@@ -114,6 +114,17 @@ function BulkImportModal({ clientId, items, onClose, onSaved }: {
 }
 
 const CATEGORIAS = ['Máquinas', 'Equipamentos', 'Veículos', 'Imóveis rurais', 'Imóveis urbanos', 'Rebanho', 'Outros']
+
+// Vida útil em anos e taxa de depreciação anual por categoria (método linear, % a.a.)
+const DEPRECIACAO_TAXA: Record<string, number> = {
+  'Máquinas':       0.10,  // 10 anos
+  'Equipamentos':   0.10,  // 10 anos
+  'Veículos':       0.20,  // 5 anos
+  'Imóveis rurais': 0.025, // 40 anos
+  'Imóveis urbanos':0.025,
+  'Rebanho':        0.20,
+  'Outros':         0.10,
+}
 const CAT_ICON: Record<string, string> = {
   'Máquinas': '🚜', 'Equipamentos': '⚙️', 'Veículos': '🚛',
   'Imóveis rurais': '🌾', 'Imóveis urbanos': '🏠', 'Rebanho': '🐄', 'Outros': '📦',
@@ -328,6 +339,46 @@ export function TabPatrimonio({ clientId, clienteNome }: { clientId: string; cli
           </div>
         ))}
       </div>
+
+      {/* Depreciação anual estimada */}
+      {!loading && items.length > 0 && (() => {
+        const deprecPorCat = CATEGORIAS.map(cat => {
+          const bens = items.filter(i => i.categoria === cat)
+          const totalVal = bens.reduce((s, b) => s + b.valorAvaliado, 0)
+          const taxa = DEPRECIACAO_TAXA[cat] ?? 0.10
+          const deprecAnual = totalVal * taxa
+          return { cat, totalVal, taxa, deprecAnual, qtd: bens.length }
+        }).filter(c => c.qtd > 0 && !['Imóveis rurais', 'Imóveis urbanos'].includes(c.cat))
+        const totalDeprecAnual = deprecPorCat.reduce((s, c) => s + c.deprecAnual, 0)
+        const totalDeprecMensal = totalDeprecAnual / 12
+        return (
+          <Card className="p-4">
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <h4 className="font-semibold text-sm text-gray-900">Depreciação Anual Estimada</h4>
+                <p className="text-xs text-gray-400 mt-0.5">Método linear · Exclui imóveis · Inclui apenas bens depreciáveis</p>
+              </div>
+              <div className="text-right">
+                <p className="text-lg font-bold text-red-600">{fmtBRL(totalDeprecAnual)}/ano</p>
+                <p className="text-xs text-gray-400">{fmtBRL(totalDeprecMensal)}/mês</p>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+              {deprecPorCat.map(c => (
+                <div key={c.cat} className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
+                  <p className="text-xs font-semibold text-gray-600 truncate">{c.cat}</p>
+                  <p className="text-sm font-bold text-red-500">{fmtBRL(c.deprecAnual)}/ano</p>
+                  <p className="text-xs text-gray-400">{(c.taxa * 100).toFixed(0)}% a.a. · {c.qtd} bens</p>
+                  <p className="text-xs text-gray-400">{fmtBRL(c.totalVal)} valor</p>
+                </div>
+              ))}
+            </div>
+            <p className="text-xs text-amber-600 mt-3 bg-amber-50 rounded-lg px-3 py-2">
+              A depreciação de <strong>{fmtBRL(totalDeprecAnual)}/ano</strong> representa um custo real que reduz o resultado econômico — inclua no DRE Rural para uma análise precisa.
+            </p>
+          </Card>
+        )
+      })()}
 
       {loading ? <div className="py-10 text-center text-gray-400 text-sm">Carregando...</div> : (
         <>
