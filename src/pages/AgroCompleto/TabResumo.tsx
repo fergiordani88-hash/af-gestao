@@ -97,7 +97,7 @@ function IndiceRow({ label, value, status, tooltip }: { label: string; value: st
   )
 }
 
-const SAFRAS_HISTORICAS = ['2022/23', '2023/24', '2024/25', '2025/26']
+const SAFRA_ATUAL = '2025/26'
 
 export function TabResumo({ clientId, clienteNome, clienteCidade }: {
   clientId: string; clienteNome?: string; clienteCidade?: string
@@ -108,7 +108,7 @@ export function TabResumo({ clientId, clienteNome, clienteCidade }: {
   const [totalEndividamento, setTotalEndividamento] = useState(0)
   const [saldoCaixa, setSaldoCaixa] = useState<number | null>(null)
   const [loading, setLoading] = useState(true)
-  const [safra, setSafra] = useState('2024/25')
+  const safra = SAFRA_ATUAL
 
   useEffect(() => {
     setLoading(true)
@@ -225,22 +225,9 @@ export function TabResumo({ clientId, clienteNome, clienteCidade }: {
         </div>
       </div>
 
-      {/* Seletor de safra */}
+      {/* Indicador de safra */}
       <div className="flex items-center gap-3">
-        <label className="text-xs font-semibold text-gray-600">Safra de referência:</label>
-        <div className="flex gap-1">
-          {SAFRAS_HISTORICAS.map(s => (
-            <button
-              key={s}
-              onClick={() => setSafra(s)}
-              className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all ${
-                safra === s ? 'bg-af-green text-white shadow' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-              }`}
-            >
-              {s}
-            </button>
-          ))}
-        </div>
+        <span className="bg-af-green text-white text-xs font-bold px-3 py-1 rounded-lg">Safra {SAFRA_ATUAL}</span>
         {!hasProducao && (
           <span className="text-xs text-amber-600 font-medium">⚠ Sem dados lançados para esta safra</span>
         )}
@@ -377,51 +364,77 @@ export function TabResumo({ clientId, clienteNome, clienteCidade }: {
         </Section>
 
         {/* Endividamento */}
-        <Section title={`Endividamento · Serviço ${anoAtual}`} icon={CreditCard} color="text-blue-600">
-          {parcelas.length === 0 ? (
-            <p className="text-sm text-gray-400 text-center py-4">Sem contratos lançados</p>
-          ) : (
-            <div className="space-y-3">
-              <div className="grid grid-cols-2 gap-3 text-center">
-                <div className="bg-blue-50 rounded-xl p-3">
-                  <p className="text-xs text-gray-500">Dívida total atual</p>
-                  <p className="text-base font-bold text-blue-700">{fmtBRL(totalEndividamento)}</p>
-                </div>
-                <div className="bg-purple-50 rounded-xl p-3">
-                  <p className="text-xs text-gray-500">Parcelas em {anoAtual}</p>
-                  <p className="text-base font-bold text-purple-700">{fmtBRL(servicoAnual)}</p>
-                  <p className="text-xs text-purple-500">{parcelasAnoAtual.length} parcelas</p>
-                </div>
-              </div>
-              {/* Parcelas por mês no ano atual */}
-              {(() => {
-                const meses: Record<number, number> = {}
-                parcelasAnoAtual.forEach(p => {
-                  const m = new Date(p.vencimento).getMonth()
-                  meses[m] = (meses[m] ?? 0) + p.valorParcela
-                })
-                const maxVal = Math.max(...Object.values(meses), 1)
-                const nomMes = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez']
-                return (
-                  <div>
-                    <p className="text-xs font-semibold text-gray-500 mb-2">Concentração de vencimentos {anoAtual}</p>
-                    <div className="flex items-end gap-0.5 h-12">
-                      {Array.from({ length: 12 }, (_, i) => {
-                        const val = meses[i] ?? 0
-                        const h = maxVal > 0 ? (val / maxVal) * 100 : 0
-                        return (
-                          <div key={i} className="flex-1 flex flex-col items-center gap-0.5">
-                            <div className="w-full bg-blue-200 rounded-t" style={{ height: `${h}%`, minHeight: val > 0 ? 2 : 0 }} title={`${nomMes[i]}: ${fmtBRL(val)}`} />
-                            <span className="text-gray-400" style={{ fontSize: 8 }}>{nomMes[i].slice(0,1)}</span>
-                          </div>
-                        )
-                      })}
-                    </div>
+        <Section title="Endividamento" icon={CreditCard} color="text-blue-600">
+          <div className="space-y-3">
+            {/* Custos da atividade */}
+            <div className="rounded-xl border border-amber-200 bg-amber-50 p-3">
+              <p className="text-xs font-bold text-amber-700 mb-2 uppercase tracking-wide">Custos da Atividade</p>
+              {!hasProducao ? (
+                <p className="text-xs text-gray-400">Sem produção lançada</p>
+              ) : (
+                <div className="space-y-1">
+                  <div className="flex justify-between text-xs">
+                    <span className="text-gray-600">Custo de produção</span>
+                    <span className="font-semibold text-amber-800">{fmtBRL(custoTotal)}</span>
                   </div>
-                )
-              })()}
+                  <div className="flex justify-between text-xs">
+                    <span className="text-gray-600">Custo por ha</span>
+                    <span className="font-semibold text-amber-800">{fmtBRL(custoMedioHa)}/ha</span>
+                  </div>
+                </div>
+              )}
             </div>
-          )}
+
+            {/* Endividamento bancário */}
+            <div className="rounded-xl border border-blue-200 bg-blue-50 p-3">
+              <p className="text-xs font-bold text-blue-700 mb-2 uppercase tracking-wide">Endividamento Bancário</p>
+              {parcelas.length === 0 ? (
+                <p className="text-xs text-gray-400">Sem contratos lançados</p>
+              ) : (
+                <div className="space-y-1">
+                  <div className="flex justify-between text-xs">
+                    <span className="text-gray-600">Saldo devedor total</span>
+                    <span className="font-semibold text-blue-800">{fmtBRL(totalEndividamento)}</span>
+                  </div>
+                  <div className="flex justify-between text-xs">
+                    <span className="text-gray-600">Parcelas em {anoAtual}</span>
+                    <span className="font-semibold text-blue-800">{fmtBRL(servicoAnual)}</span>
+                  </div>
+                  <div className="flex justify-between text-xs text-gray-500">
+                    <span>{parcelasAnoAtual.length} vencimentos no ano</span>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Gráfico de vencimentos */}
+            {parcelas.length > 0 && (() => {
+              const meses: Record<number, number> = {}
+              parcelasAnoAtual.forEach(p => {
+                const m = new Date(p.vencimento).getMonth()
+                meses[m] = (meses[m] ?? 0) + p.valorParcela
+              })
+              const maxVal = Math.max(...Object.values(meses), 1)
+              const nomMes = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez']
+              return (
+                <div>
+                  <p className="text-xs font-semibold text-gray-500 mb-2">Concentração de vencimentos {anoAtual}</p>
+                  <div className="flex items-end gap-0.5 h-12">
+                    {Array.from({ length: 12 }, (_, i) => {
+                      const val = meses[i] ?? 0
+                      const h = maxVal > 0 ? (val / maxVal) * 100 : 0
+                      return (
+                        <div key={i} className="flex-1 flex flex-col items-center gap-0.5">
+                          <div className="w-full bg-blue-200 rounded-t" style={{ height: `${h}%`, minHeight: val > 0 ? 2 : 0 }} title={`${nomMes[i]}: ${fmtBRL(val)}`} />
+                          <span className="text-gray-400" style={{ fontSize: 8 }}>{nomMes[i].slice(0,1)}</span>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )
+            })()}
+          </div>
         </Section>
 
         {/* Resultado econômico */}
@@ -430,28 +443,123 @@ export function TabResumo({ clientId, clienteNome, clienteCidade }: {
             <p className="text-sm text-gray-400 text-center py-4">Sem produção lançada para safra {safra}</p>
           ) : (
             <div className="space-y-3">
-              <div className="space-y-2">
-                {[
-                  { label: 'Receita bruta', val: receitaBruta, cls: 'text-green-600' },
-                  { label: 'Custo de produção', val: -custoTotal, cls: 'text-red-500' },
-                  { label: 'Resultado líquido', val: resultadoLiq, cls: resultadoLiq >= 0 ? 'text-blue-700 font-bold' : 'text-red-700 font-bold', border: true },
-                ].map(({ label, val, cls, border }) => (
-                  <div key={label} className={`flex justify-between items-center py-1 ${border ? 'border-t-2 border-gray-200 mt-1' : ''}`}>
-                    <span className="text-sm text-gray-600">{label}</span>
-                    <span className={`text-sm ${cls}`}>{val < 0 ? `(${fmtBRL(Math.abs(val))})` : fmtBRL(val)}</span>
+              {/* DRE simplificada */}
+              <div className="space-y-1">
+                <div className="flex justify-between items-center py-1">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-sm text-gray-600">Receita bruta</span>
+                    <span className="relative group cursor-default"><Info size={11} className="text-gray-400" />
+                      <div className="absolute left-4 top-0 w-56 bg-gray-900 text-white text-xs rounded-lg px-3 py-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                        Produção total (sc) × Cotação (R$/sc) por cultura.
+                      </div>
+                    </span>
                   </div>
-                ))}
+                  <span className="text-sm font-semibold text-green-600">{fmtBRL(receitaBruta)}</span>
+                </div>
+                <div className="flex justify-between items-center py-1">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-sm text-gray-600">(-) Custo de produção</span>
+                    <span className="relative group cursor-default"><Info size={11} className="text-gray-400" />
+                      <div className="absolute left-4 top-0 w-60 bg-gray-900 text-white text-xs rounded-lg px-3 py-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                        Custo/ha × Área + Custo de arrendamento. Inclui insumos, mão de obra e operações.
+                      </div>
+                    </span>
+                  </div>
+                  <span className="text-sm text-red-500">({fmtBRL(custoTotal)})</span>
+                </div>
+                <div className="flex justify-between items-center py-1.5 border-t border-gray-200">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-sm font-semibold text-gray-700">Resultado operacional</span>
+                    <span className="relative group cursor-default"><Info size={11} className="text-gray-400" />
+                      <div className="absolute left-4 top-0 w-56 bg-gray-900 text-white text-xs rounded-lg px-3 py-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                        Receita bruta − Custo de produção. Saudável: margem {'>'} 20%.
+                      </div>
+                    </span>
+                  </div>
+                  <span className={`text-sm font-bold ${resultadoLiq >= 0 ? 'text-blue-700' : 'text-red-700'}`}>{fmtBRL(resultadoLiq)}</span>
+                </div>
+                <div className="flex justify-between items-center py-1">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-sm text-gray-600">(-) Serviço da dívida ({anoAtual})</span>
+                    <span className="relative group cursor-default"><Info size={11} className="text-gray-400" />
+                      <div className="absolute left-4 top-0 w-60 bg-gray-900 text-white text-xs rounded-lg px-3 py-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                        Total de parcelas bancárias com vencimento em {anoAtual}. Saudável: resultado operacional {'>'} 1,5× o serviço da dívida.
+                      </div>
+                    </span>
+                  </div>
+                  <span className="text-sm text-red-500">{servicoAnual > 0 ? `(${fmtBRL(servicoAnual)})` : '—'}</span>
+                </div>
+                <div className="flex justify-between items-center py-1.5 border-t-2 border-gray-300">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-sm font-bold text-gray-900">Resultado após endividamento</span>
+                    <span className="relative group cursor-default"><Info size={11} className="text-gray-400" />
+                      <div className="absolute left-4 top-0 w-60 bg-gray-900 text-white text-xs rounded-lg px-3 py-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                        Resultado operacional − Serviço da dívida. Mostra o que sobra de caixa após pagar todas as obrigações. Saudável: valor positivo.
+                      </div>
+                    </span>
+                  </div>
+                  {(() => {
+                    const resAfterDebt = resultadoLiq - servicoAnual
+                    return <span className={`text-base font-bold ${resAfterDebt >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>{fmtBRL(resAfterDebt)}</span>
+                  })()}
+                </div>
               </div>
-              <div className="bg-gray-50 rounded-xl p-3 grid grid-cols-2 gap-2 text-center text-xs">
+
+              {/* Indicadores */}
+              <div className="bg-gray-50 rounded-xl p-3 grid grid-cols-2 gap-3 text-xs">
                 <div>
-                  <p className="text-gray-500">Margem líquida</p>
-                  <p className={`text-lg font-bold ${margem >= 0 ? 'text-blue-700' : 'text-red-700'}`}>{fmtPct(margem)}</p>
+                  <div className="flex items-center gap-1 mb-0.5">
+                    <p className="text-gray-500 font-semibold">Margem operacional</p>
+                    <span className="relative group cursor-default"><Info size={10} className="text-gray-400" />
+                      <div className="absolute left-4 top-0 w-56 bg-gray-900 text-white text-xs rounded-lg px-3 py-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                        Resultado operacional ÷ Receita bruta. Saudável: {'>'} 20%. Atenção: 10–20%. Risco: {'<'} 10%.
+                      </div>
+                    </span>
+                  </div>
+                  <p className={`text-xl font-bold ${statusMargem === 'ok' ? 'text-emerald-600' : statusMargem === 'atencao' ? 'text-amber-600' : 'text-red-600'}`}>{fmtPct(margem)}</p>
+                  <Badge status={statusMargem} label={statusMargem === 'ok' ? 'Saudável' : statusMargem === 'atencao' ? 'Atenção' : 'Risco'} />
                 </div>
                 <div>
-                  <p className="text-gray-500">Resultado/ha</p>
-                  <p className={`text-lg font-bold ${resultadoLiq >= 0 ? 'text-blue-700' : 'text-red-700'}`}>{fmtBRL(areaTotal > 0 ? resultadoLiq / areaTotal : 0)}</p>
+                  <div className="flex items-center gap-1 mb-0.5">
+                    <p className="text-gray-500 font-semibold">Resultado/ha</p>
+                    <span className="relative group cursor-default"><Info size={10} className="text-gray-400" />
+                      <div className="absolute left-4 top-0 w-56 bg-gray-900 text-white text-xs rounded-lg px-3 py-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                        Resultado operacional ÷ Área total. Indica a rentabilidade por hectare cultivado.
+                      </div>
+                    </span>
+                  </div>
+                  <p className={`text-xl font-bold ${resultadoLiq >= 0 ? 'text-blue-700' : 'text-red-700'}`}>{fmtBRL(areaTotal > 0 ? resultadoLiq / areaTotal : 0)}</p>
+                </div>
+                <div>
+                  <div className="flex items-center gap-1 mb-0.5">
+                    <p className="text-gray-500 font-semibold">Capacidade de pagamento</p>
+                    <span className="relative group cursor-default"><Info size={10} className="text-gray-400" />
+                      <div className="absolute left-4 top-0 w-60 bg-gray-900 text-white text-xs rounded-lg px-3 py-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                        Resultado operacional ÷ Serviço anual da dívida. Saudável: {'>'} 1,5×. Atenção: 1–1,5×. Risco: {'<'} 1×.
+                      </div>
+                    </span>
+                  </div>
+                  <p className={`text-xl font-bold ${statusCapPag === 'ok' ? 'text-emerald-600' : statusCapPag === 'atencao' ? 'text-amber-600' : 'text-red-600'}`}>
+                    {capPagamento === Infinity || servicoAnual === 0 ? '—' : `${fmtN(capPagamento, 2)}×`}
+                  </p>
+                  {servicoAnual > 0 && <Badge status={statusCapPag} label={statusCapPag === 'ok' ? 'Saudável' : statusCapPag === 'atencao' ? 'Atenção' : 'Risco'} />}
+                </div>
+                <div>
+                  <div className="flex items-center gap-1 mb-0.5">
+                    <p className="text-gray-500 font-semibold">Endiv. / Receita bruta</p>
+                    <span className="relative group cursor-default"><Info size={10} className="text-gray-400" />
+                      <div className="absolute left-4 top-0 w-60 bg-gray-900 text-white text-xs rounded-lg px-3 py-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                        Saldo devedor total ÷ Receita bruta anual. Saudável: {'<'} 1×. Atenção: 1–2×. Risco: {'>'} 2×.
+                      </div>
+                    </span>
+                  </div>
+                  <p className={`text-xl font-bold ${statusEndivRec === 'ok' ? 'text-emerald-600' : statusEndivRec === 'atencao' ? 'text-amber-600' : 'text-red-600'}`}>
+                    {receitaBruta === 0 ? '—' : `${fmtN(endivReceita, 2)}×`}
+                  </p>
+                  {receitaBruta > 0 && <Badge status={statusEndivRec} label={statusEndivRec === 'ok' ? 'Saudável' : statusEndivRec === 'atencao' ? 'Atenção' : 'Risco'} />}
                 </div>
               </div>
+
               {saldoCaixa !== null && (
                 <div className="flex items-center justify-between bg-gray-50 rounded-xl p-3">
                   <div className="flex items-center gap-2 text-xs text-gray-500">
