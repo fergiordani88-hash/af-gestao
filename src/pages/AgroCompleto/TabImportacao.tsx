@@ -382,8 +382,8 @@ export function TabImportacao({ clientId }: { clientId: string }) {
   return (
     <div className="space-y-5">
       <div>
-        <h2 className="font-bold text-gray-900">Importar Cadastro Bancário</h2>
-        <p className="text-xs text-gray-500 mt-0.5">Faça upload de um PDF de cadastro (Sicredi, Banco do Brasil, etc.) para pré-preencher patrimônio, produção e contratos automaticamente com IA</p>
+        <h2 className="font-bold text-gray-900">Importar Cadastro</h2>
+        <p className="text-xs text-gray-500 mt-0.5">Faça upload de um PDF bancário ou planilha Excel (.xlsx) para importar patrimônio, produção e contratos automaticamente</p>
       </div>
 
       <div
@@ -395,19 +395,19 @@ export function TabImportacao({ clientId }: { clientId: string }) {
         {loading ? (
           <>
             <Loader2 size={40} className="text-af-green animate-spin mb-4" />
-            <p className="font-semibold text-gray-700">Processando PDF com IA...</p>
+            <p className="font-semibold text-gray-700">Processando arquivo...</p>
             <p className="text-sm text-gray-400 mt-1">Isso pode levar alguns segundos</p>
           </>
         ) : (
           <>
             <Upload size={40} className="text-gray-300 group-hover:text-af-green mb-4 transition-colors" />
-            <p className="font-semibold text-gray-700">Arraste o PDF aqui ou clique para selecionar</p>
-            <p className="text-sm text-gray-400 mt-1">Formatos aceitos: PDF · Tamanho máximo: 20 MB</p>
+            <p className="font-semibold text-gray-700">Arraste o arquivo aqui ou clique para selecionar</p>
+            <p className="text-sm text-gray-400 mt-1">Formatos aceitos: PDF · Excel (.xlsx, .xls) · Tamanho máximo: 20 MB</p>
           </>
         )}
       </div>
 
-      <input ref={fileRef} type="file" accept=".pdf" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f) }} />
+      <input ref={fileRef} type="file" accept=".pdf,.xlsx,.xls" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f) }} />
 
       {error && (
         <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 flex items-center gap-2 text-red-700 text-sm">
@@ -453,7 +453,7 @@ export function TabImportacao({ clientId }: { clientId: string }) {
           </div>
         </div>
         <p className="text-xs text-gray-400 mt-4 border-t pt-3">
-          Compatível com: Sicredi · Banco do Brasil · Bradesco Agro · outros cadastros bancários rurais
+          PDF: Sicredi · Banco do Brasil · Bradesco Agro · outros cadastros bancários rurais · Excel: qualquer planilha com colunas reconhecíveis (use abas "Patrimônio", "Produção", "Contratos")
         </p>
       </Card>
     </div>
