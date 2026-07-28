@@ -154,8 +154,8 @@ export const agroApi = {
       if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error ?? `HTTP ${res.status}`) }
       return res.json()
     },
-    confirm: (body: { clientId: string; patrimonio: any[]; producao: any[] }) =>
-      req<{ patrimonioImportado: number; patrimonioErros: number; producaoImportada: number; producaoErros: number; erros?: string[] }>(
+    confirm: (body: { clientId: string; patrimonio: any[]; producao: any[]; contratos: any[] }) =>
+      req<{ patrimonioImportado: number; patrimonioErros: number; producaoImportada: number; producaoErros: number; contratosImportados: number; contratosErros: number; erros?: string[] }>(
         '/cadastro/confirm', { method: 'POST', body: JSON.stringify(body) }
       ),
   },

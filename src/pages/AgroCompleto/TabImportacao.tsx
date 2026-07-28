@@ -16,10 +16,17 @@ interface ProducaoItem {
   cotacao: number; custoPorHa: number; areaArrendada: number; custoArrendHa: number
   _sel: boolean
 }
+interface ContratoItem {
+  banco: string; modalidade: string; numeroContrato?: string; dataContratacao: string
+  valorTomado: number; totalParcelas: number; parcelaAtual: number; periodicidade: string
+  taxa: number; vencimento: string; valorParcela: number; sistemaAmortizacao?: string; tomador?: string
+  _sel: boolean
+}
 interface ParseResult {
   nomeProdutor?: string; cpf?: string; cidade?: string; estado?: string; telefone?: string
   patrimonio: PatrimonioItem[]
   producao: ProducaoItem[]
+  contratos: ContratoItem[]
 }
 
 const CAT_COLORS: Record<string, string> = {
@@ -39,7 +46,7 @@ export function TabImportacao({ clientId }: { clientId: string }) {
   const [doneResult, setDoneResult] = useState<any>(null)
   const [error, setError] = useState<string | null>(null)
   const [fileName, setFileName] = useState<string | null>(null)
-  const [openSection, setOpenSection] = useState<'patrimonio' | 'producao' | null>('patrimonio')
+  const [openSection, setOpenSection] = useState<'patrimonio' | 'producao' | 'contratos' | null>('contratos')
   const fileRef = useRef<HTMLInputElement>(null)
 
   const handleFile = async (file: File) => {
@@ -54,7 +61,9 @@ export function TabImportacao({ clientId }: { clientId: string }) {
         ...res,
         patrimonio: (res.patrimonio ?? []).map((p: any) => ({ ...p, _sel: true })),
         producao:   (res.producao   ?? []).map((p: any) => ({ ...p, _sel: true })),
+        contratos:  (res.contratos  ?? []).map((c: any) => ({ ...c, _sel: true })),
       }
+      if (data.contratos.length > 0) setOpenSection('contratos')
       setResult(data)
       setStep('preview')
     } catch (e: any) {
@@ -78,8 +87,16 @@ export function TabImportacao({ clientId }: { clientId: string }) {
     return { ...r, producao }
   })
 
+  const toggleCont = (i: number) => setResult(r => {
+    if (!r) return r
+    const contratos = [...r.contratos]
+    contratos[i] = { ...contratos[i], _sel: !contratos[i]._sel }
+    return { ...r, contratos }
+  })
+
   const toggleAllPat  = (v: boolean) => setResult(r => r ? ({ ...r, patrimonio: r.patrimonio.map(p => ({ ...p, _sel: v })) }) : r)
   const toggleAllProd = (v: boolean) => setResult(r => r ? ({ ...r, producao:   r.producao.map(p => ({ ...p, _sel: v })) }) : r)
+  const toggleAllCont = (v: boolean) => setResult(r => r ? ({ ...r, contratos:  r.contratos.map(c => ({ ...c, _sel: v })) }) : r)
 
   const handleConfirm = async () => {
     if (!result) return
@@ -87,7 +104,8 @@ export function TabImportacao({ clientId }: { clientId: string }) {
     try {
       const patrimonio = result.patrimonio.filter(p => p._sel).map(({ _sel, ...p }) => p)
       const producao   = result.producao.filter(p => p._sel).map(({ _sel, ...p }) => p)
-      const res = await agroApi.cadastroImport.confirm({ clientId, patrimonio, producao })
+      const contratos  = result.contratos.filter(c => c._sel).map(({ _sel, ...c }) => c)
+      const res = await agroApi.cadastroImport.confirm({ clientId, patrimonio, producao, contratos })
       setDoneResult(res)
       if (res.erros && res.erros.length > 0) console.error('Erros de importação:', res.erros)
       setStep('done')
@@ -105,10 +123,10 @@ export function TabImportacao({ clientId }: { clientId: string }) {
         <h2 className="text-xl font-bold text-gray-900">Importação concluída!</h2>
         <div className="grid grid-cols-2 gap-4 mt-4">
           {[
-            { label: 'Bens patrimoniais importados', value: doneResult.patrimonioImportado, ok: true },
-            { label: 'Registros de produção importados', value: doneResult.producaoImportada, ok: true },
-            { label: 'Erros patrimônio', value: doneResult.patrimonioErros, ok: false },
-            { label: 'Erros produção', value: doneResult.producaoErros, ok: false },
+            { label: 'Bens patrimoniais importados', value: doneResult.patrimonioImportado ?? 0, ok: true },
+            { label: 'Registros de produção importados', value: doneResult.producaoImportada ?? 0, ok: true },
+            { label: 'Contratos importados', value: doneResult.contratosImportados ?? 0, ok: true },
+            { label: 'Erros', value: (doneResult.patrimonioErros ?? 0) + (doneResult.producaoErros ?? 0) + (doneResult.contratosErros ?? 0), ok: false },
           ].map(k => (
             <div key={k.label} className={`border rounded-xl p-4 text-center ${k.ok ? 'bg-emerald-50 border-emerald-200' : k.value > 0 ? 'bg-red-50 border-red-200' : 'bg-gray-50 border-gray-200'}`}>
               <p className="text-2xl font-bold text-gray-900">{k.value}</p>
@@ -116,7 +134,7 @@ export function TabImportacao({ clientId }: { clientId: string }) {
             </div>
           ))}
         </div>
-        <p className="text-sm text-gray-500 mt-4">Acesse as abas Patrimônio e Produção para verificar os dados importados.</p>
+        <p className="text-sm text-gray-500 mt-4">Acesse as abas Patrimônio, Produção e Contratos para verificar os dados importados.</p>
         {doneResult.erros && doneResult.erros.length > 0 && (
           <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 max-w-lg text-left">
             <p className="text-xs font-bold text-red-700 mb-1">Erros ({doneResult.erros.length}):</p>
@@ -134,8 +152,10 @@ export function TabImportacao({ clientId }: { clientId: string }) {
   if (step === 'preview' && result) {
     const selPat  = result.patrimonio.filter(p => p._sel).length
     const selProd = result.producao.filter(p => p._sel).length
+    const selCont = result.contratos.filter(c => c._sel).length
     const allPat  = result.patrimonio.every(p => p._sel)
     const allProd = result.producao.every(p => p._sel)
+    const allCont = result.contratos.length === 0 || result.contratos.every(c => c._sel)
 
     const patPorCat = Array.from(new Set(result.patrimonio.map(p => p.categoria)))
 
@@ -154,9 +174,9 @@ export function TabImportacao({ clientId }: { clientId: string }) {
               className="px-4 py-2 border border-gray-200 rounded-xl text-sm text-gray-600 hover:bg-gray-50">
               Cancelar
             </button>
-            <button onClick={handleConfirm} disabled={confirming || (selPat + selProd === 0)}
+            <button onClick={handleConfirm} disabled={confirming || (selPat + selProd + selCont === 0)}
               className="flex items-center gap-2 bg-af-green hover:bg-af-green/90 disabled:opacity-50 text-white text-sm font-semibold rounded-xl px-5 py-2">
-              {confirming ? <><Loader2 size={14} className="animate-spin" /> Importando...</> : `Importar selecionados (${selPat + selProd})`}
+              {confirming ? <><Loader2 size={14} className="animate-spin" /> Importando...</> : `Importar selecionados (${selPat + selProd + selCont})`}
             </button>
           </div>
         </div>
@@ -172,6 +192,7 @@ export function TabImportacao({ clientId }: { clientId: string }) {
           {[
             { label: 'Bens patrimoniais', value: result.patrimonio.length, sel: selPat, color: 'text-orange-700 bg-orange-50 border-orange-200' },
             { label: 'Registros produção', value: result.producao.length, sel: selProd, color: 'text-emerald-700 bg-emerald-50 border-emerald-200' },
+            { label: 'Contratos de crédito', value: result.contratos.length, sel: selCont, color: 'text-blue-700 bg-blue-50 border-blue-200' },
           ].map(k => (
             <div key={k.label} className={`border rounded-xl p-4 ${k.color}`}>
               <p className="text-xs text-gray-500 mb-1">{k.label} encontrados</p>
@@ -241,6 +262,63 @@ export function TabImportacao({ clientId }: { clientId: string }) {
           </Card>
         )}
 
+        {/* Contratos */}
+        {result.contratos.length > 0 && (
+          <Card>
+            <button onClick={() => setOpenSection(openSection === 'contratos' ? null : 'contratos')}
+              className="w-full flex items-center justify-between px-4 py-3 border-b border-gray-100 hover:bg-gray-50/50">
+              <div className="flex items-center gap-3">
+                <span className="font-semibold text-gray-900">Contratos de Crédito</span>
+                <span className="text-xs bg-blue-100 text-blue-700 rounded-full px-2 py-0.5">{result.contratos.length} contratos</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="text-xs text-gray-500">{selCont} selecionados</span>
+                <button onClick={e => { e.stopPropagation(); toggleAllCont(!allCont) }}
+                  className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 border border-blue-200 rounded-lg px-2 py-1">
+                  {allCont ? <CheckSquare size={12} /> : <Square size={12} />} {allCont ? 'Desmarcar todos' : 'Selecionar todos'}
+                </button>
+                {openSection === 'contratos' ? <ChevronUp size={16} className="text-gray-400" /> : <ChevronDown size={16} className="text-gray-400" />}
+              </div>
+            </button>
+            {openSection === 'contratos' && (
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead className="bg-gray-50 border-b">
+                    <tr>
+                      <th className="px-3 py-2 w-8"></th>
+                      {['Contrato', 'Modalidade', 'Banco', 'Contratado', 'Parcelas', 'Taxa', 'Periodi.', 'Vencimento', 'Saldo Devedor'].map(h => (
+                        <th key={h} className="px-3 py-2 text-left font-semibold text-gray-500 uppercase whitespace-nowrap">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-50">
+                    {result.contratos.map((c, i) => (
+                      <tr key={i} className={`hover:bg-gray-50/50 ${!c._sel ? 'opacity-50' : ''}`}>
+                        <td className="px-3 py-2.5">
+                          <button onClick={() => toggleCont(i)}>
+                            {c._sel ? <CheckSquare size={14} className="text-af-green" /> : <Square size={14} className="text-gray-400" />}
+                          </button>
+                        </td>
+                        <td className="px-3 py-2.5 font-mono text-gray-700">{c.numeroContrato ?? '—'}</td>
+                        <td className="px-3 py-2.5 font-medium text-gray-900">{c.modalidade}</td>
+                        <td className="px-3 py-2.5 text-gray-600">{c.banco}</td>
+                        <td className="px-3 py-2.5">{fmtBRL(c.valorTomado)}</td>
+                        <td className="px-3 py-2.5 text-center">
+                          <span className="px-1.5 py-0.5 rounded bg-gray-100 text-gray-700">{c.parcelaAtual}/{c.totalParcelas}</span>
+                        </td>
+                        <td className="px-3 py-2.5 text-emerald-700 font-semibold">{(c.taxa * 100).toFixed(2)}% a.a.</td>
+                        <td className="px-3 py-2.5">{c.periodicidade}</td>
+                        <td className="px-3 py-2.5">{c.vencimento}</td>
+                        <td className="px-3 py-2.5 font-bold text-red-700">{fmtBRL(c.valorParcela)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </Card>
+        )}
+
         {/* Produção */}
         {result.producao.length > 0 && (
           <Card>
@@ -305,7 +383,7 @@ export function TabImportacao({ clientId }: { clientId: string }) {
     <div className="space-y-5">
       <div>
         <h2 className="font-bold text-gray-900">Importar Cadastro Bancário</h2>
-        <p className="text-xs text-gray-500 mt-0.5">Faça upload de um PDF de cadastro (Sicredi, Banco do Brasil, etc.) para pré-preencher patrimônio e produção automaticamente com IA</p>
+        <p className="text-xs text-gray-500 mt-0.5">Faça upload de um PDF de cadastro (Sicredi, Banco do Brasil, etc.) para pré-preencher patrimônio, produção e contratos automaticamente com IA</p>
       </div>
 
       <div
@@ -341,7 +419,7 @@ export function TabImportacao({ clientId }: { clientId: string }) {
         <h3 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
           <FileText size={16} className="text-af-green" /> O que será importado automaticamente
         </h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-600">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-gray-600">
           <div>
             <p className="font-semibold text-gray-800 mb-2">🏗️ Patrimônio</p>
             <ul className="space-y-1 text-xs">
@@ -364,6 +442,16 @@ export function TabImportacao({ clientId }: { clientId: string }) {
             </ul>
           </div>
         </div>
+          <div>
+            <p className="font-semibold text-gray-800 mb-2">💳 Contratos de Crédito</p>
+            <ul className="space-y-1 text-xs">
+              <li>✅ Todos os contratos do documento (MODERFROTA, FCO RURAL, CPR, etc.)</li>
+              <li>✅ Número do contrato, banco e modalidade</li>
+              <li>✅ Valor financiado, taxa de juros e periodicidade</li>
+              <li>✅ Parcela atual e data de vencimento</li>
+              <li>✅ Saldo devedor atual</li>
+            </ul>
+          </div>
         <p className="text-xs text-gray-400 mt-4 border-t pt-3">
           Compatível com: Sicredi · Banco do Brasil · Bradesco Agro · outros cadastros bancários rurais
         </p>
