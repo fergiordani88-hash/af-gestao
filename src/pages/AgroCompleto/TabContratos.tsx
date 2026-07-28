@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Plus, Trash2, Edit2, X, ChevronDown, ChevronUp, AlertTriangle, FileUp, Loader2, TableProperties, Filter, Download, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react'
+import { Plus, Trash2, Edit2, X, ChevronDown, ChevronUp, AlertTriangle, FileUp, Loader2, TableProperties, Filter, Download, ArrowUpDown, ArrowUp, ArrowDown, CheckSquare, Square } from 'lucide-react'
 import { agroApi, type AgroContrato, type AgroParcela } from '../../services/agroApi'
 import { Card } from '../../components/ui/Card'
 import { clsx } from 'clsx'
@@ -82,6 +82,115 @@ function calcParcelaCorrigida(valorParcela: number, indexador: string | undefine
   const taxaAnual = taxaRef(indexador) / 100 + (spread ?? 0)
   const taxaPeriodo = Math.pow(1 + taxaAnual, 1 / periodos) - 1
   return valorParcela * (1 + taxaPeriodo)
+}
+
+const fmtBRL2 = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 0, maximumFractionDigits: 0 })
+
+function BulkImportModal({ contratos, clientId, onClose, onSaved }: {
+  contratos: Partial<AgroContrato>[]; clientId: string; onClose: () => void; onSaved: () => void
+}) {
+  const [items, setItems] = useState(contratos.map(c => ({ ...c, _sel: true })))
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+  const [done, setDone] = useState(false)
+  const [counts, setCounts] = useState({ ok: 0, err: 0 })
+
+  const toggle = (i: number) => setItems(its => its.map((it, idx) => idx === i ? { ...it, _sel: !it._sel } : it))
+  const toggleAll = (v: boolean) => setItems(its => its.map(it => ({ ...it, _sel: v })))
+  const allSel = items.every(it => it._sel)
+  const selCount = items.filter(it => it._sel).length
+
+  const handleImport = async () => {
+    const sel = items.filter(it => it._sel)
+    if (sel.length === 0) return
+    setSaving(true); setError('')
+    const results = await Promise.allSettled(
+      sel.map(({ _sel, ...c }) => agroApi.contratos.create({ ...c, clientId } as AgroContrato))
+    )
+    const ok = results.filter(r => r.status === 'fulfilled').length
+    const err = results.filter(r => r.status === 'rejected').length
+    setCounts({ ok, err })
+    setSaving(false)
+    setDone(true)
+    onSaved()
+  }
+
+  if (done) return (
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8 text-center">
+        <p className="text-4xl mb-3">✅</p>
+        <h2 className="text-lg font-bold text-gray-900 mb-2">Importação concluída!</h2>
+        <p className="text-sm text-gray-600">{counts.ok} contrato(s) importado(s) com sucesso{counts.err > 0 ? `, ${counts.err} com erro` : ''}.</p>
+        <button onClick={onClose} className="mt-5 bg-af-green text-white rounded-xl px-6 py-2.5 text-sm font-semibold hover:bg-af-green/90">Fechar</button>
+      </div>
+    </div>
+  )
+
+  return (
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[90vh] flex flex-col">
+        <div className="flex items-center justify-between px-6 py-4 border-b shrink-0">
+          <div>
+            <h2 className="text-lg font-bold">{items.length} contratos encontrados no PDF</h2>
+            <p className="text-xs text-gray-500 mt-0.5">Selecione os contratos que deseja importar</p>
+          </div>
+          <div className="flex items-center gap-3">
+            <button onClick={() => toggleAll(!allSel)} className="flex items-center gap-1.5 text-sm text-blue-600 border border-blue-200 rounded-lg px-3 py-1.5 hover:bg-blue-50">
+              {allSel ? <CheckSquare size={14} /> : <Square size={14} />} {allSel ? 'Desmarcar todos' : 'Selecionar todos'}
+            </button>
+            <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-lg"><X size={16} /></button>
+          </div>
+        </div>
+
+        <div className="overflow-auto flex-1 px-6 py-4">
+          <table className="w-full text-xs">
+            <thead className="bg-gray-50 sticky top-0">
+              <tr>
+                <th className="px-3 py-2 w-8"></th>
+                {['Contrato', 'Modalidade', 'Banco', 'Contratado', 'Parc.', 'Taxa a.a.', 'Period.', 'Vencimento', 'Saldo Devedor'].map(h => (
+                  <th key={h} className="px-3 py-2 text-left font-semibold text-gray-500 uppercase whitespace-nowrap">{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {items.map((c, i) => (
+                <tr key={i} className={`hover:bg-gray-50/50 ${!c._sel ? 'opacity-40' : ''}`}>
+                  <td className="px-3 py-3">
+                    <button onClick={() => toggle(i)}>
+                      {c._sel ? <CheckSquare size={14} className="text-af-green" /> : <Square size={14} className="text-gray-400" />}
+                    </button>
+                  </td>
+                  <td className="px-3 py-3 font-mono text-gray-700 whitespace-nowrap">{c.numeroContrato ?? '—'}</td>
+                  <td className="px-3 py-3 font-medium text-gray-900 whitespace-nowrap">{c.modalidade}</td>
+                  <td className="px-3 py-3 text-gray-600">{c.banco}</td>
+                  <td className="px-3 py-3 text-gray-700">{c.valorTomado ? fmtBRL2(c.valorTomado) : '—'}</td>
+                  <td className="px-3 py-3 text-center">
+                    <span className="px-1.5 py-0.5 rounded bg-gray-100 text-gray-700 whitespace-nowrap">{c.parcelaAtual}/{c.totalParcelas}</span>
+                  </td>
+                  <td className="px-3 py-3 text-emerald-700 font-semibold whitespace-nowrap">
+                    {c.taxa ? `${(c.taxa * 100).toFixed(2)}%` : '—'}
+                  </td>
+                  <td className="px-3 py-3 text-gray-600">{c.periodicidade}</td>
+                  <td className="px-3 py-3 text-gray-700 whitespace-nowrap">{c.vencimento ? c.vencimento.toString().split('T')[0] : '—'}</td>
+                  <td className="px-3 py-3 font-bold text-red-700 whitespace-nowrap">{c.valorParcela ? fmtBRL2(c.valorParcela) : '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {error && <p className="px-6 pb-2 text-sm text-red-600 flex items-center gap-1 shrink-0"><AlertTriangle size={13} /> {error}</p>}
+
+        <div className="px-6 py-4 border-t flex gap-3 justify-end shrink-0">
+          <button onClick={onClose} className="px-4 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-600 hover:bg-gray-50">Cancelar</button>
+          <button onClick={handleImport} disabled={saving || selCount === 0}
+            className="flex items-center gap-2 bg-af-green hover:bg-af-green/90 disabled:opacity-50 text-white text-sm font-semibold rounded-xl px-6 py-2.5">
+            {saving ? <><Loader2 size={14} className="animate-spin" /> Importando...</> : `Importar ${selCount} contrato(s)`}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
 }
 
 function ContratoModal({ contrato, clientId, onClose, onSaved, prefill }: {
@@ -260,6 +369,7 @@ export function TabContratos({ clientId }: { clientId: string }) {
   const [importMsg, setImportMsg] = useState('')
   const [prefillQueue, setPrefillQueue] = useState<Partial<AgroContrato>[]>([])
   const [queueTotal, setQueueTotal] = useState(0)
+  const [bulkContratos, setBulkContratos] = useState<Partial<AgroContrato>[] | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
   const [anoExpandido, setAnoExpandido] = useState<string | null>(null)
   const [contratoExpandido, setContratoExpandido] = useState<string | null>(null)
@@ -458,26 +568,12 @@ export function TabContratos({ clientId }: { clientId: string }) {
       const data = await res.json()
       if (!res.ok) throw new Error(data.error ?? 'Erro ao processar')
 
-      // PDF com múltiplos contratos — abre um a um no modal para revisão
-      if (Array.isArray(data.contratos) && data.contratos.length > 0) {
-        const queue = data.contratos.map((ct: any) => mapFields(ct)).filter((f: Partial<AgroContrato>) => f.banco || f.valorTomado)
-        if (queue.length === 0) throw new Error('Nenhum contrato identificado no PDF.')
-        setQueueTotal(queue.length)
-        const [first, ...rest] = queue
-        setPrefillQueue(rest)
-        setPrefill({ ...first, clientId })
-        setModal('new')
-        setImportMsg(`✅ ${queue.length} contrato(s) identificado(s) — revise e salve um a um.`)
-      } else {
-        // Contrato único — abre modal para conferência
-        const pre = mapFields(data)
-        setQueueTotal(1)
-        setPrefillQueue([])
-        setPrefill({ ...pre, clientId })
-        setModal('new')
-        const found = [pre.banco, pre.valorTomado, pre.dataContratacao, pre.vencimento, pre.totalParcelas].filter(v => v && v !== 0 && v !== '').length
-        setImportMsg(`✅ ${found} campo(s) identificado(s) — confira e salve.`)
-      }
+      // Abre modal de bulk preview com todos os contratos encontrados
+      const lista = Array.isArray(data.contratos) ? data.contratos : [data]
+      const mapped = lista.map((ct: any) => mapFields(ct)).filter((f: Partial<AgroContrato>) => f.banco || f.valorTomado)
+      if (mapped.length === 0) throw new Error('Nenhum contrato identificado no PDF.')
+      setBulkContratos(mapped)
+      setImportMsg('')
     } catch (err: any) {
       setImportMsg('❌ ' + err.message)
     } finally {
@@ -934,6 +1030,15 @@ export function TabContratos({ clientId }: { clientId: string }) {
             </table>
           </div>
         </Card>
+      )}
+
+      {bulkContratos && (
+        <BulkImportModal
+          contratos={bulkContratos}
+          clientId={clientId}
+          onClose={() => setBulkContratos(null)}
+          onSaved={() => { load(); setImportMsg('✅ Contratos importados com sucesso!') }}
+        />
       )}
 
       {modal && (
