@@ -16,8 +16,8 @@ const INDEXADORES = ['Pré-fixado', 'CDI', 'SELIC', 'IPCA', 'TR']
 
 // Taxas de referência vigentes (% a.a.) — atualizar conforme divulgação oficial
 const TAXAS_REF: Record<string, number> = {
-  CDI:  14.75, // Meta SELIC/CDI — COPOM jul/2025
-  SELIC: 14.75,
+  CDI:  14.25, // Meta SELIC/CDI — COPOM jul/2026
+  SELIC: 14.25,
   IPCA:  5.48, // IPCA acumulado 12 meses jun/2025 — IBGE
   TR:    0.88, // TR estimada — BACEN jul/2025
 }
