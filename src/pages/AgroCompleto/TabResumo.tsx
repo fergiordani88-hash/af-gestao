@@ -588,6 +588,110 @@ export function TabResumo({ clientId, clienteNome, clienteCidade }: {
       </div>
 
       {/* Análise de alavancagem e solvência */}
+      {/* Análise por Hectare */}
+      {hasProducao && areaTotal > 0 && (
+        <Section title="Análise por Hectare" icon={Activity} color="text-teal-600">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-gray-100">
+                  <th className="text-left py-2 text-xs font-semibold text-gray-500 uppercase">Indicador</th>
+                  <th className="text-right py-2 text-xs font-semibold text-gray-500 uppercase">Total</th>
+                  <th className="text-right py-2 text-xs font-semibold text-gray-500 uppercase">Por Hectare</th>
+                  <th className="text-left py-2 text-xs font-semibold text-gray-500 uppercase pl-4">Referência saudável</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {(() => {
+                  const resAfterDebt = resultadoLiq - servicoAnual
+                  const pctReceitaDivida = receitaBruta > 0 ? (servicoAnual / receitaBruta) * 100 : 0
+                  const rows: { label: string; tooltip: string; total: number; cor: string; ref: string; isCurrency?: boolean; isPct?: boolean }[] = [
+                    {
+                      label: 'Receita bruta',
+                      tooltip: 'Produção × cotação de cada cultura.',
+                      total: receitaBruta, cor: 'text-green-600',
+                      ref: 'Benchmark regional',
+                    },
+                    {
+                      label: 'Custo de produção',
+                      tooltip: 'Insumos, operações e arrendamento.',
+                      total: custoTotal, cor: 'text-amber-600',
+                      ref: '< 75% da receita bruta',
+                    },
+                    {
+                      label: 'Resultado operacional',
+                      tooltip: 'Receita bruta − Custo de produção.',
+                      total: resultadoLiq, cor: resultadoLiq >= 0 ? 'text-blue-700' : 'text-red-600',
+                      ref: 'Margem > 20%',
+                    },
+                    {
+                      label: `Serviço da dívida (${anoAtual})`,
+                      tooltip: `Parcelas bancárias com vencimento em ${anoAtual}.`,
+                      total: servicoAnual, cor: 'text-red-500',
+                      ref: '< 30% do resultado operacional',
+                    },
+                    {
+                      label: 'Resultado após endividamento',
+                      tooltip: 'O que sobra por ha após pagar todas as obrigações.',
+                      total: resAfterDebt, cor: resAfterDebt >= 0 ? 'text-emerald-700' : 'text-red-700',
+                      ref: 'Valor positivo',
+                    },
+                    {
+                      label: 'Saldo devedor bancário',
+                      tooltip: 'Dívida total acumulada ÷ área. Quanto de dívida está "pendurado" em cada hectare.',
+                      total: totalEndividamento, cor: 'text-purple-600',
+                      ref: '< 1× receita bruta/ha',
+                    },
+                  ]
+                  return rows.map(r => (
+                    <tr key={r.label} className="hover:bg-gray-50/60">
+                      <td className="py-2.5">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-gray-700">{r.label}</span>
+                          <span className="relative group cursor-default">
+                            <Info size={11} className="text-gray-400" />
+                            <div className="absolute left-4 top-0 w-56 bg-gray-900 text-white text-xs rounded-lg px-3 py-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                              {r.tooltip}
+                            </div>
+                          </span>
+                        </div>
+                      </td>
+                      <td className={`py-2.5 text-right font-semibold ${r.cor}`}>
+                        {fmtBRL(r.total)}
+                      </td>
+                      <td className={`py-2.5 text-right font-bold text-base ${r.cor}`}>
+                        {fmtBRL(r.total / areaTotal)}<span className="text-xs font-normal text-gray-400">/ha</span>
+                      </td>
+                      <td className="py-2.5 pl-4 text-xs text-gray-400">{r.ref}</td>
+                    </tr>
+                  ))
+                })()}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Comprometimento da receita */}
+          {receitaBruta > 0 && servicoAnual > 0 && (() => {
+            const pct = (servicoAnual / receitaBruta) * 100
+            const status: Status = pct < 20 ? 'ok' : pct < 35 ? 'atencao' : 'risco'
+            return (
+              <div className="mt-4 p-3 bg-gray-50 rounded-xl flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-semibold text-gray-700">Comprometimento da receita com banco</p>
+                  <p className="text-xs text-gray-500 mt-0.5">Parcelas {anoAtual} ÷ Receita bruta — Saudável: &lt; 20% · Atenção: 20–35% · Risco: &gt; 35%</p>
+                </div>
+                <div className="text-right ml-4">
+                  <p className={`text-2xl font-bold ${status === 'ok' ? 'text-emerald-600' : status === 'atencao' ? 'text-amber-600' : 'text-red-600'}`}>
+                    {fmtPct(pct)}
+                  </p>
+                  <Badge status={status} label={status === 'ok' ? 'Saudável' : status === 'atencao' ? 'Atenção' : 'Risco'} />
+                </div>
+              </div>
+            )
+          })()}
+        </Section>
+      )}
+
       <Section title="Análise de Alavancagem & Solvência" icon={BarChart2} color="text-indigo-600">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8">
           <div>
