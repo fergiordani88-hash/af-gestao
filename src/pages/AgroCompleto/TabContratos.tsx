@@ -224,7 +224,7 @@ function ContratoModal({ contrato, clientId, onClose, onSaved, prefill }: {
             </div>
           )}
           <div>
-            <label className={lbl}>Vencimento da Próxima Parcela *</label>
+            <label className={lbl}>Vencimento da Última Parcela *</label>
             <input type="date" className={inp} value={form.vencimento?.toString().split('T')[0] ?? ''} onChange={e => set('vencimento', e.target.value)} />
           </div>
           <div>
