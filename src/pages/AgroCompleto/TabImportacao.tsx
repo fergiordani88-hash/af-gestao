@@ -441,7 +441,6 @@ export function TabImportacao({ clientId }: { clientId: string }) {
               <li>✅ Renda efetiva e renda prevista</li>
             </ul>
           </div>
-        </div>
           <div>
             <p className="font-semibold text-gray-800 mb-2">💳 Contratos de Crédito</p>
             <ul className="space-y-1 text-xs">
@@ -452,6 +451,7 @@ export function TabImportacao({ clientId }: { clientId: string }) {
               <li>✅ Saldo devedor atual</li>
             </ul>
           </div>
+        </div>
         <p className="text-xs text-gray-400 mt-4 border-t pt-3">
           Compatível com: Sicredi · Banco do Brasil · Bradesco Agro · outros cadastros bancários rurais
         </p>
