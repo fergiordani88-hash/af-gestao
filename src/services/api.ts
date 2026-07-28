@@ -25,7 +25,8 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   })
 
   if (res.status === 401) {
-    localStorage.removeItem('af-token')
+    localStorage.removeItem('af-auth')
+    localStorage.removeItem('af-app')
     window.location.href = '/login'
     throw new Error('Token inválido ou expirado. Faça login novamente.')
   }
