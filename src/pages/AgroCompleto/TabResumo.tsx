@@ -137,8 +137,15 @@ export function TabResumo({ clientId, clienteNome, clienteCidade }: {
 
   // ── Produção da safra selecionada ──────────────────────────────
   const prodSafra = producao.filter(p => p.safra === safra)
-  const areaTotal     = prodSafra.reduce((s, p) => s + p.area, 0)
-  const areaArrendada = prodSafra.reduce((s, p) => s + p.areaArrendada, 0)
+
+  // Soja + Milho 2ª + Feijão são cultivados na MESMA terra em rotação.
+  // A área física é a da cultura principal (ordem = 'principal').
+  // Se não houver principal, usa a de maior área. Não somar entre culturas.
+  const principal = prodSafra.find(p => p.ordem === 'principal') ?? prodSafra.reduce<AgroProducao | undefined>(
+    (m, p) => (!m || p.area > m.area) ? p : m, undefined
+  )
+  const areaTotal     = principal?.area ?? 0
+  const areaArrendada = principal?.areaArrendada ?? 0
   const areaPropria   = areaTotal - areaArrendada
   const pctArrendada  = areaTotal > 0 ? (areaArrendada / areaTotal) * 100 : 0
 
