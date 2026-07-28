@@ -608,14 +608,14 @@ export function TabContratos({ clientId }: { clientId: string }) {
             Filtros
             {filtrosAtivos > 0 && <span className="bg-af-green text-white text-xs rounded-full w-4 h-4 flex items-center justify-center leading-none">{filtrosAtivos}</span>}
           </button>
-          <input ref={fileRef} type="file" accept=".pdf" className="hidden" onChange={handleImportPdf} />
+          <input ref={fileRef} type="file" accept=".pdf,.xlsx,.xls" className="hidden" onChange={handleImportPdf} />
           <button
             onClick={() => fileRef.current?.click()}
             disabled={importing}
             className="flex items-center gap-2 border border-af-green text-af-green rounded-xl px-4 py-2 text-sm font-semibold hover:bg-af-green/5 disabled:opacity-60"
           >
             {importing ? <Loader2 size={15} className="animate-spin" /> : <FileUp size={15} />}
-            {importing ? 'Lendo...' : 'Importar PDF'}
+            {importing ? 'Lendo...' : 'Importar PDF / Excel'}
           </button>
           <button onClick={() => { setPrefill(undefined); setModal('new') }} className="flex items-center gap-2 bg-af-green text-white rounded-xl px-4 py-2 text-sm font-semibold hover:bg-af-green-light">
             <Plus size={15} /> Novo Contrato
