@@ -327,10 +327,6 @@ export function TabResumo({ clientId, clienteNome, clienteCidade }: {
                   })}
                 </tbody>
               </table>
-              <div className="bg-gray-50 rounded-xl p-3 flex justify-between text-xs">
-                <span className="text-gray-500">Custo médio/ha</span>
-                <span className="font-bold text-gray-800">{fmtBRL(custoMedioHa)}/ha</span>
-              </div>
             </div>
           )}
         </Section>
