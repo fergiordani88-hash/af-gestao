@@ -97,7 +97,7 @@ function IndiceRow({ label, value, status, tooltip }: { label: string; value: st
   )
 }
 
-const SAFRA_ATUAL = '2025/26'
+const SAFRAS = ['2025/26', '2026/27']
 
 export function TabResumo({ clientId, clienteNome, clienteCidade }: {
   clientId: string; clienteNome?: string; clienteCidade?: string
@@ -108,7 +108,7 @@ export function TabResumo({ clientId, clienteNome, clienteCidade }: {
   const [totalEndividamento, setTotalEndividamento] = useState(0)
   const [saldoCaixa, setSaldoCaixa] = useState<number | null>(null)
   const [loading, setLoading] = useState(true)
-  const safra = SAFRA_ATUAL
+  const [safra, setSafra] = useState('2025/26')
 
   useEffect(() => {
     setLoading(true)
@@ -225,9 +225,22 @@ export function TabResumo({ clientId, clienteNome, clienteCidade }: {
         </div>
       </div>
 
-      {/* Indicador de safra */}
+      {/* Seletor de safra */}
       <div className="flex items-center gap-3">
-        <span className="bg-af-green text-white text-xs font-bold px-3 py-1 rounded-lg">Safra {SAFRA_ATUAL}</span>
+        <label className="text-xs font-semibold text-gray-600">Safra:</label>
+        <div className="flex gap-1">
+          {SAFRAS.map(s => (
+            <button
+              key={s}
+              onClick={() => setSafra(s)}
+              className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all ${
+                safra === s ? 'bg-af-green text-white shadow' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+            >
+              {s}
+            </button>
+          ))}
+        </div>
         {!hasProducao && (
           <span className="text-xs text-amber-600 font-medium">⚠ Sem dados lançados para esta safra</span>
         )}
