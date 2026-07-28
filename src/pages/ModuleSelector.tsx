@@ -62,8 +62,8 @@ const MODULES: {
 ]
 
 const MODULE_PATHS: Record<AppModule, string> = {
-  agro: '/',
-  empresarial: '/',
+  agro: '/agro-completo',
+  empresarial: '/pj-completo',
   pay: '/pay',
   consultoria: '/',
 }
@@ -77,7 +77,13 @@ export function ModuleSelector() {
 
   const handleSelect = (mod: AppModule) => {
     setCurrentModule(mod)
-    navigate(MODULE_PATHS[mod])
+    // cliente_rural e cliente_empresa vão para área do cliente
+    const isClient = user?.role === 'cliente_rural' || user?.role === 'cliente_empresa'
+    if (isClient && (mod === 'agro' || mod === 'empresarial')) {
+      navigate('/area-cliente')
+    } else {
+      navigate(MODULE_PATHS[mod])
+    }
   }
 
   return (
