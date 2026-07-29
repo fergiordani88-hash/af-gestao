@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import {
   Sprout, CreditCard, Shield, TrendingUp, TrendingDown,
-  MapPin, BarChart2, AlertTriangle, CheckCircle, Info, Activity, FileDown
+  MapPin, BarChart2, AlertTriangle, CheckCircle, Info, Activity, FileDown, Target
 } from 'lucide-react'
 import { agroApi, type AgroProducao, type AgroPatrimonio, type AgroParcela } from '../../services/agroApi'
 import { usePDF } from '../../pdf/usePDF'
@@ -179,6 +179,23 @@ export function TabResumo({ clientId, clienteNome, clienteCidade }: {
   const solvencia     = totalEndividamento > 0 ? patrimonioLiqPat / totalEndividamento : Infinity
   const endivReceita  = receitaBruta > 0 ? totalEndividamento / receitaBruta : 0
   const capPagamento  = servicoAnual > 0 ? resultadoLiq / servicoAnual : Infinity
+
+  // ── Capacidade de Pagamento (exceto custeio) ───────────────────
+  const MODALIDADES_CUSTEIO = ['Custeio', 'CPR']
+  const contratosCusteioIds = new Set(
+    contratos.filter(c => MODALIDADES_CUSTEIO.includes(c.modalidade)).map((c: any) => c.id)
+  )
+  const servicoCusteioAnual  = parcelasAnoAtual.filter(p => contratosCusteioIds.has(p.contratoId)).reduce((s, p) => s + p.valorParcela, 0)
+  const servicoSemCusteioAnual = servicoAnual - servicoCusteioAnual
+  const endivCusteio   = contratos.filter((c: any) => MODALIDADES_CUSTEIO.includes(c.modalidade)).reduce((s: number, c: any) => s + c.valorTomado, 0)
+  const endivSemCusteio = totalEndividamento - endivCusteio
+
+  // Comprometimento da receita líquida com serviço exceto custeio
+  const comprometimentoPct = resultadoLiq > 0 ? (servicoSemCusteioAnual / resultadoLiq) * 100 : 0
+  const capMax30 = resultadoLiq * 0.30  // limite saudável
+  const capMax50 = resultadoLiq * 0.50  // limite crítico
+  const margemDisponivel = capMax30 - servicoSemCusteioAnual  // positivo = folga; negativo = excedeu
+  const statusCapEndiv: Status = comprometimentoPct <= 30 ? 'ok' : comprometimentoPct <= 50 ? 'atencao' : 'risco'
 
   const statusAlavancagem: Status = alavancagem < 30 ? 'ok' : alavancagem < 50 ? 'atencao' : 'risco'
   const statusSolvencia:   Status = solvencia > 2   ? 'ok' : solvencia > 1   ? 'atencao' : 'risco'
@@ -713,6 +730,178 @@ export function TabResumo({ clientId, clienteNome, clienteCidade }: {
           )}
         </Section>
       </div>
+
+      {/* ── Capacidade de Pagamento & Ponto de Equilíbrio ─────────── */}
+      {(parcelas.length > 0 || hasProducao) && (
+        <Section title="Capacidade de Pagamento & Ponto de Equilíbrio do Endividamento" icon={Target} color="text-violet-600">
+          <div className="space-y-5">
+
+            {/* Contexto: por que separar custeio */}
+            <div className="bg-violet-50 border border-violet-100 rounded-xl px-4 py-3 text-xs text-violet-700">
+              <strong>Como funciona:</strong> O custeio (Custeio + CPR) financia a própria atividade e já está previsto nos custos de produção — ele não compromete o resultado líquido. O que realmente impacta a capacidade de pagamento é o <strong>endividamento exceto custeio</strong> (investimentos, repactuações, BNDES, Finame etc.), pois precisa ser pago com o resultado líquido da operação.
+            </div>
+
+            {/* Divisão custeio vs exceto custeio */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
+                <p className="text-xs font-bold text-amber-700 uppercase tracking-wide mb-2">Custeio (Custeio + CPR)</p>
+                <p className="text-xs text-amber-600 mb-3">Vinculado à atividade produtiva — não entra no cálculo de capacidade</p>
+                <div className="space-y-1.5">
+                  <div className="flex justify-between text-xs">
+                    <span className="text-gray-600">Saldo devedor</span>
+                    <span className="font-bold text-amber-800">{fmtBRL(endivCusteio)}</span>
+                  </div>
+                  <div className="flex justify-between text-xs">
+                    <span className="text-gray-600">Parcelas em {anoAtual}</span>
+                    <span className="font-semibold text-amber-700">{fmtBRL(servicoCusteioAnual)}</span>
+                  </div>
+                  <div className="flex justify-between text-xs">
+                    <span className="text-gray-600">Contratos</span>
+                    <span className="text-gray-700">{contratos.filter((c: any) => MODALIDADES_CUSTEIO.includes(c.modalidade)).length}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className={`rounded-xl border p-4 ${statusCapEndiv === 'ok' ? 'border-green-200 bg-green-50' : statusCapEndiv === 'atencao' ? 'border-amber-200 bg-amber-50' : 'border-red-200 bg-red-50'}`}>
+                <p className={`text-xs font-bold uppercase tracking-wide mb-2 ${statusCapEndiv === 'ok' ? 'text-green-700' : statusCapEndiv === 'atencao' ? 'text-amber-700' : 'text-red-700'}`}>
+                  Exceto Custeio (Investimento, BNDES, Repactuação...)
+                </p>
+                <p className="text-xs text-gray-500 mb-3">Impacta diretamente a capacidade de pagamento</p>
+                <div className="space-y-1.5">
+                  <div className="flex justify-between text-xs">
+                    <span className="text-gray-600">Saldo devedor</span>
+                    <span className="font-bold text-gray-900">{fmtBRL(endivSemCusteio)}</span>
+                  </div>
+                  <div className="flex justify-between text-xs">
+                    <span className="text-gray-600">Parcelas em {anoAtual}</span>
+                    <span className="font-semibold text-gray-900">{fmtBRL(servicoSemCusteioAnual)}</span>
+                  </div>
+                  <div className="flex justify-between text-xs">
+                    <span className="text-gray-600">Contratos</span>
+                    <span className="text-gray-700">{contratos.filter((c: any) => !MODALIDADES_CUSTEIO.includes(c.modalidade)).length}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Ponto de equilíbrio visual */}
+            {hasProducao && resultadoLiq > 0 && (
+              <div className="space-y-3">
+                <p className="text-xs font-bold text-gray-600 uppercase tracking-wide">Comprometimento da Receita Líquida com Serviço Exceto Custeio</p>
+
+                {/* Barra de capacidade */}
+                <div className="relative">
+                  <div className="h-8 bg-gray-100 rounded-xl overflow-hidden flex">
+                    {/* Porção comprometida */}
+                    <div
+                      className={`h-full transition-all ${comprometimentoPct > 50 ? 'bg-red-500' : comprometimentoPct > 30 ? 'bg-amber-400' : 'bg-emerald-500'}`}
+                      style={{ width: `${Math.min(comprometimentoPct, 100)}%` }}
+                    />
+                  </div>
+                  {/* Marcador 30% */}
+                  <div className="absolute top-0 h-8 border-l-2 border-dashed border-emerald-600" style={{ left: '30%' }}>
+                    <span className="absolute -top-5 -translate-x-1/2 text-xs font-bold text-emerald-600 whitespace-nowrap">30%</span>
+                  </div>
+                  {/* Marcador 50% */}
+                  <div className="absolute top-0 h-8 border-l-2 border-dashed border-red-500" style={{ left: '50%' }}>
+                    <span className="absolute -top-5 -translate-x-1/2 text-xs font-bold text-red-500 whitespace-nowrap">50%</span>
+                  </div>
+                  {/* Valor atual */}
+                  <div className="mt-1 flex justify-between text-xs text-gray-400">
+                    <span>0%</span>
+                    <span className={`font-bold text-sm ${statusCapEndiv === 'ok' ? 'text-emerald-600' : statusCapEndiv === 'atencao' ? 'text-amber-600' : 'text-red-600'}`}>
+                      {fmtN(comprometimentoPct, 1)}% comprometido
+                    </span>
+                    <span>100%</span>
+                  </div>
+                </div>
+
+                {/* Tabela ponto de equilíbrio */}
+                <div className="border border-gray-100 rounded-xl overflow-hidden">
+                  <table className="w-full text-xs">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="text-left px-4 py-2.5 font-semibold text-gray-500 uppercase">Nível</th>
+                        <th className="text-right px-4 py-2.5 font-semibold text-gray-500 uppercase">Parcelas máx./ano</th>
+                        <th className="text-right px-4 py-2.5 font-semibold text-gray-500 uppercase">% da rec. líquida</th>
+                        <th className="text-right px-4 py-2.5 font-semibold text-gray-500 uppercase">Situação atual</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-50">
+                      <tr className="bg-emerald-50/60">
+                        <td className="px-4 py-2.5 font-semibold text-emerald-700">Saudável (ponto de equilíbrio)</td>
+                        <td className="px-4 py-2.5 text-right font-bold text-emerald-700">{fmtBRL(capMax30)}</td>
+                        <td className="px-4 py-2.5 text-right text-emerald-600">até 30%</td>
+                        <td className="px-4 py-2.5 text-right">
+                          {servicoSemCusteioAnual <= capMax30
+                            ? <span className="text-emerald-600 font-semibold">✓ Dentro do limite</span>
+                            : <span className="text-red-600 font-semibold">Excede em {fmtBRL(servicoSemCusteioAnual - capMax30)}</span>
+                          }
+                        </td>
+                      </tr>
+                      <tr className="bg-red-50/40">
+                        <td className="px-4 py-2.5 font-semibold text-red-700">Limite crítico</td>
+                        <td className="px-4 py-2.5 text-right font-bold text-red-700">{fmtBRL(capMax50)}</td>
+                        <td className="px-4 py-2.5 text-right text-red-600">até 50%</td>
+                        <td className="px-4 py-2.5 text-right">
+                          {servicoSemCusteioAnual <= capMax50
+                            ? <span className="text-amber-600 font-semibold">Dentro do limite crítico</span>
+                            : <span className="text-red-700 font-bold">⚠ Excede em {fmtBRL(servicoSemCusteioAnual - capMax50)}</span>
+                          }
+                        </td>
+                      </tr>
+                      <tr className="bg-blue-50/40 font-semibold">
+                        <td className="px-4 py-2.5 text-blue-700">Situação atual (exceto custeio)</td>
+                        <td className="px-4 py-2.5 text-right text-blue-800">{fmtBRL(servicoSemCusteioAnual)}</td>
+                        <td className="px-4 py-2.5 text-right">
+                          <span className={`font-bold ${statusCapEndiv === 'ok' ? 'text-emerald-600' : statusCapEndiv === 'atencao' ? 'text-amber-600' : 'text-red-600'}`}>
+                            {fmtN(comprometimentoPct, 1)}%
+                          </span>
+                        </td>
+                        <td className="px-4 py-2.5 text-right">
+                          <Badge status={statusCapEndiv} label={statusCapEndiv === 'ok' ? 'Saudável' : statusCapEndiv === 'atencao' ? 'Atenção' : 'Risco'} />
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Folga ou déficit */}
+                <div className={`rounded-xl p-4 flex items-center justify-between ${margemDisponivel >= 0 ? 'bg-emerald-50 border border-emerald-200' : 'bg-red-50 border border-red-200'}`}>
+                  <div>
+                    <p className={`text-xs font-bold uppercase tracking-wide ${margemDisponivel >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>
+                      {margemDisponivel >= 0 ? 'Margem disponível para novos compromissos' : 'Endividamento excede o ponto de equilíbrio'}
+                    </p>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      {margemDisponivel >= 0
+                        ? `Ainda há espaço para assumir até ${fmtBRL(margemDisponivel)}/ano em novas parcelas (exceto custeio) sem sair da zona saudável`
+                        : `Para atingir o ponto de equilíbrio, o serviço exceto custeio precisaria reduzir ${fmtBRL(Math.abs(margemDisponivel))}/ano — considere reestruturação`
+                      }
+                    </p>
+                  </div>
+                  <span className={`text-2xl font-bold ml-4 shrink-0 ${margemDisponivel >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                    {margemDisponivel >= 0 ? '+' : ''}{fmtBRL(margemDisponivel)}
+                  </span>
+                </div>
+
+                {/* Receita líquida de referência */}
+                <div className="text-xs text-gray-400 text-center">
+                  Receita líquida de referência (safra {safra}): <strong className="text-gray-600">{fmtBRL(resultadoLiq)}</strong>
+                </div>
+              </div>
+            )}
+
+            {!hasProducao && (
+              <p className="text-sm text-gray-400 text-center py-4">Lance os dados de produção da safra para calcular o ponto de equilíbrio</p>
+            )}
+            {hasProducao && resultadoLiq <= 0 && (
+              <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-xs text-red-700">
+                ⚠ Receita líquida negativa ou zero — não é possível calcular capacidade de pagamento. Revise os dados de produção e custos.
+              </div>
+            )}
+          </div>
+        </Section>
+      )}
 
       {/* Análise de alavancagem e solvência */}
       {/* Análise por Hectare */}
