@@ -373,6 +373,8 @@ export function TabContratos({ clientId }: { clientId: string }) {
   const fileRef = useRef<HTMLInputElement>(null)
   const [anoExpandido, setAnoExpandido] = useState<string | null>(null)
   const [contratoExpandido, setContratoExpandido] = useState<string | null>(null)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [deletingBulk, setDeletingBulk] = useState(false)
 
   // Filtros
   const [showFilters, setShowFilters] = useState(false)
@@ -512,7 +514,35 @@ export function TabContratos({ clientId }: { clientId: string }) {
   const handleDelete = async (id: string) => {
     if (!confirm('Excluir este contrato?')) return
     await agroApi.contratos.delete(id)
+    setSelectedIds(prev => { const s = new Set(prev); s.delete(id); return s })
     load()
+  }
+
+  const handleBulkDelete = async () => {
+    const ids = Array.from(selectedIds)
+    if (ids.length === 0) return
+    if (!confirm(`Excluir ${ids.length} contrato(s) selecionado(s)? Esta ação não pode ser desfeita.`)) return
+    setDeletingBulk(true)
+    await Promise.allSettled(ids.map(id => agroApi.contratos.delete(id)))
+    setSelectedIds(new Set())
+    setDeletingBulk(false)
+    load()
+  }
+
+  const toggleSelect = (id: string) => setSelectedIds(prev => {
+    const s = new Set(prev)
+    s.has(id) ? s.delete(id) : s.add(id)
+    return s
+  })
+
+  const toggleSelectAll = () => {
+    const visibleIds = contratosFiltrados.map(c => c.id!).filter(Boolean)
+    const allSelected = visibleIds.every(id => selectedIds.has(id))
+    if (allSelected) {
+      setSelectedIds(prev => { const s = new Set(prev); visibleIds.forEach(id => s.delete(id)); return s })
+    } else {
+      setSelectedIds(prev => { const s = new Set(prev); visibleIds.forEach(id => s.add(id)); return s })
+    }
   }
 
   const getToken = () => {
@@ -617,6 +647,16 @@ export function TabContratos({ clientId }: { clientId: string }) {
             {importing ? <Loader2 size={15} className="animate-spin" /> : <FileUp size={15} />}
             {importing ? 'Lendo...' : 'Importar PDF / Excel'}
           </button>
+          {selectedIds.size > 0 && (
+            <button
+              onClick={handleBulkDelete}
+              disabled={deletingBulk}
+              className="flex items-center gap-2 bg-red-500 hover:bg-red-600 disabled:opacity-60 text-white rounded-xl px-4 py-2 text-sm font-semibold"
+            >
+              {deletingBulk ? <Loader2 size={15} className="animate-spin" /> : <Trash2 size={15} />}
+              Excluir {selectedIds.size} selecionado(s)
+            </button>
+          )}
           <button onClick={() => { setPrefill(undefined); setModal('new') }} className="flex items-center gap-2 bg-af-green text-white rounded-xl px-4 py-2 text-sm font-semibold hover:bg-af-green-light">
             <Plus size={15} /> Novo Contrato
           </button>
@@ -778,6 +818,14 @@ export function TabContratos({ clientId }: { clientId: string }) {
             <table className="w-full text-xs">
               <thead className="sticky top-0 z-10">
                 <tr className="bg-gray-50 border-b">
+                  <th className="px-3 py-2 w-8">
+                    <button onClick={toggleSelectAll}>
+                      {contratosFiltrados.length > 0 && contratosFiltrados.every(c => selectedIds.has(c.id!))
+                        ? <CheckSquare size={14} className="text-af-green" />
+                        : <Square size={14} className="text-gray-400" />
+                      }
+                    </button>
+                  </th>
                   {([
                     { label: 'Modalidade',      key: 'modalidade' },
                     { label: 'Banco',           key: 'banco' },
@@ -815,7 +863,15 @@ export function TabContratos({ clientId }: { clientId: string }) {
                 {contratosFiltrados.map(c => {
                 const parcContrato = cronograma?.parcelas.filter(p => p.contratoId === c.id) ?? []
                 return (<>
-                  <tr key={c.id} className="hover:bg-gray-50/50 group">
+                  <tr key={c.id} className={`hover:bg-gray-50/50 group ${selectedIds.has(c.id!) ? 'bg-red-50/30' : ''}`}>
+                    <td className="px-3 py-2.5">
+                      <button onClick={() => c.id && toggleSelect(c.id)}>
+                        {selectedIds.has(c.id!)
+                          ? <CheckSquare size={14} className="text-red-500" />
+                          : <Square size={14} className="text-gray-300 group-hover:text-gray-400" />
+                        }
+                      </button>
+                    </td>
                     <td className="px-3 py-2.5 font-medium text-gray-900 whitespace-nowrap">{c.modalidade}</td>
                     <td className="px-3 py-2.5 text-gray-700">{c.banco}</td>
                     <td className="px-3 py-2.5 text-gray-600">
@@ -865,7 +921,7 @@ export function TabContratos({ clientId }: { clientId: string }) {
                   </tr>
                   {contratoExpandido === c.id && (
                     <tr key={`exp-${c.id}`}>
-                      <td colSpan={15} className="px-4 py-3 bg-blue-50/40 border-b border-blue-100">
+                      <td colSpan={16} className="px-4 py-3 bg-blue-50/40 border-b border-blue-100">
                         <div className="text-xs font-semibold text-blue-700 mb-2 flex items-center gap-2">
                           <TableProperties size={13} />
                           Tabela de Amortização — {c.banco} {c.numeroContrato ?? ''} ({c.sistemaAmortizacao ?? 'Price'})
