@@ -114,6 +114,8 @@ export function TabResumo({ clientId, clienteNome, clienteCidade }: {
   const [loading, setLoading] = useState(true)
   const [safra, setSafra] = useState('2025/26')
   const [exportando, setExportando] = useState(false)
+  const [limSaudavel, setLimSaudavel] = useState(30)
+  const [limCritico,  setLimCritico]  = useState(50)
 
   useEffect(() => {
     setLoading(true)
@@ -192,10 +194,10 @@ export function TabResumo({ clientId, clienteNome, clienteCidade }: {
 
   // Comprometimento da receita líquida com serviço exceto custeio
   const comprometimentoPct = resultadoLiq > 0 ? (servicoSemCusteioAnual / resultadoLiq) * 100 : 0
-  const capMax30 = resultadoLiq * 0.30  // limite saudável
-  const capMax50 = resultadoLiq * 0.50  // limite crítico
-  const margemDisponivel = capMax30 - servicoSemCusteioAnual  // positivo = folga; negativo = excedeu
-  const statusCapEndiv: Status = comprometimentoPct <= 30 ? 'ok' : comprometimentoPct <= 50 ? 'atencao' : 'risco'
+  const capMaxSaudavel = resultadoLiq * (limSaudavel / 100)
+  const capMaxCritico  = resultadoLiq * (limCritico  / 100)
+  const margemDisponivel = capMaxSaudavel - servicoSemCusteioAnual
+  const statusCapEndiv: Status = comprometimentoPct <= limSaudavel ? 'ok' : comprometimentoPct <= limCritico ? 'atencao' : 'risco'
 
   const statusAlavancagem: Status = alavancagem < 30 ? 'ok' : alavancagem < 50 ? 'atencao' : 'risco'
   const statusSolvencia:   Status = solvencia > 2   ? 'ok' : solvencia > 1   ? 'atencao' : 'risco'
@@ -798,13 +800,13 @@ export function TabResumo({ clientId, clienteNome, clienteCidade }: {
                       style={{ width: `${Math.min(comprometimentoPct, 100)}%` }}
                     />
                   </div>
-                  {/* Marcador 30% */}
-                  <div className="absolute top-0 h-8 border-l-2 border-dashed border-emerald-600" style={{ left: '30%' }}>
-                    <span className="absolute -top-5 -translate-x-1/2 text-xs font-bold text-emerald-600 whitespace-nowrap">30%</span>
+                  {/* Marcador saudável */}
+                  <div className="absolute top-0 h-8 border-l-2 border-dashed border-emerald-600" style={{ left: `${limSaudavel}%` }}>
+                    <span className="absolute -top-5 -translate-x-1/2 text-xs font-bold text-emerald-600 whitespace-nowrap">{limSaudavel}%</span>
                   </div>
-                  {/* Marcador 50% */}
-                  <div className="absolute top-0 h-8 border-l-2 border-dashed border-red-500" style={{ left: '50%' }}>
-                    <span className="absolute -top-5 -translate-x-1/2 text-xs font-bold text-red-500 whitespace-nowrap">50%</span>
+                  {/* Marcador crítico */}
+                  <div className="absolute top-0 h-8 border-l-2 border-dashed border-red-500" style={{ left: `${limCritico}%` }}>
+                    <span className="absolute -top-5 -translate-x-1/2 text-xs font-bold text-red-500 whitespace-nowrap">{limCritico}%</span>
                   </div>
                   {/* Valor atual */}
                   <div className="mt-1 flex justify-between text-xs text-gray-400">
@@ -823,30 +825,52 @@ export function TabResumo({ clientId, clienteNome, clienteCidade }: {
                       <tr>
                         <th className="text-left px-4 py-2.5 font-semibold text-gray-500 uppercase">Nível</th>
                         <th className="text-right px-4 py-2.5 font-semibold text-gray-500 uppercase">Parcelas máx./ano</th>
-                        <th className="text-right px-4 py-2.5 font-semibold text-gray-500 uppercase">% da rec. líquida</th>
+                        <th className="text-right px-4 py-2.5 font-semibold text-gray-500 uppercase">Limite (%)</th>
                         <th className="text-right px-4 py-2.5 font-semibold text-gray-500 uppercase">Situação atual</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-50">
                       <tr className="bg-emerald-50/60">
                         <td className="px-4 py-2.5 font-semibold text-emerald-700">Saudável (ponto de equilíbrio)</td>
-                        <td className="px-4 py-2.5 text-right font-bold text-emerald-700">{fmtBRL(capMax30)}</td>
-                        <td className="px-4 py-2.5 text-right text-emerald-600">até 30%</td>
+                        <td className="px-4 py-2.5 text-right font-bold text-emerald-700">{fmtBRL(capMaxSaudavel)}</td>
                         <td className="px-4 py-2.5 text-right">
-                          {servicoSemCusteioAnual <= capMax30
+                          <div className="flex items-center justify-end gap-1">
+                            <span className="text-gray-400">até</span>
+                            <input
+                              type="number" min={1} max={99}
+                              value={limSaudavel}
+                              onChange={e => setLimSaudavel(Math.min(Number(e.target.value), limCritico - 1))}
+                              className="w-12 text-center border border-emerald-300 rounded-lg px-1 py-0.5 text-xs font-bold text-emerald-700 focus:outline-none focus:ring-1 focus:ring-emerald-400 bg-white"
+                            />
+                            <span className="text-emerald-600 font-bold">%</span>
+                          </div>
+                        </td>
+                        <td className="px-4 py-2.5 text-right">
+                          {servicoSemCusteioAnual <= capMaxSaudavel
                             ? <span className="text-emerald-600 font-semibold">✓ Dentro do limite</span>
-                            : <span className="text-red-600 font-semibold">Excede em {fmtBRL(servicoSemCusteioAnual - capMax30)}</span>
+                            : <span className="text-red-600 font-semibold">Excede em {fmtBRL(servicoSemCusteioAnual - capMaxSaudavel)}</span>
                           }
                         </td>
                       </tr>
                       <tr className="bg-red-50/40">
                         <td className="px-4 py-2.5 font-semibold text-red-700">Limite crítico</td>
-                        <td className="px-4 py-2.5 text-right font-bold text-red-700">{fmtBRL(capMax50)}</td>
-                        <td className="px-4 py-2.5 text-right text-red-600">até 50%</td>
+                        <td className="px-4 py-2.5 text-right font-bold text-red-700">{fmtBRL(capMaxCritico)}</td>
                         <td className="px-4 py-2.5 text-right">
-                          {servicoSemCusteioAnual <= capMax50
+                          <div className="flex items-center justify-end gap-1">
+                            <span className="text-gray-400">até</span>
+                            <input
+                              type="number" min={1} max={99}
+                              value={limCritico}
+                              onChange={e => setLimCritico(Math.max(Number(e.target.value), limSaudavel + 1))}
+                              className="w-12 text-center border border-red-300 rounded-lg px-1 py-0.5 text-xs font-bold text-red-700 focus:outline-none focus:ring-1 focus:ring-red-400 bg-white"
+                            />
+                            <span className="text-red-600 font-bold">%</span>
+                          </div>
+                        </td>
+                        <td className="px-4 py-2.5 text-right">
+                          {servicoSemCusteioAnual <= capMaxCritico
                             ? <span className="text-amber-600 font-semibold">Dentro do limite crítico</span>
-                            : <span className="text-red-700 font-bold">⚠ Excede em {fmtBRL(servicoSemCusteioAnual - capMax50)}</span>
+                            : <span className="text-red-700 font-bold">⚠ Excede em {fmtBRL(servicoSemCusteioAnual - capMaxCritico)}</span>
                           }
                         </td>
                       </tr>
