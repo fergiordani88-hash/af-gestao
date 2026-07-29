@@ -183,13 +183,14 @@ export function TabResumo({ clientId, clienteNome, clienteCidade }: {
   const capPagamento  = servicoAnual > 0 ? resultadoLiq / servicoAnual : Infinity
 
   // ── Capacidade de Pagamento (exceto custeio) ───────────────────
-  const MODALIDADES_CUSTEIO = ['Custeio', 'CPR']
+  const isCusteio = (modalidade: string) =>
+    ['custeio', 'cpr'].some(k => modalidade.toLowerCase().includes(k))
   const contratosCusteioIds = new Set(
-    contratos.filter(c => MODALIDADES_CUSTEIO.includes(c.modalidade)).map((c: any) => c.id)
+    contratos.filter((c: any) => isCusteio(c.modalidade)).map((c: any) => c.id)
   )
-  const servicoCusteioAnual  = parcelasAnoAtual.filter(p => contratosCusteioIds.has(p.contratoId)).reduce((s, p) => s + p.valorParcela, 0)
+  const servicoCusteioAnual    = parcelasAnoAtual.filter(p => contratosCusteioIds.has(p.contratoId)).reduce((s, p) => s + p.valorParcela, 0)
   const servicoSemCusteioAnual = servicoAnual - servicoCusteioAnual
-  const endivCusteio   = contratos.filter((c: any) => MODALIDADES_CUSTEIO.includes(c.modalidade)).reduce((s: number, c: any) => s + c.valorTomado, 0)
+  const endivCusteio    = contratos.filter((c: any) => isCusteio(c.modalidade)).reduce((s: number, c: any) => s + c.valorTomado, 0)
   const endivSemCusteio = totalEndividamento - endivCusteio
 
   // Comprometimento da receita líquida com serviço exceto custeio
@@ -759,7 +760,7 @@ export function TabResumo({ clientId, clienteNome, clienteCidade }: {
                   </div>
                   <div className="flex justify-between text-xs">
                     <span className="text-gray-600">Contratos</span>
-                    <span className="text-gray-700">{contratos.filter((c: any) => MODALIDADES_CUSTEIO.includes(c.modalidade)).length}</span>
+                    <span className="text-gray-700">{contratos.filter((c: any) => isCusteio(c.modalidade)).length}</span>
                   </div>
                 </div>
               </div>
@@ -780,7 +781,7 @@ export function TabResumo({ clientId, clienteNome, clienteCidade }: {
                   </div>
                   <div className="flex justify-between text-xs">
                     <span className="text-gray-600">Contratos</span>
-                    <span className="text-gray-700">{contratos.filter((c: any) => !MODALIDADES_CUSTEIO.includes(c.modalidade)).length}</span>
+                    <span className="text-gray-700">{contratos.filter((c: any) => !isCusteio(c.modalidade)).length}</span>
                   </div>
                 </div>
               </div>
