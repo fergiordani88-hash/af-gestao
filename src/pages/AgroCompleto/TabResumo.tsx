@@ -362,7 +362,6 @@ export function TabResumo({ clientId, clienteNome, clienteCidade }: {
 
   // ── Exportar Relatório Completo PDF ────────────────────────────
   const handleExportarRelatorio = async () => {
-    console.log('PDF: clique registrado')
     setExportando(true)
     try {
       // Busca dados adicionais para o relatório (projeção e cenários)
@@ -439,6 +438,7 @@ export function TabResumo({ clientId, clienteNome, clienteCidade }: {
         consultorName: 'AF Gestão & Consultoria',
         safra,
         dataGeracao:   new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' }),
+        horaGeracao:   new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
         culturas:      prodSafra.map(p => ({ ...p, custoItens: p.custoItens })),
         areaTotal,
         areaArrendada,
