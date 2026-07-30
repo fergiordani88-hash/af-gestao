@@ -59,12 +59,21 @@ function calcParcelaAtualSAC(c: AgroContrato): number {
   return amort + saldo * i
 }
 
-// Custo Efetivo Total anual: taxa contratual + índice de referência (quando pós-fixado)
+// Taxa capitalizada anual: spread + índice (pós-fixado) ou taxa nominal (pré-fixado)
+// taxa e spread são armazenados em decimal (0.095 = 9,5%)
 function calcCET(taxa: number, indexador: string | undefined, spread: number | undefined): number {
-  // Pós-fixado: CET = taxa_referência + spread (taxa nominal ignorada, igual ao backend)
-  if (indexador && indexador !== 'Pré-fixado') return taxaRef(indexador) + (spread ?? 0) * 100
-  // Pré-fixado: CET = taxa nominal
-  return taxa * 100
+  if (indexador && indexador !== 'Pré-fixado')
+    return (taxaRef(indexador) + (spread ?? 0)) * 100  // retorna em %
+  return taxa * 100  // retorna em %
+}
+
+// Exibe taxa nominal como string legível
+function taxaNominalLabel(taxa: number, indexador: string | undefined, spread: number | undefined): string {
+  if (indexador && indexador !== 'Pré-fixado') {
+    const s = ((spread ?? 0) * 100).toFixed(2).replace('.', ',')
+    return `${indexador} + ${s}% a.a.`
+  }
+  return `${(taxa * 100).toFixed(2).replace('.', ',')}% a.a.`
 }
 
 function isPosFix(indexador?: string) {
@@ -79,7 +88,7 @@ function amortLabel(c: { indexador?: string; sistemaAmortizacao?: string }) {
 function calcParcelaCorrigida(valorParcela: number, indexador: string | undefined, spread: number | undefined, periodicidade: string): number {
   if (!valorParcela || !indexador || indexador === 'Pré-fixado') return valorParcela
   const periodos = periodicidade === 'Mensal' ? 12 : periodicidade === 'Semestral' ? 2 : 1
-  const taxaAnual = taxaRef(indexador) / 100 + (spread ?? 0)
+  const taxaAnual = taxaRef(indexador) + (spread ?? 0)  // ambos em decimal
   const taxaPeriodo = Math.pow(1 + taxaAnual, 1 / periodos) - 1
   return valorParcela * (1 + taxaPeriodo)
 }
@@ -899,7 +908,7 @@ export function TabContratos({ clientId }: { clientId: string }) {
                     { label: 'Parc. Atual',     key: 'parcelaAtual' },
                     { label: 'Period.',         key: 'periodicidade' },
                     { label: 'Amort.',          key: 'sistemaAmortizacao' },
-                    { label: 'CET a.a.',        key: 'cet' },
+                    { label: 'Taxa / Correção',  key: 'cet' },
                     { label: 'Próx. Venc.',     key: 'vencimento' },
                     { label: 'Parc. Nominal',   key: 'valorParcela' },
                     { label: 'Parc. c/ Índice', key: null },
@@ -952,11 +961,27 @@ export function TabContratos({ clientId }: { clientId: string }) {
                         {amortLabel(c)}
                       </span>
                     </td>
-                    <td className="px-3 py-2.5 text-gray-600 whitespace-nowrap">
-                      <span className="font-semibold">{calcCET(c.taxa, c.indexador, c.spreadIndexador).toFixed(2)}%</span>
-                      {c.indexador && c.indexador !== 'Pré-fixado' && (
-                        <span className="ml-1 text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full">{c.indexador}</span>
-                      )}
+                    <td className="px-3 py-2.5 whitespace-nowrap">
+                      <div className="flex flex-col gap-0.5">
+                        {/* Taxa nominal */}
+                        <span className="font-semibold text-gray-900 text-xs">
+                          {taxaNominalLabel(c.taxa, c.indexador, c.spreadIndexador)}
+                        </span>
+                        {/* Correção monetária */}
+                        {c.indexador && c.indexador !== 'Pré-fixado' ? (
+                          <span className="text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full w-fit font-medium">
+                            Com correção {c.indexador}
+                          </span>
+                        ) : (
+                          <span className="text-xs text-gray-400">Sem correção</span>
+                        )}
+                        {/* Taxa capitalizada total (só para pós-fixados) */}
+                        {c.indexador && c.indexador !== 'Pré-fixado' && (
+                          <span className="text-xs text-gray-500">
+                            Cap.: <span className="font-medium text-gray-700">{calcCET(c.taxa, c.indexador, c.spreadIndexador).toFixed(2).replace('.', ',')}% a.a.</span>
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className={`px-3 py-2.5 font-medium whitespace-nowrap ${new Date(c.vencimento) < new Date() ? 'text-red-600' : 'text-gray-900'}`}>
                       {fmtDate(c.vencimento)}
