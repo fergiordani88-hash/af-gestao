@@ -1,4 +1,5 @@
-import { Document, Page, View, Text, StyleSheet } from '@react-pdf/renderer'
+import { Document, Page, View, Text, StyleSheet, Image } from '@react-pdf/renderer'
+import logoAF from '../assets/logo-af.png'
 
 // ── Types ──────────────────────────────────────────────────────────────────
 export interface RelCultura {
@@ -852,17 +853,8 @@ export function RelatorioCompletoAgroPDF({ data }: { data: RelatorioCompletoAgro
 
           {/* Parecer — panel + text */}
           <View style={{ flexDirection: 'row', gap: 14, marginTop: 10 }}>
-            <View style={{ width: 120 }}>
-              <View style={{ ...s.panel, alignItems: 'center', paddingVertical: 20 }}>
-                <Text style={{ fontFamily: 'Times-Roman', fontSize: 28, color: C.gold, marginBottom: 4 }}>AF</Text>
-                <Text style={{ fontFamily: 'Helvetica', fontSize: 7, color: C.white, textAlign: 'center', lineHeight: 1.5, marginBottom: 8 }}>
-                  Gestão &{'\n'}Consultoria
-                </Text>
-                <View style={{ width: 40, height: 0.5, backgroundColor: C.gold, marginBottom: 8 }} />
-                <Text style={{ fontFamily: 'Helvetica', fontSize: 5.5, color: C.gold, textAlign: 'center', letterSpacing: 0.8, textTransform: 'uppercase' }}>
-                  PLANEJAMENTO{'\n'}ESTRATÉGIA{'\n'}RESULTADOS
-                </Text>
-              </View>
+            <View style={{ width: 140, alignItems: 'center', justifyContent: 'center' }}>
+              <Image src={logoAF} style={{ width: 130 }} />
             </View>
             <View style={{ flex: 1 }}>
               <Sec title="Parecer Consultivo" />
