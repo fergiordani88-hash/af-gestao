@@ -54,9 +54,32 @@ export function TabReestruturacao({ clientId }: { clientId: string }) {
   const [receitaAnual, setReceitaAnual] = useState(0)
 
   // Simulação unificada para os contratos selecionados
-  const [simTaxa,    setSimTaxa]    = useState('')   // % a.a.
-  const [simPrazo,   setSimPrazo]   = useState('')   // meses
-  const [simSistema, setSimSistema] = useState<'SAC' | 'Price'>('SAC')
+  const [simTaxa,          setSimTaxa]          = useState('')
+  const [simTipoTaxa,      setSimTipoTaxa]      = useState<'aa' | 'am'>('aa')
+  const [simParcelas,      setSimParcelas]      = useState('')   // número de parcelas
+  const [simPeriodicidade, setSimPeriodicidade] = useState<'Mensal' | 'Semestral' | 'Anual'>('Mensal')
+  const [simIndexador,     setSimIndexador]     = useState<'Pré-fixado' | 'CDI' | 'TR' | 'IPCA'>('Pré-fixado')
+  const [simSistema,       setSimSistema]       = useState<'SAC' | 'Price'>('SAC')
+
+  const TAXAS_REF: Record<string, number> = { CDI: 0.1425, TR: 0.0088, IPCA: 0.0548 }
+
+  // Converte inputs para taxa anual efetiva (decimal)
+  const taxaAnualEfetiva = useMemo(() => {
+    const t = parseFloat(simTaxa) / 100
+    if (isNaN(t)) return null
+    const taxaNominal = simTipoTaxa === 'am' ? Math.pow(1 + t, 12) - 1 : t
+    const taxaBase = simIndexador !== 'Pré-fixado' ? TAXAS_REF[simIndexador] ?? 0 : 0
+    return taxaNominal + taxaBase
+  }, [simTaxa, simTipoTaxa, simIndexador])
+
+  // Converte nº de parcelas para meses equivalentes (para cálculos existentes)
+  const mesesEquivalentes = useMemo(() => {
+    const n = parseInt(simParcelas)
+    if (isNaN(n) || n <= 0) return null
+    if (simPeriodicidade === 'Anual')    return n * 12
+    if (simPeriodicidade === 'Semestral') return n * 6
+    return n // Mensal
+  }, [simParcelas, simPeriodicidade])
 
   useEffect(() => {
     if (!clientId) return
@@ -125,34 +148,32 @@ export function TabReestruturacao({ clientId }: { clientId: string }) {
 
   const sim = useMemo(() => {
     if (selecionados.length === 0) return null
-    const totalSaldo    = selecionados.reduce((s, c) => s + c.saldoDevedor, 0)
-    const servicoAtual  = selecionados.reduce((s, c) => s + c.servicoAnual, 0)
-    const taxaSim  = simTaxa  ? parseFloat(simTaxa)  / 100 : null
-    const prazoSim = simPrazo ? parseInt(simPrazo)         : null
+    const totalSaldo   = selecionados.reduce((s, c) => s + c.saldoDevedor, 0)
+    const servicoAtual = selecionados.reduce((s, c) => s + c.servicoAnual, 0)
 
-    if (!taxaSim || !prazoSim) return { totalSaldo, servicoAtual, novoParcela: null, novoServicoAnual: null }
+    if (!taxaAnualEfetiva || !mesesEquivalentes) return { totalSaldo, servicoAtual, novoParcela: null, novoServicoAnual: null }
 
     const novoParcela = simSistema === 'Price'
-      ? parcelaPrice(totalSaldo, taxaSim, prazoSim)
-      : parcelaSAC1(totalSaldo, taxaSim, prazoSim)
+      ? parcelaPrice(totalSaldo, taxaAnualEfetiva, mesesEquivalentes)
+      : parcelaSAC1(totalSaldo, taxaAnualEfetiva, mesesEquivalentes)
     const novoServicoAnual = simSistema === 'Price'
-      ? novoParcela * Math.min(12, prazoSim)
-      : servicoAnualSAC(totalSaldo, taxaSim, prazoSim)
+      ? novoParcela * Math.min(12, mesesEquivalentes)
+      : servicoAnualSAC(totalSaldo, taxaAnualEfetiva, mesesEquivalentes)
 
     const economia = servicoAtual - novoServicoAnual
     const pctRecAtual  = receitaAnual > 0 ? servicoAtual / receitaAnual * 100 : 0
     const pctRecNovo   = receitaAnual > 0 ? novoServicoAnual / receitaAnual * 100 : 0
-    const totalSaldoGeral = contratos.reduce((s, c) => s + c.saldoDevedor, 0)
-    const servicoGeral    = contratos.reduce((s, c) => s + c.servicoAnual, 0)
+    const totalSaldoGeral  = contratos.reduce((s, c) => s + c.saldoDevedor, 0)
+    const servicoGeral     = contratos.reduce((s, c) => s + c.servicoAnual, 0)
     const novoServiceGeral = servicoGeral - servicoAtual + novoServicoAnual
-    const pctRecNovGeral  = receitaAnual > 0 ? novoServiceGeral / receitaAnual * 100 : 0
+    const pctRecNovGeral   = receitaAnual > 0 ? novoServiceGeral / receitaAnual * 100 : 0
 
     return {
       totalSaldo, servicoAtual, novoParcela, novoServicoAnual,
-      economia, pctRecAtual, pctRecNovo, prazoSim, taxaSim,
+      economia, pctRecAtual, pctRecNovo, prazoSim: mesesEquivalentes, taxaSim: taxaAnualEfetiva,
       totalSaldoGeral, servicoGeral, novoServiceGeral, pctRecNovGeral,
     }
-  }, [selecionados, simTaxa, simPrazo, simSistema, contratos, receitaAnual])
+  }, [selecionados, taxaAnualEfetiva, mesesEquivalentes, simSistema, contratos, receitaAnual])
 
   if (loading) return (
     <div className="flex items-center justify-center py-24 text-gray-400">
@@ -260,26 +281,76 @@ export function TabReestruturacao({ clientId }: { clientId: string }) {
           </div>
 
           <div className="p-5 space-y-5">
-            {/* Inputs */}
-            <div className="grid grid-cols-3 gap-4">
+            {/* Inputs — linha 1 */}
+            <div className="grid grid-cols-2 gap-4">
+              {/* Taxa */}
               <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-1.5">Nova Taxa (% a.a.)</label>
-                <input
-                  type="number" min={0} step={0.5} value={simTaxa}
-                  onChange={e => setSimTaxa(e.target.value)}
-                  placeholder="ex: 8.5"
-                  className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm font-semibold text-center focus:outline-none focus:ring-2 focus:ring-blue-300"
-                />
+                <label className="block text-xs font-semibold text-gray-600 mb-1.5">Nova Taxa (spread/nominal)</label>
+                <div className="flex gap-1">
+                  <input
+                    type="number" min={0} step={0.1} value={simTaxa}
+                    onChange={e => setSimTaxa(e.target.value)}
+                    placeholder="ex: 8.5"
+                    className="flex-1 border border-gray-200 rounded-xl px-3 py-2.5 text-sm font-semibold text-center focus:outline-none focus:ring-2 focus:ring-blue-300"
+                  />
+                  {/* Toggle a.a. / a.m. */}
+                  <div className="flex rounded-xl border border-gray-200 overflow-hidden text-xs font-semibold">
+                    <button
+                      onClick={() => setSimTipoTaxa('aa')}
+                      className={`px-2.5 py-2 transition-colors ${simTipoTaxa === 'aa' ? 'bg-blue-600 text-white' : 'bg-white text-gray-500 hover:bg-gray-50'}`}
+                    >a.a.</button>
+                    <button
+                      onClick={() => setSimTipoTaxa('am')}
+                      className={`px-2.5 py-2 transition-colors ${simTipoTaxa === 'am' ? 'bg-blue-600 text-white' : 'bg-white text-gray-500 hover:bg-gray-50'}`}
+                    >a.m.</button>
+                  </div>
+                </div>
               </div>
+              {/* Indexador */}
               <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-1.5">Novo Prazo (meses)</label>
+                <label className="block text-xs font-semibold text-gray-600 mb-1.5">Indexador</label>
+                <select
+                  value={simIndexador} onChange={e => setSimIndexador(e.target.value as typeof simIndexador)}
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-300 bg-white"
+                >
+                  <option value="Pré-fixado">Pré-fixado</option>
+                  <option value="CDI">CDI (14,25% a.a.)</option>
+                  <option value="TR">TR (0,88% a.a.)</option>
+                  <option value="IPCA">IPCA (5,48% a.a.)</option>
+                </select>
+                {simIndexador !== 'Pré-fixado' && simTaxa && (
+                  <p className="text-xs text-blue-600 mt-1">
+                    Taxa total efetiva: {taxaAnualEfetiva != null ? (taxaAnualEfetiva * 100).toFixed(2).replace('.', ',') + '% a.a.' : '—'}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {/* Inputs — linha 2 */}
+            <div className="grid grid-cols-3 gap-4">
+              {/* Nº de parcelas */}
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1.5">Nº de Parcelas</label>
                 <input
-                  type="number" min={1} step={6} value={simPrazo}
-                  onChange={e => setSimPrazo(e.target.value)}
+                  type="number" min={1} step={1} value={simParcelas}
+                  onChange={e => setSimParcelas(e.target.value)}
                   placeholder="ex: 60"
                   className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm font-semibold text-center focus:outline-none focus:ring-2 focus:ring-blue-300"
                 />
               </div>
+              {/* Periodicidade */}
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1.5">Periodicidade</label>
+                <select
+                  value={simPeriodicidade} onChange={e => setSimPeriodicidade(e.target.value as typeof simPeriodicidade)}
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-300 bg-white"
+                >
+                  <option value="Mensal">Mensal</option>
+                  <option value="Semestral">Semestral</option>
+                  <option value="Anual">Anual</option>
+                </select>
+              </div>
+              {/* Sistema amortização */}
               <div>
                 <label className="block text-xs font-semibold text-gray-600 mb-1.5">Sistema de Amortização</label>
                 <select
@@ -326,7 +397,7 @@ export function TabReestruturacao({ clientId }: { clientId: string }) {
                       {sim.economia >= 0 ? 'Redução no serviço anual dos contratos selecionados' : 'Aumento no serviço anual'}
                     </p>
                     <p className="text-xs text-gray-500 mt-0.5">
-                      Prazo: {sim.prazoSim} meses · Taxa: {fmtN(sim.taxaSim * 100, 2)}% a.a. · Sistema: {simSistema}
+                      {simParcelas} parcelas {simPeriodicidade.toLowerCase()}s · {fmtN((sim.taxaSim ?? 0) * 100, 2)}% a.a.{simIndexador !== 'Pré-fixado' ? ` (${simIndexador} + ${simTaxa}%)` : ''} · {simSistema}
                     </p>
                     {sim.novoServicoAnual != null && (
                       <p className="text-xs text-gray-500 mt-0.5">
@@ -362,8 +433,8 @@ export function TabReestruturacao({ clientId }: { clientId: string }) {
               </div>
             )}
 
-            {(!simTaxa || !simPrazo) && (
-              <p className="text-xs text-gray-400 text-center py-2">Informe a nova taxa e o novo prazo para ver a simulação</p>
+            {(!simTaxa || !simParcelas) && (
+              <p className="text-xs text-gray-400 text-center py-2">Informe a taxa e o número de parcelas para ver a simulação</p>
             )}
           </div>
         </div>
@@ -377,7 +448,7 @@ export function TabReestruturacao({ clientId }: { clientId: string }) {
 
       <div className="flex justify-end">
         <button
-          onClick={() => { setSimTaxa(''); setSimPrazo(''); setSimSistema('SAC') }}
+          onClick={() => { setSimTaxa(''); setSimParcelas(''); setSimSistema('SAC'); setSimPeriodicidade('Mensal'); setSimIndexador('Pré-fixado'); setSimTipoTaxa('aa') }}
           className="flex items-center gap-1.5 text-xs text-gray-500 border border-gray-200 px-3 py-2 rounded-lg hover:bg-gray-50"
         >
           <RotateCcw size={12} /> Resetar simulação
