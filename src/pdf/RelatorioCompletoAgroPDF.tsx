@@ -73,9 +73,6 @@ const s = StyleSheet.create({
   coverSidebarText: {
     fontFamily: 'Helvetica', fontSize: 5.5, color: C.muted,
     letterSpacing: 1.2, textTransform: 'uppercase',
-    transform: [{ rotate: '-90deg' }],
-    width: 400,
-    textAlign: 'center',
   },
 
   // ── Page header ──
