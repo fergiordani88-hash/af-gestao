@@ -239,8 +239,7 @@ function Cover({ data, recBruta }: { data: RelatorioCompletoAgroData; recBruta: 
           <View style={{ flex: 1, justifyContent: 'flex-end' }}>
             <Text style={{ fontFamily: 'Times-Roman', fontSize: 20, color: C.gold, marginBottom: 6 }}>"</Text>
             <Text style={{ fontFamily: 'Times-Roman', fontSize: 9.5, color: C.body, fontStyle: 'italic', lineHeight: 1.7 }}>
-              Todo grande negócio rural começa{'\n'}
-              com decisões baseadas em dados.
+              Trabalhamos para transformar desafios financeiros em oportunidades de crescimento. Com estratégia, conhecimento e compromisso com o futuro do seu negócio.
             </Text>
           </View>
         </View>
