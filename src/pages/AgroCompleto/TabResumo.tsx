@@ -370,8 +370,10 @@ export function TabResumo({ clientId, clienteNome, clienteCidade }: {
         agroApi.despesas.list(clientId).catch(() => [] as any[]),
       ])
       const custosFixosAnuais = custosFixos.reduce((s: number, cf: any) => s + cf.valorMensal, 0) * 12
+      const agora = new Date(); agora.setHours(0, 0, 0, 0)
       const dividasPorAno: Record<string, number> = {}
       for (const p of parcelas) {
+        if (new Date(p.vencimento) < agora) continue   // só a partir de hoje
         const ano = String(new Date(p.vencimento).getFullYear())
         dividasPorAno[ano] = (dividasPorAno[ano] ?? 0) + p.valorParcela
       }
@@ -395,10 +397,10 @@ export function TabResumo({ clientId, clienteNome, clienteCidade }: {
           const g = Math.pow(1.02, i)
           for (const p of baseProds) { recBruta += p.area * p.produtividade * p.cotacao * g; custo += p.area * p.custoPorHa * p.cotacao * g }
         }
-        const lucBruto = recBruta - custo
-        const dividas = dividasPorAno[String(ano)] ?? 0
-        const resultadoLiquido = lucBruto - custosFixosAnuais - dividas
-        return { ano, recBruta, resultadoLiquido }
+        const custoAtividade = custo + custosFixosAnuais
+        const endividamento = dividasPorAno[String(ano)] ?? 0
+        const resultadoLiquido = recBruta - custoAtividade - endividamento
+        return { ano, recBruta, custoAtividade, endividamento, resultadoLiquido }
       })
 
       // Cenários do localStorage

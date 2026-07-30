@@ -33,7 +33,7 @@ export interface RelatorioCompletoAgroData {
   margem: number; alavancagem: number; solvencia: number
   endivReceita: number; capPagamento: number; ratingLabel: string; ratingColor: string
   cenarios: RelCenario[]
-  projecao10Anos: number; projecaoAnos: { ano: number; resultadoLiquido: number; recBruta: number }[]
+  projecao10Anos: number; projecaoAnos: { ano: number; resultadoLiquido: number; recBruta: number; custoAtividade?: number; endividamento?: number }[]
   // Análise de crédito ampliada
   jurosAnuais?: number; jurosHa?: number
   jurosAnuaisSacas?: number; jurosSacasHa?: number; jurosCultura?: string
@@ -636,16 +636,25 @@ export function RelatorioCompletoAgroPDF({ data }: { data: RelatorioCompletoAgro
             ))}
           </View>
 
+        </View>
+        <Ftr client={data.clientName} date={data.dataGeracao} hora={h} />
+      </Page>
+
+      {/* ══ PÁG 4 — ANÁLISE DE CRÉDITO ══ */}
+      <Page size="A4" style={s.page}>
+        <Hdr section="Análise de Crédito" client={data.clientName} safra={data.safra} />
+        <View style={s.body}>
+
           {/* Custo dos juros em sacas */}
           {(data.jurosAnuais ?? 0) > 0 && (
             <>
-              <Sec title={`Custo dos Juros Bancários em Sacas${data.jurosCultura ? ` (${data.jurosCultura})` : ''}`} />
-              <View style={{ flexDirection: 'row', gap: 6, marginBottom: 12 }}>
+              <Sec title={`Custo dos Juros Bancários em Sacas${data.jurosCultura ? ` — referência ${data.jurosCultura}` : ''}`} />
+              <View style={{ flexDirection: 'row', gap: 8, marginBottom: 16 }}>
                 <View style={{ ...s.kpiR, flex: 1 }}>
                   <Text style={s.kpiLabel}>Juros bancários anuais</Text>
                   <Text style={s.kpiValR}>{R(data.jurosAnuais!)}</Text>
                   {(data.jurosAnuaisSacas ?? 0) > 0 && (
-                    <Text style={{ fontFamily: 'Helvetica-Bold', fontSize: 7, color: C.neg, marginTop: 3 }}>
+                    <Text style={{ fontFamily: 'Helvetica-Bold', fontSize: 8, color: C.neg, marginTop: 4 }}>
                       {data.jurosAnuaisSacas!.toLocaleString('pt-BR', { maximumFractionDigits: 0 })} sacas
                     </Text>
                   )}
@@ -654,22 +663,25 @@ export function RelatorioCompletoAgroPDF({ data }: { data: RelatorioCompletoAgro
                   <Text style={s.kpiLabel}>Por hectare</Text>
                   <Text style={s.kpiValR}>{R(data.jurosHa ?? 0)}/ha</Text>
                   {(data.jurosSacasHa ?? 0) > 0 && (
-                    <Text style={{ fontFamily: 'Helvetica-Bold', fontSize: 7, color: C.neg, marginTop: 3 }}>
+                    <Text style={{ fontFamily: 'Helvetica-Bold', fontSize: 8, color: C.neg, marginTop: 4 }}>
                       {(data.jurosSacasHa!).toFixed(1)} sc/ha
                     </Text>
                   )}
                 </View>
-                {(data.comprometimentoReceita ?? 0) > 0 && (
-                  <View style={{ ...((data.comprometimentoReceita ?? 0) > 35 ? s.kpiR : (data.comprometimentoReceita ?? 0) > 20 ? s.kpi : s.kpiG), flex: 2 }}>
-                    <Text style={s.kpiLabel}>Comprometimento da receita com banco · Saudável: &lt; 20% · Atenção: 20–35% · Risco: &gt; 35%</Text>
-                    <Text style={{ fontFamily: 'Times-Roman', fontSize: 14, color: (data.comprometimentoReceita ?? 0) > 35 ? C.neg : (data.comprometimentoReceita ?? 0) > 20 ? C.amber : C.pos }}>
-                      {pct(data.comprometimentoReceita!)}
-                    </Text>
-                    <Text style={{ fontFamily: 'Helvetica', fontSize: 6.5, color: C.muted, marginTop: 2 }}>
-                      {(data.comprometimentoReceita ?? 0) > 35 ? 'Risco — receita muito comprometida com juros' : (data.comprometimentoReceita ?? 0) > 20 ? 'Atenção — monitorar evolução' : 'Saudável — dentro dos parâmetros'}
-                    </Text>
-                  </View>
-                )}
+                {(data.comprometimentoReceita ?? 0) > 0 && (() => {
+                  const cr = data.comprometimentoReceita!
+                  const st = cr > 35 ? s.kpiR : cr > 20 ? s.kpi : s.kpiG
+                  const col = cr > 35 ? C.neg : cr > 20 ? C.amber : C.pos
+                  const label = cr > 35 ? 'Risco — receita muito comprometida com banco' : cr > 20 ? 'Atenção — monitorar evolução' : 'Saudável — dentro dos parâmetros'
+                  return (
+                    <View style={{ ...st, flex: 2 }}>
+                      <Text style={s.kpiLabel}>Comprometimento da receita com banco</Text>
+                      <Text style={{ fontFamily: 'Times-Roman', fontSize: 18, color: col }}>{pct(cr)}</Text>
+                      <Text style={{ fontFamily: 'Helvetica', fontSize: 6.5, color: C.muted, marginTop: 3 }}>{label}</Text>
+                      <Text style={{ fontFamily: 'Helvetica', fontSize: 6, color: C.muted, marginTop: 2 }}>Saudável: &lt; 20% · Atenção: 20–35% · Risco: &gt; 35%</Text>
+                    </View>
+                  )
+                })()}
               </View>
             </>
           )}
@@ -678,35 +690,42 @@ export function RelatorioCompletoAgroPDF({ data }: { data: RelatorioCompletoAgro
           {(data.cpHorizonte || data.anoHorizonte || data.lpHorizonte) && (
             <>
               <Sec title="Capacidade de Pagamento por Horizonte" />
-              <View style={{ flexDirection: 'row', gap: 6, marginBottom: 10 }}>
+              <View style={{ flexDirection: 'row', gap: 8, marginBottom: 16 }}>
                 {[
-                  { label: 'Curto Prazo (≤ 360 dias)', h: data.cpHorizonte },
-                  { label: `Dentro do Ano (${data.anoHorizonte?.anoRef ?? ''})`, h: data.anoHorizonte },
-                  { label: 'Longo Prazo (> 360 dias) · Serviço médio anual', h: data.lpHorizonte },
+                  { label: 'Curto Prazo', sub: '≤ 360 dias', h: data.cpHorizonte },
+                  { label: `Dentro do Ano`, sub: String(data.anoHorizonte?.anoRef ?? ''), h: data.anoHorizonte },
+                  { label: 'Longo Prazo', sub: '> 360 dias · serviço médio anual', h: data.lpHorizonte },
                 ].filter(item => item.h).map((item, i) => {
                   const h2 = item.h!
                   const col = h2.status === 'ok' ? C.pos : h2.status === 'atencao' ? C.amber : C.neg
                   const bg  = h2.status === 'ok' ? '#E8F4ED' : h2.status === 'atencao' ? '#FFF8E1' : '#FFEBEE'
                   const bor = h2.status === 'ok' ? '#A5D6A7' : h2.status === 'atencao' ? '#FFE082' : '#FFCDD2'
                   return (
-                    <View key={i} style={{ flex: 1, backgroundColor: bg, borderWidth: 0.5, borderColor: bor, borderRadius: 3, borderTopWidth: 2, borderTopColor: col, padding: 10 }}>
-                      <Text style={{ fontFamily: 'Helvetica-Bold', fontSize: 6.5, color: col, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>{item.label}</Text>
-                      <Text style={{ fontFamily: 'Helvetica', fontSize: 5.5, color: C.muted, marginBottom: 2 }}>Parcelas vencendo</Text>
-                      <Text style={{ fontFamily: 'Times-Roman', fontSize: 10, color: C.ink, marginBottom: 6 }}>{R(h2.servico)}</Text>
-                      <Text style={{ fontFamily: 'Helvetica', fontSize: 5.5, color: C.muted, marginBottom: 2 }}>Nº vencimentos</Text>
-                      <Text style={{ fontFamily: 'Helvetica-Bold', fontSize: 8, color: C.ink, marginBottom: 6 }}>{h2.parcelas}</Text>
-                      <View style={{ height: 0.5, backgroundColor: bor, marginBottom: 6 }} />
-                      <Text style={{ fontFamily: 'Helvetica', fontSize: 5.5, color: C.muted, marginBottom: 1 }}>PE saudável (30%)</Text>
-                      <Text style={{ fontFamily: 'Helvetica', fontSize: 7, color: C.pos, marginBottom: 4 }}>{R(h2.peSaud)}</Text>
-                      <Text style={{ fontFamily: 'Helvetica', fontSize: 5.5, color: C.muted, marginBottom: 1 }}>PE crítico (50%)</Text>
-                      <Text style={{ fontFamily: 'Helvetica', fontSize: 7, color: C.amber, marginBottom: 6 }}>{R(h2.peCrit)}</Text>
-                      <View style={{ height: 0.5, backgroundColor: bor, marginBottom: 6 }} />
-                      <Text style={{ fontFamily: 'Helvetica', fontSize: 5.5, color: C.muted, marginBottom: 2 }}>Comprometimento atual</Text>
-                      <Text style={{ fontFamily: 'Helvetica-Bold', fontSize: 9, color: col, marginBottom: 4 }}>{pct(h2.pct)}</Text>
-                      <Text style={{ fontFamily: 'Helvetica', fontSize: 5.5, color: C.muted, marginBottom: 1 }}>{h2.saldo >= 0 ? 'Superávit' : 'Déficit'}</Text>
-                      <Text style={{ fontFamily: 'Helvetica-Bold', fontSize: 8, color: h2.saldo >= 0 ? C.pos : C.neg }}>{R(Math.abs(h2.saldo))}</Text>
-                      <View style={{ backgroundColor: col, borderRadius: 2, paddingHorizontal: 6, paddingVertical: 3, alignSelf: 'flex-start', marginTop: 6 }}>
-                        <Text style={{ fontFamily: 'Helvetica-Bold', fontSize: 6, color: C.white }}>
+                    <View key={i} style={{ flex: 1, backgroundColor: bg, borderWidth: 0.5, borderColor: bor, borderRadius: 4, borderTopWidth: 3, borderTopColor: col, padding: 12 }}>
+                      <Text style={{ fontFamily: 'Helvetica-Bold', fontSize: 8, color: col, marginBottom: 1 }}>{item.label}</Text>
+                      <Text style={{ fontFamily: 'Helvetica', fontSize: 6, color: C.muted, marginBottom: 10 }}>{item.sub}</Text>
+
+                      <Text style={{ fontFamily: 'Helvetica', fontSize: 6, color: C.muted, marginBottom: 1 }}>Serviço das parcelas</Text>
+                      <Text style={{ fontFamily: 'Times-Roman', fontSize: 12, color: C.ink, marginBottom: 2 }}>{R(h2.servico)}</Text>
+                      <Text style={{ fontFamily: 'Helvetica', fontSize: 6, color: C.muted, marginBottom: 10 }}>{h2.parcelas} vencimento{h2.parcelas !== 1 ? 's' : ''}</Text>
+
+                      <View style={{ height: 0.5, backgroundColor: bor, marginBottom: 8 }} />
+
+                      <Text style={{ fontFamily: 'Helvetica', fontSize: 6, color: C.muted, marginBottom: 1 }}>PE saudável (30%)</Text>
+                      <Text style={{ fontFamily: 'Helvetica-Bold', fontSize: 8, color: C.pos, marginBottom: 6 }}>{R(h2.peSaud)}</Text>
+                      <Text style={{ fontFamily: 'Helvetica', fontSize: 6, color: C.muted, marginBottom: 1 }}>PE crítico (50%)</Text>
+                      <Text style={{ fontFamily: 'Helvetica-Bold', fontSize: 8, color: C.amber, marginBottom: 8 }}>{R(h2.peCrit)}</Text>
+
+                      <View style={{ height: 0.5, backgroundColor: bor, marginBottom: 8 }} />
+
+                      <Text style={{ fontFamily: 'Helvetica', fontSize: 6, color: C.muted, marginBottom: 1 }}>Comprometimento atual</Text>
+                      <Text style={{ fontFamily: 'Helvetica-Bold', fontSize: 14, color: col, marginBottom: 4 }}>{pct(h2.pct)}</Text>
+
+                      <Text style={{ fontFamily: 'Helvetica', fontSize: 6, color: C.muted, marginBottom: 1 }}>{h2.saldo >= 0 ? 'Superávit de caixa' : 'Déficit de caixa'}</Text>
+                      <Text style={{ fontFamily: 'Helvetica-Bold', fontSize: 9, color: h2.saldo >= 0 ? C.pos : C.neg, marginBottom: 8 }}>{R(Math.abs(h2.saldo))}</Text>
+
+                      <View style={{ backgroundColor: col, borderRadius: 3, paddingHorizontal: 8, paddingVertical: 4, alignSelf: 'flex-start' }}>
+                        <Text style={{ fontFamily: 'Helvetica-Bold', fontSize: 7, color: C.white }}>
                           {h2.status === 'ok' ? '✓ Saudável' : h2.status === 'atencao' ? '⚠ Atenção' : '✗ Risco'}
                         </Text>
                       </View>
@@ -719,34 +738,35 @@ export function RelatorioCompletoAgroPDF({ data }: { data: RelatorioCompletoAgro
 
           {/* Concentração de vencimentos por ano */}
           {(data.vencimentosPorAno ?? []).length > 0 && (() => {
+            const anoCorte360 = new Date(new Date().getTime() + 360 * 24 * 60 * 60 * 1000).getFullYear()
             const venc = data.vencimentosPorAno!
             const maxVal = Math.max(...venc.map(v => v.valor), 1)
-            const hoje = new Date().getFullYear()
             return (
               <>
-                <Sec title="Concentração de Vencimentos por Ano" />
-                <View style={{ marginBottom: 10 }}>
+                <Sec title="Concentração de Vencimentos por Ano (a partir de hoje)" />
+                <View style={{ marginBottom: 8 }}>
                   {venc.map((v, i) => {
                     const barW = (v.valor / maxVal) * 100
-                    const isCP = v.ano <= hoje
+                    const isCP = v.ano <= anoCorte360
+                    const barColor = isCP ? '#1976D2' : '#7B1FA2'
                     return (
-                      <View key={i} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4, gap: 8 }}>
-                        <Text style={{ fontFamily: 'Helvetica-Bold', fontSize: 7, color: C.muted, width: 28 }}>{v.ano}</Text>
-                        <View style={{ flex: 1, height: 12, backgroundColor: '#EEF2EE', borderRadius: 2, overflow: 'hidden' }}>
-                          <View style={{ width: `${barW}%` as any, height: '100%', backgroundColor: isCP ? '#2196F3' : '#9C27B0', borderRadius: 2 }} />
+                      <View key={i} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 5, gap: 10 }}>
+                        <Text style={{ fontFamily: 'Helvetica-Bold', fontSize: 7.5, color: isCP ? '#1976D2' : '#7B1FA2', width: 30 }}>{v.ano}</Text>
+                        <View style={{ flex: 1, height: 14, backgroundColor: '#F0F0F0', borderRadius: 2, overflow: 'hidden' }}>
+                          <View style={{ width: `${barW}%` as any, height: '100%', backgroundColor: barColor, borderRadius: 2 }} />
                         </View>
-                        <Text style={{ fontFamily: 'Helvetica-Bold', fontSize: 7, color: C.ink, width: 70, textAlign: 'right' }}>{R(v.valor)}</Text>
+                        <Text style={{ fontFamily: 'Helvetica-Bold', fontSize: 7.5, color: C.ink, width: 80, textAlign: 'right' }}>{R(v.valor)}</Text>
                       </View>
                     )
                   })}
-                  <View style={{ flexDirection: 'row', gap: 16, marginTop: 6 }}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                      <View style={{ width: 10, height: 6, backgroundColor: '#2196F3', borderRadius: 1 }} />
-                      <Text style={{ fontFamily: 'Helvetica', fontSize: 6, color: C.muted }}>Curto prazo (CP)</Text>
+                  <View style={{ flexDirection: 'row', gap: 20, marginTop: 8 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                      <View style={{ width: 12, height: 7, backgroundColor: '#1976D2', borderRadius: 1 }} />
+                      <Text style={{ fontFamily: 'Helvetica', fontSize: 6.5, color: C.muted }}>Curto prazo (≤ 360 dias)</Text>
                     </View>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                      <View style={{ width: 10, height: 6, backgroundColor: '#9C27B0', borderRadius: 1 }} />
-                      <Text style={{ fontFamily: 'Helvetica', fontSize: 6, color: C.muted }}>Longo prazo (LP)</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                      <View style={{ width: 12, height: 7, backgroundColor: '#7B1FA2', borderRadius: 1 }} />
+                      <Text style={{ fontFamily: 'Helvetica', fontSize: 6.5, color: C.muted }}>Longo prazo (&gt; 360 dias)</Text>
                     </View>
                   </View>
                 </View>
@@ -758,7 +778,7 @@ export function RelatorioCompletoAgroPDF({ data }: { data: RelatorioCompletoAgro
         <Ftr client={data.clientName} date={data.dataGeracao} hora={h} />
       </Page>
 
-      {/* ══ PÁG 4 — CENÁRIOS + PROJEÇÃO ══ */}
+      {/* ══ PÁG 5 — CENÁRIOS + PROJEÇÃO ══ */}
       <Page size="A4" style={s.page}>
         <Hdr section="Cenários · Projeção 10 Anos" client={data.clientName} safra={data.safra} />
         <View style={s.body}>
@@ -802,14 +822,16 @@ export function RelatorioCompletoAgroPDF({ data }: { data: RelatorioCompletoAgro
               <Sec title="Projeção Anual — Cenário Base" />
               <View style={s.tbl}>
                 <View style={s.thd}>
-                  {['Ano', 'Receita Bruta', 'Resultado Líquido', 'Situação'].map(h2 => (
-                    <Text key={h2} style={s.th}>{h2}</Text>
+                  {['Ano', 'Receita Bruta', 'Custos da Atividade', 'Endividamento', 'Resultado Líquido', 'Situação'].map(h2 => (
+                    <Text key={h2} style={{ ...s.th, flex: h2 === 'Ano' ? 0.6 : 1 }}>{h2}</Text>
                   ))}
                 </View>
                 {data.projecaoAnos.map((r, i) => (
                   <View key={r.ano} style={[s.tr, i % 2 === 0 ? s.trA : {}]}>
-                    <Text style={s.tdB}>{r.ano}</Text>
+                    <Text style={{ ...s.tdB, flex: 0.6 }}>{r.ano}</Text>
                     <Text style={{ ...s.td, color: C.pos }}>{R(r.recBruta)}</Text>
+                    <Text style={{ ...s.td, color: C.neg }}>{r.custoAtividade != null ? R(r.custoAtividade) : '—'}</Text>
+                    <Text style={{ ...s.td, color: C.neg }}>{r.endividamento != null ? R(r.endividamento) : '—'}</Text>
                     <Text style={{ ...s.td, fontFamily: 'Helvetica-Bold', color: r.resultadoLiquido >= 0 ? C.pos : C.neg }}>{R(r.resultadoLiquido)}</Text>
                     <Text style={{ ...s.td, color: r.resultadoLiquido >= 0 ? C.pos : C.neg }}>
                       {r.resultadoLiquido >= 0 ? '✓ Positivo' : '✗ Negativo'}
@@ -817,8 +839,10 @@ export function RelatorioCompletoAgroPDF({ data }: { data: RelatorioCompletoAgro
                   </View>
                 ))}
                 <View style={[s.tr, s.trT]}>
-                  <Text style={s.tdB}>Total 10 Anos</Text>
+                  <Text style={{ ...s.tdB, flex: 0.6 }}>Total 10 Anos</Text>
                   <Text style={s.tdG}>{R(data.projecaoAnos.reduce((a, r) => a + r.recBruta, 0))}</Text>
+                  <Text style={{ ...s.td, color: C.neg }}>{R(data.projecaoAnos.reduce((a, r) => a + (r.custoAtividade ?? 0), 0))}</Text>
+                  <Text style={{ ...s.td, color: C.neg }}>{R(data.projecaoAnos.reduce((a, r) => a + (r.endividamento ?? 0), 0))}</Text>
                   <Text style={{ ...s.td, fontFamily: 'Helvetica-Bold', color: data.projecao10Anos >= 0 ? C.pos : C.neg }}>{R(data.projecao10Anos)}</Text>
                   <Text style={{ ...s.td, color: C.muted }}>{data.projecaoAnos.filter(r => r.resultadoLiquido >= 0).length} de 10 positivos</Text>
                 </View>
