@@ -466,6 +466,9 @@ export function TabResumo({ clientId, clienteNome, clienteCidade }: {
         projecao10Anos: projecaoAnos.reduce((s, r) => s + r.resultadoLiquido, 0),
         projecaoAnos,
       })
+    } catch (err: any) {
+      console.error('Erro ao gerar PDF:', err)
+      alert(`Erro ao gerar PDF: ${err?.message ?? String(err)}`)
     } finally {
       setExportando(false)
     }
