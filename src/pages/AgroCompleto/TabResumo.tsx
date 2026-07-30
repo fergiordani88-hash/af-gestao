@@ -362,6 +362,7 @@ export function TabResumo({ clientId, clienteNome, clienteCidade }: {
 
   // ── Exportar Relatório Completo PDF ────────────────────────────
   const handleExportarRelatorio = async () => {
+    console.log('PDF: clique registrado')
     setExportando(true)
     try {
       // Busca dados adicionais para o relatório (projeção e cenários)
