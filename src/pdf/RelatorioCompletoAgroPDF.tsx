@@ -195,7 +195,7 @@ function Ftr({ client, date, hora }: { client: string; date: string; hora?: stri
 // ── Section heading ─────────────────────────────────────────────────────────
 function Sec({ title }: { title: string }) {
   return (
-    <View style={{ marginBottom: 12 }}>
+    <View style={{ marginBottom: 12 }} minPresenceAhead={40}>
       <Text style={s.secLabel}>{title}</Text>
       <View style={s.secLine} />
     </View>
@@ -853,8 +853,8 @@ export function RelatorioCompletoAgroPDF({ data }: { data: RelatorioCompletoAgro
 
           {/* Parecer — panel + text */}
           <View style={{ flexDirection: 'row', gap: 14, marginTop: 10 }}>
-            <View style={{ width: 150, alignItems: 'center', justifyContent: 'center' }}>
-              <Image src={logoAF} style={{ width: 150 }} />
+            <View style={{ width: 170, alignItems: 'center', justifyContent: 'center' }}>
+              <Image src={logoAF} style={{ width: 220 }} />
             </View>
             <View style={{ flex: 1 }}>
               <Sec title="Parecer Consultivo" />
