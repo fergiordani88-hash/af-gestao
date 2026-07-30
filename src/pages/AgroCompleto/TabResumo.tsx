@@ -189,7 +189,8 @@ export function TabResumo({ clientId, clienteNome, clienteCidade }: {
   }
 
   // ── Produção da safra selecionada ──────────────────────────────
-  const prodSafra = producao.filter(p => p.safra === safra)
+  // Filtra entradas com área > 0 (exclui registros vazios/duplicados)
+  const prodSafra = producao.filter(p => p.safra === safra && p.area > 0)
 
   // Soja + Milho 2ª + Feijão são cultivados na MESMA terra em rotação.
   // A área física é a da cultura principal (ordem = 'principal').
@@ -598,9 +599,18 @@ export function TabResumo({ clientId, clienteNome, clienteCidade }: {
                 <tbody>
                   {prodSafra.map(p => {
                     const c = calcRow(p)
+                    const colheita = getColheitaDate(p, colheitaDatas)
+                    const jaRealizada = colheita <= hoje
                     return (
-                      <tr key={p.id ?? p.cultura} className="border-b border-gray-50">
-                        <td className="py-1.5 font-medium text-gray-800">{p.cultura}</td>
+                      <tr key={p.id ?? p.cultura} className={`border-b border-gray-50 ${jaRealizada ? 'opacity-50' : ''}`}>
+                        <td className="py-1.5 font-medium text-gray-800 flex items-center gap-1.5">
+                          {p.cultura}
+                          {jaRealizada && (
+                            <span className="text-xs bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded-full font-normal">
+                              realizada {colheita.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}
+                            </span>
+                          )}
+                        </td>
                         <td className="text-right text-gray-600">{fmtN(p.area, 0)} ha</td>
                         <td className="text-right text-gray-600">{fmtN(p.produtividade, 1)} sc</td>
                         <td className="text-right text-amber-600 font-medium">{fmtN(c.peHa, 1)} sc</td>
