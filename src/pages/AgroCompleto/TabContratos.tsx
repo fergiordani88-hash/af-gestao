@@ -612,7 +612,7 @@ export function TabContratos({ clientId }: { clientId: string }) {
     }
   }
 
-  const anos = cronograma ? Object.keys(cronograma.porAno).sort() : []
+  const anos = cronograma ? Object.keys(cronograma.porAno).sort().filter(a => parseInt(a) >= 2026) : []
 
   return (
     <div className="space-y-5">
