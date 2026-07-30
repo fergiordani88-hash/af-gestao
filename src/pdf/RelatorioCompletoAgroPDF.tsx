@@ -31,98 +31,153 @@ export interface RelatorioCompletoAgroData {
   projecao10Anos: number; projecaoAnos: { ano: number; resultadoLiquido: number; recBruta: number }[]
 }
 
-// ── Colors ─────────────────────────────────────────────────────────────────
+// ── Brand tokens ───────────────────────────────────────────────────────────
 const C = {
-  coverBg: '#0C2416', headerBg: '#0D2B17',
-  green: '#1B5E20', greenPale: '#E8F5E9',
-  gold: '#C9A96E', goldPale: '#FBF3E0',
-  cream: '#FAFAF7', white: '#FFFFFF',
-  dark: '#1A1A1A', grayDark: '#616161', grayMid: '#9E9E9E', border: '#E0E0E0',
-  red: '#B71C1C', redPale: '#FFEBEE', amber: '#E65100',
+  cream:    '#F4EFE6',   // warm off-white page background
+  white:    '#FFFFFF',
+  gold:     '#B8975A',   // AF brand gold — muted, elegant
+  goldMid:  '#D4B87A',   // lighter gold for accents
+  goldLine: '#C8A86A',
+  ink:      '#232318',   // near-black for headings
+  body:     '#3A3A32',   // body text
+  muted:    '#7A7A6A',   // labels, secondary
+  border:   '#D8D2C4',   // very subtle warm border
+  positive: '#2B5929',   // deep forest green (numbers only)
+  negative: '#8B1A1A',   // deep burgundy (numbers only)
+  amber:    '#7A5020',
+  strip:    '#E8E0D0',   // thin top strip on content pages
 }
 
 // ── Styles ─────────────────────────────────────────────────────────────────
 const s = StyleSheet.create({
-  coverPage: { fontFamily: 'Helvetica', backgroundColor: C.coverBg },
-  page: { fontFamily: 'Helvetica', fontSize: 9, color: C.dark, backgroundColor: C.white, paddingBottom: 52 },
-  body: { paddingHorizontal: 36, paddingTop: 20 },
-  section: { marginBottom: 16 },
-  sectionTitle: {
-    fontSize: 8, fontFamily: 'Helvetica-Bold', color: C.green,
-    textTransform: 'uppercase', letterSpacing: 1,
-    marginBottom: 8, paddingBottom: 5,
-    borderBottomWidth: 1.5, borderBottomColor: C.gold,
+  coverPage: {
+    fontFamily: 'Times-Roman',
+    backgroundColor: C.cream,
   },
-  header: {
-    backgroundColor: C.headerBg, paddingHorizontal: 36,
-    paddingTop: 16, paddingBottom: 14,
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+  page: {
+    fontFamily: 'Helvetica',
+    fontSize: 8.5,
+    color: C.body,
+    backgroundColor: C.cream,
+    paddingBottom: 44,
   },
-  goldStripe: { height: 3, backgroundColor: C.gold },
-  // KPI
-  kpiRow: { flexDirection: 'row', gap: 7, marginBottom: 7 },
-  kpi: { flex: 1, backgroundColor: C.white, borderWidth: 1, borderColor: C.border, borderRadius: 5, borderTopWidth: 3, borderTopColor: C.gold, padding: 10 },
-  kpiG: { flex: 1, backgroundColor: C.white, borderWidth: 1, borderColor: '#C8E6C9', borderRadius: 5, borderTopWidth: 3, borderTopColor: C.green, padding: 10 },
-  kpiR: { flex: 1, backgroundColor: C.white, borderWidth: 1, borderColor: '#FFCDD2', borderRadius: 5, borderTopWidth: 3, borderTopColor: C.red, padding: 10 },
-  kpiLabel: { fontSize: 6.5, color: C.grayMid, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 4 },
-  kpiVal: { fontSize: 11, fontFamily: 'Helvetica-Bold', color: C.dark },
-  kpiValG: { fontSize: 11, fontFamily: 'Helvetica-Bold', color: C.green },
-  kpiValR: { fontSize: 11, fontFamily: 'Helvetica-Bold', color: C.red },
-  // Table
-  table: { borderWidth: 1, borderColor: C.border, borderRadius: 5, overflow: 'hidden', marginBottom: 8 },
-  thead: { backgroundColor: C.headerBg, flexDirection: 'row', paddingVertical: 6, paddingHorizontal: 10 },
-  th: { color: C.white, fontSize: 6.5, fontFamily: 'Helvetica-Bold', textTransform: 'uppercase', letterSpacing: 0.5, flex: 1 },
-  tr: { flexDirection: 'row', paddingVertical: 5, paddingHorizontal: 10, borderTopWidth: 1, borderTopColor: C.border },
-  trAlt: { backgroundColor: C.cream },
-  trTotal: { backgroundColor: C.greenPale },
-  td: { fontSize: 7.5, color: C.dark, flex: 1 },
-  // Footer
+  body: { paddingHorizontal: 44, paddingTop: 26 },
+
+  // ── Cover elements ──
+  coverCorner: { position: 'absolute', width: 14, height: 14, borderColor: C.gold },
+  coverSidebar: {
+    position: 'absolute', left: 0, top: 0, bottom: 0, width: 28,
+    backgroundColor: C.strip,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  coverSidebarText: {
+    fontFamily: 'Helvetica', fontSize: 5.5, color: C.muted,
+    letterSpacing: 1.2, textTransform: 'uppercase',
+    transform: [{ rotate: '-90deg' }],
+    width: 400,
+    textAlign: 'center',
+  },
+
+  // ── Page header ──
+  pageHeader: {
+    backgroundColor: C.strip,
+    paddingHorizontal: 44, paddingVertical: 9,
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    borderBottomWidth: 0.75, borderBottomColor: C.gold,
+  },
+  pageHeaderSection: { fontFamily: 'Helvetica', fontSize: 6.5, color: C.muted, letterSpacing: 1.5, textTransform: 'uppercase' },
+  pageHeaderBrand:   { fontFamily: 'Helvetica', fontSize: 6.5, color: C.muted, letterSpacing: 1.5, textTransform: 'uppercase' },
+
+  // ── Footer ──
   footer: {
     position: 'absolute', bottom: 0, left: 0, right: 0,
-    paddingHorizontal: 36, paddingVertical: 9,
+    paddingHorizontal: 44, paddingVertical: 10,
+    borderTopWidth: 0.5, borderTopColor: C.border,
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    borderTopWidth: 1, borderTopColor: C.border, backgroundColor: C.white,
+    backgroundColor: C.cream,
   },
-  footerTxt: { fontSize: 6.5, color: C.grayMid },
-  footerGold: { fontSize: 6.5, color: C.gold },
+  footerLeft:  { fontFamily: 'Helvetica', fontSize: 6.5, color: C.muted },
+  footerMid:   { fontFamily: 'Helvetica', fontSize: 6.5, color: C.gold },
+  footerRight: { fontFamily: 'Helvetica', fontSize: 6.5, color: C.muted },
+
+  // ── Section title ──
+  sectionTitle: {
+    fontFamily: 'Helvetica', fontSize: 6.5, color: C.gold,
+    letterSpacing: 1.8, textTransform: 'uppercase',
+    marginBottom: 3, marginTop: 0,
+  },
+  sectionRule: {
+    height: 0.5, backgroundColor: C.goldLine, marginBottom: 14,
+  },
+
+  // ── KPI ──
+  kpiRow: { flexDirection: 'row', gap: 6, marginBottom: 10 },
+  kpiBox: {
+    flex: 1, paddingVertical: 11, paddingHorizontal: 12,
+    borderWidth: 0.5, borderColor: C.border, borderRadius: 2,
+    backgroundColor: C.white,
+  },
+  kpiLabel: { fontFamily: 'Helvetica', fontSize: 6, color: C.muted, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 5 },
+  kpiVal:   { fontFamily: 'Times-Roman', fontSize: 13, color: C.ink },
+  kpiValPos: { fontFamily: 'Times-Roman', fontSize: 13, color: C.positive },
+  kpiValNeg: { fontFamily: 'Times-Roman', fontSize: 13, color: C.negative },
+
+  // ── Table ──
+  table:  { marginBottom: 10 },
+  thead:  {
+    flexDirection: 'row', paddingVertical: 5, paddingHorizontal: 10,
+    borderBottomWidth: 0.75, borderBottomColor: C.gold,
+    backgroundColor: C.strip,
+  },
+  th: { fontFamily: 'Helvetica', fontSize: 6, color: C.muted, textTransform: 'uppercase', letterSpacing: 0.8, flex: 1 },
+  tr: {
+    flexDirection: 'row', paddingVertical: 6, paddingHorizontal: 10,
+    borderBottomWidth: 0.5, borderBottomColor: C.border,
+  },
+  trAlt: { backgroundColor: C.white },
+  trTotal: { backgroundColor: C.strip, borderTopWidth: 0.75, borderTopColor: C.gold },
+  td:     { fontFamily: 'Helvetica', fontSize: 7.5, color: C.body, flex: 1 },
+  tdBold: { fontFamily: 'Helvetica-Bold', fontSize: 7.5, color: C.ink, flex: 1 },
+  tdPos:  { fontFamily: 'Helvetica', fontSize: 7.5, color: C.positive, flex: 1 },
+  tdNeg:  { fontFamily: 'Helvetica', fontSize: 7.5, color: C.negative, flex: 1 },
+
+  // ── DRE rows ──
+  dreRow: {
+    flexDirection: 'row', justifyContent: 'space-between',
+    paddingVertical: 6.5, paddingHorizontal: 12,
+    borderBottomWidth: 0.5, borderBottomColor: C.border,
+  },
+  dreTotal: { backgroundColor: C.strip, borderBottomWidth: 0.75, borderBottomColor: C.gold },
 })
 
-// ── Helpers ────────────────────────────────────────────────────────────────
-const fmtBRL = (v: number) =>
+// ── Formatters ─────────────────────────────────────────────────────────────
+const R = (v: number) =>
   v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 0, maximumFractionDigits: 0 })
-const fmtPct = (v: number) => `${Number(v).toFixed(1)}%`
-const fmtX = (v: number) => isFinite(v) ? `${v.toFixed(2)}x` : '—'
-const sc = (ok: boolean, warn?: boolean) => ok ? C.green : warn ? C.amber : C.red
+const pct = (v: number) => `${Number(v).toFixed(1)}%`
+const xv  = (v: number) => isFinite(v) && !isNaN(v) ? `${v.toFixed(2)}x` : '—'
+const sc  = (ok: boolean, warn?: boolean) => ok ? C.positive : warn ? C.amber : C.negative
 
-// ── Logo ───────────────────────────────────────────────────────────────────
-function Logo() {
+// ── Logo block ─────────────────────────────────────────────────────────────
+function Logo({ dark = false }: { dark?: boolean }) {
+  const textColor = dark ? C.white : C.ink
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-      <View style={{ width: 28, height: 28, borderRadius: 5, backgroundColor: C.gold, alignItems: 'center', justifyContent: 'center', marginRight: 8 }}>
-        <Text style={{ color: C.coverBg, fontSize: 13, fontFamily: 'Helvetica-Bold' }}>AF</Text>
-      </View>
-      <View style={{ borderLeftWidth: 1, borderLeftColor: '#FFFFFF35', paddingLeft: 8 }}>
-        <Text style={{ color: C.white, fontSize: 9, fontFamily: 'Helvetica-Bold' }}>Gestão & Consultoria</Text>
-        <Text style={{ color: '#FFFFFF55', fontSize: 5.5, letterSpacing: 0.8, marginTop: 2 }}>PLANEJAMENTO · ESTRATÉGIA · RESULTADOS</Text>
-      </View>
+    <View style={{ alignItems: 'center' }}>
+      <Text style={{ fontFamily: 'Times-Roman', fontSize: 28, color: C.gold, letterSpacing: -1 }}>AF</Text>
+      <Text style={{ fontFamily: 'Times-Roman', fontSize: 10.5, color: textColor, marginTop: -2, letterSpacing: 0.5 }}>Gestão & Consultoria</Text>
+      <View style={{ width: 120, height: 0.5, backgroundColor: C.gold, marginTop: 6, marginBottom: 6 }} />
+      <Text style={{ fontFamily: 'Helvetica', fontSize: 5.5, color: C.gold, letterSpacing: 2.5, textTransform: 'uppercase' }}>PLANEJAMENTO · ESTRATÉGIA · RESULTADOS</Text>
     </View>
   )
 }
 
-// ── Header ─────────────────────────────────────────────────────────────────
-function Hdr({ title, sub, client, date }: { title: string; sub: string; client: string; date: string }) {
+// ── Page header ─────────────────────────────────────────────────────────────
+function Hdr({ section, client, date }: { section: string; client: string; date: string }) {
   return (
-    <>
-      <View style={s.header}>
-        <Logo />
-        <View style={{ alignItems: 'flex-end' }}>
-          <Text style={{ color: C.white, fontSize: 10, fontFamily: 'Helvetica-Bold' }}>{title}</Text>
-          <Text style={{ color: '#FFFFFF65', fontSize: 7, marginTop: 2 }}>{sub}</Text>
-          <Text style={{ color: C.gold, fontSize: 6.5, marginTop: 3 }}>{client} · {date}</Text>
-        </View>
-      </View>
-      <View style={s.goldStripe} />
-    </>
+    <View style={s.pageHeader}>
+      <Text style={s.pageHeaderSection}>{section}</Text>
+      <Text style={{ fontFamily: 'Helvetica', fontSize: 6, color: C.muted }}>{client} · Safra {date}</Text>
+      <Text style={s.pageHeaderBrand}>AF Gestão & Consultoria</Text>
+    </View>
   )
 }
 
@@ -130,75 +185,120 @@ function Hdr({ title, sub, client, date }: { title: string; sub: string; client:
 function Ftr({ client, date, hora }: { client: string; date: string; hora?: string }) {
   return (
     <View style={s.footer} fixed>
-      <Text style={s.footerTxt}>AF Gestão & Consultoria · Campo Grande/MS · {client} · Confidencial</Text>
-      <Text style={s.footerGold}>www.afgestaoeconsultoria.com.br</Text>
-      <Text style={s.footerTxt} render={({ pageNumber, totalPages }) =>
-        `Gerado em ${date}${hora ? ` às ${hora}` : ''} · Pág. ${pageNumber}/${totalPages}`
+      <Text style={s.footerLeft}>AF Gestão & Consultoria · Campo Grande/MS</Text>
+      <Text style={s.footerMid}>www.afgestaoeconsultoria.com.br</Text>
+      <Text style={s.footerRight} render={({ pageNumber, totalPages }) =>
+        `${client} · Gerado em ${date}${hora ? ` às ${hora}` : ''} · ${pageNumber}/${totalPages}`
       } />
     </View>
   )
 }
 
-// ── Cover page ─────────────────────────────────────────────────────────────
+// ── Section heading ─────────────────────────────────────────────────────────
+function Section({ title }: { title: string }) {
+  return (
+    <View style={{ marginBottom: 12, marginTop: 4 }}>
+      <Text style={s.sectionTitle}>{title}</Text>
+      <View style={s.sectionRule} />
+    </View>
+  )
+}
+
+// ── Cover ──────────────────────────────────────────────────────────────────
 function Cover({ data, recBruta }: { data: RelatorioCompletoAgroData; recBruta: number }) {
+  const pl = data.patrimonioGruto - data.totalOnus
   return (
     <Page size="A4" style={s.coverPage}>
-      <View style={{ height: 7, backgroundColor: C.gold }} />
+      {/* Left sidebar strip */}
+      <View style={s.coverSidebar}>
+        <Text style={s.coverSidebarText}>
+          MATERIAL CONFIDENCIAL · AF GESTÃO & CONSULTORIA
+        </Text>
+      </View>
 
-      {/* Company header */}
-      <View style={{ paddingHorizontal: 48, paddingTop: 40, paddingBottom: 32, borderBottomWidth: 1, borderBottomColor: '#FFFFFF10' }}>
+      {/* Corner marks */}
+      <View style={[s.coverCorner, { top: 36, left: 52, borderTopWidth: 0.75, borderLeftWidth: 0.75 }]} />
+      <View style={[s.coverCorner, { top: 36, right: 36, borderTopWidth: 0.75, borderRightWidth: 0.75 }]} />
+      <View style={[s.coverCorner, { bottom: 36, left: 52, borderBottomWidth: 0.75, borderLeftWidth: 0.75 }]} />
+      <View style={[s.coverCorner, { bottom: 36, right: 36, borderBottomWidth: 0.75, borderRightWidth: 0.75 }]} />
+
+      {/* Gold top accent */}
+      <View style={{ height: 3, backgroundColor: C.gold, marginLeft: 28 }} />
+
+      {/* Logo centered */}
+      <View style={{ marginLeft: 28, paddingTop: 70, alignItems: 'center' }}>
         <Logo />
       </View>
 
-      {/* Hero */}
-      <View style={{ paddingHorizontal: 48, paddingTop: 52, flex: 1 }}>
-        <Text style={{ color: C.gold, fontSize: 7.5, letterSpacing: 2.5, fontFamily: 'Helvetica-Bold', textTransform: 'uppercase', marginBottom: 12 }}>
-          Relatório Completo Agro 360°
+      {/* Label + title */}
+      <View style={{ marginLeft: 28, paddingHorizontal: 60, paddingTop: 58 }}>
+        <Text style={{ fontFamily: 'Helvetica', fontSize: 6, color: C.gold, letterSpacing: 2, textTransform: 'uppercase', marginBottom: 5 }}>
+          Área Especializada
         </Text>
-        <View style={{ width: 40, height: 2, backgroundColor: C.gold, marginBottom: 20 }} />
-        <Text style={{ color: C.white, fontSize: 26, fontFamily: 'Helvetica-Bold', lineHeight: 1.2, marginBottom: 10 }}>
+        <View style={{ width: 260, height: 0.5, backgroundColor: C.border, marginBottom: 18 }} />
+
+        <Text style={{ fontFamily: 'Times-Roman', fontSize: 26, color: C.ink, lineHeight: 1.2 }}>
+          Relatório Agro
+        </Text>
+        <Text style={{ fontFamily: 'Times-Roman', fontSize: 26, color: C.gold, lineHeight: 1.2, fontStyle: 'italic' }}>
+          360° Completo
+        </Text>
+        <View style={{ width: 60, height: 0.75, backgroundColor: C.gold, marginTop: 18, marginBottom: 22 }} />
+
+        <Text style={{ fontFamily: 'Helvetica', fontSize: 10, color: C.body, lineHeight: 1.6 }}>
           {data.clientName}
         </Text>
-        <View style={{ flexDirection: 'row', gap: 20, marginBottom: 44 }}>
-          {data.clientCity && <Text style={{ color: '#FFFFFF70', fontSize: 10 }}>{data.clientCity}</Text>}
-          <Text style={{ color: C.gold, fontSize: 10, fontFamily: 'Helvetica-Bold' }}>{data.areaTotal.toLocaleString('pt-BR')} ha</Text>
-          <Text style={{ color: '#FFFFFF50', fontSize: 10 }}>Safra {data.safra}</Text>
-        </View>
-
-        {/* Rating */}
-        <View style={{ backgroundColor: data.ratingColor, borderRadius: 10, paddingHorizontal: 20, paddingVertical: 14, alignSelf: 'flex-start', marginBottom: 50 }}>
-          <Text style={{ color: '#FFFFFF80', fontSize: 6.5, letterSpacing: 2, textTransform: 'uppercase', marginBottom: 4, fontFamily: 'Helvetica-Bold' }}>Diagnóstico Geral</Text>
-          <Text style={{ color: C.white, fontSize: 22, fontFamily: 'Helvetica-Bold' }}>{data.ratingLabel}</Text>
-        </View>
-
-        {/* Quick stats */}
-        <View style={{ flexDirection: 'row', gap: 28, borderTopWidth: 1, borderTopColor: '#FFFFFF15', paddingTop: 22 }}>
-          <View>
-            <Text style={{ color: '#FFFFFF50', fontSize: 6.5, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 4 }}>Endividamento Total</Text>
-            <Text style={{ color: C.white, fontSize: 12, fontFamily: 'Helvetica-Bold' }}>{fmtBRL(data.totalEndividamento)}</Text>
-          </View>
-          <View>
-            <Text style={{ color: '#FFFFFF50', fontSize: 6.5, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 4 }}>Receita Bruta</Text>
-            <Text style={{ color: C.gold, fontSize: 12, fontFamily: 'Helvetica-Bold' }}>{fmtBRL(recBruta)}</Text>
-          </View>
-          <View>
-            <Text style={{ color: '#FFFFFF50', fontSize: 6.5, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 4 }}>Patrimônio Líquido</Text>
-            <Text style={{ color: '#FFFFFF80', fontSize: 12, fontFamily: 'Helvetica-Bold' }}>{fmtBRL(data.patrimonioGruto - data.totalOnus)}</Text>
-          </View>
-        </View>
+        {data.clientCity && (
+          <Text style={{ fontFamily: 'Helvetica', fontSize: 8, color: C.muted, marginTop: 2 }}>
+            {data.clientCity}
+          </Text>
+        )}
+        <Text style={{ fontFamily: 'Helvetica', fontSize: 8, color: C.muted, marginTop: 2 }}>
+          Safra {data.safra} · {data.areaTotal.toLocaleString('pt-BR')} ha
+        </Text>
       </View>
 
-      {/* Cover bottom */}
-      <View style={{ paddingHorizontal: 48, paddingVertical: 18, borderTopWidth: 1, borderTopColor: '#FFFFFF10', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-        <Text style={{ color: '#FFFFFF40', fontSize: 7 }}>Gerado em {data.dataGeracao}{data.horaGeracao ? ` às ${data.horaGeracao}` : ''} · Documento Confidencial</Text>
-        <Text style={{ color: C.gold, fontSize: 7 }}>www.afgestaoeconsultoria.com.br</Text>
-        <Text style={{ color: '#FFFFFF40', fontSize: 7 }}>Campo Grande/MS</Text>
+      {/* Quick stats — 3 columns */}
+      <View style={{ marginLeft: 28, paddingHorizontal: 60, paddingTop: 48, flexDirection: 'row', gap: 0 }}>
+        {[
+          { label: 'Receita Bruta', value: R(recBruta), col: C.positive },
+          { label: 'Endividamento Total', value: R(data.totalEndividamento), col: C.ink },
+          { label: 'Patrimônio Líquido', value: R(pl), col: C.positive },
+        ].map((stat, i) => (
+          <View key={i} style={{ flex: 1, paddingRight: 20 }}>
+            <View style={{ height: 1, backgroundColor: i === 0 ? C.gold : C.border, marginBottom: 8 }} />
+            <Text style={{ fontFamily: 'Helvetica', fontSize: 5.5, color: C.muted, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 5 }}>
+              {stat.label}
+            </Text>
+            <Text style={{ fontFamily: 'Times-Roman', fontSize: 11, color: stat.col }}>
+              {stat.value}
+            </Text>
+          </View>
+        ))}
+      </View>
+
+      {/* Cover footer */}
+      <View style={{
+        position: 'absolute', bottom: 0, left: 28, right: 0,
+        borderTopWidth: 0.5, borderTopColor: C.border,
+        paddingHorizontal: 32, paddingVertical: 12,
+        flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+      }}>
+        <Text style={{ fontFamily: 'Helvetica', fontSize: 6.5, color: C.muted }}>
+          Gerado em {data.dataGeracao}{data.horaGeracao ? ` às ${data.horaGeracao}` : ''} · Campo Grande/MS
+        </Text>
+        <Text style={{ fontFamily: 'Helvetica', fontSize: 6.5, color: C.gold }}>
+          www.afgestaoeconsultoria.com.br
+        </Text>
+        <Text style={{ fontFamily: 'Helvetica', fontSize: 6.5, color: C.muted }}>
+          Documento Confidencial
+        </Text>
       </View>
     </Page>
   )
 }
 
-// ── Main ───────────────────────────────────────────────────────────────────
+// ── Main component ─────────────────────────────────────────────────────────
 export function RelatorioCompletoAgroPDF({ data }: { data: RelatorioCompletoAgroData }) {
   const culturasCalc = data.culturas.map(c => {
     const recBruta  = c.area * c.produtividade * c.cotacao
@@ -208,306 +308,386 @@ export function RelatorioCompletoAgroPDF({ data }: { data: RelatorioCompletoAgro
     const pe        = c.cotacao > 0 ? (c.custoPorHa + (c.area > 0 ? c.custoArrendHa * c.areaArrendada / c.area : 0)) : 0
     return { ...c, recBruta, custo, resultado, margem, pe }
   })
-  const recBruta   = culturasCalc.reduce((s, c) => s + c.recBruta, 0)
-  const custoTotal = culturasCalc.reduce((s, c) => s + c.custo, 0)
+  const recBruta   = culturasCalc.reduce((acc, c) => acc + c.recBruta, 0)
+  const custoTotal = culturasCalc.reduce((acc, c) => acc + c.custo, 0)
   const resOp      = recBruta - custoTotal
   const resPos     = resOp - data.servicoAnual
+  const h          = data.horaGeracao
 
-  const COR: Record<string, string> = { Pessimista: C.red, Base: '#1565C0', Otimista: C.green }
-
-  const h = data.horaGeracao
+  const COR: Record<string, string> = {
+    Pessimista: C.negative, Base: '#1565C0', Otimista: C.positive,
+  }
 
   return (
-    <Document title={`Relatório Agro 360° — ${data.clientName} · Safra ${data.safra}`} author="AF Gestão & Consultoria">
+    <Document title={`Relatório Agro 360° — ${data.clientName}`} author="AF Gestão & Consultoria">
 
-      {/* ── CAPA ── */}
+      {/* ══ CAPA ══ */}
       <Cover data={data} recBruta={recBruta} />
 
-      {/* ── PÁG 1 — RESUMO ── */}
+      {/* ══ PÁG 1 — RESUMO EXECUTIVO ══ */}
       <Page size="A4" style={s.page}>
-        <Hdr title="Resumo Executivo" sub={`Safra ${data.safra} · Diagnóstico Financeiro`} client={data.clientName} date={data.dataGeracao} />
+        <Hdr section="Resumo Executivo" client={data.clientName} date={data.safra} />
         <View style={s.body}>
 
-          {/* Banner rating */}
-          <View style={{ backgroundColor: data.ratingColor, borderRadius: 8, padding: 12, marginBottom: 18, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-            <View>
-              <Text style={{ color: '#FFFFFF80', fontSize: 7, textTransform: 'uppercase', letterSpacing: 0.8 }}>Diagnóstico Geral · {data.clientName}</Text>
-              <Text style={{ color: C.white, fontSize: 17, fontFamily: 'Helvetica-Bold', marginTop: 3 }}>{data.ratingLabel}</Text>
-              <Text style={{ color: '#FFFFFF70', fontSize: 7.5, marginTop: 2 }}>Consultor: {data.consultorName} · {data.dataGeracao}</Text>
-            </View>
-            <View style={{ alignItems: 'flex-end' }}>
-              <Text style={{ color: '#FFFFFF60', fontSize: 7 }}>Área Total</Text>
-              <Text style={{ color: C.gold, fontSize: 20, fontFamily: 'Helvetica-Bold', marginTop: 2 }}>{data.areaTotal.toLocaleString('pt-BR')} ha</Text>
-              {data.clientCity && <Text style={{ color: '#FFFFFF60', fontSize: 7, marginTop: 2 }}>{data.clientCity}</Text>}
-            </View>
+          {/* Rating banner — minimal, elegant */}
+          <View style={{
+            borderLeftWidth: 2, borderLeftColor: C.gold,
+            paddingLeft: 14, paddingVertical: 10,
+            marginBottom: 22, marginTop: 4,
+          }}>
+            <Text style={{ fontFamily: 'Helvetica', fontSize: 6, color: C.muted, letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 4 }}>
+              Diagnóstico Geral · {data.clientName}
+            </Text>
+            <Text style={{ fontFamily: 'Times-Roman', fontSize: 18, color: data.ratingColor }}>
+              {data.ratingLabel}
+            </Text>
+            <Text style={{ fontFamily: 'Helvetica', fontSize: 7, color: C.muted, marginTop: 3 }}>
+              Consultor: {data.consultorName} · {data.dataGeracao} · {data.areaTotal.toLocaleString('pt-BR')} ha
+            </Text>
           </View>
 
           {/* KPIs */}
-          <View style={s.section}>
-            <Text style={s.sectionTitle}>Resumo Executivo — Safra {data.safra}</Text>
-            <View style={s.kpiRow}>
-              <View style={s.kpiG}><Text style={s.kpiLabel}>Receita Bruta</Text><Text style={s.kpiValG}>{fmtBRL(recBruta)}</Text></View>
-              <View style={s.kpi}><Text style={s.kpiLabel}>Custo de Produção</Text><Text style={s.kpiVal}>{fmtBRL(custoTotal)}</Text></View>
-              <View style={resOp >= 0 ? s.kpiG : s.kpiR}><Text style={s.kpiLabel}>Resultado Operacional</Text><Text style={resOp >= 0 ? s.kpiValG : s.kpiValR}>{fmtBRL(resOp)}</Text></View>
-              <View style={data.margem >= 20 ? s.kpiG : s.kpi}><Text style={s.kpiLabel}>Margem Operacional</Text><Text style={data.margem >= 20 ? s.kpiValG : s.kpiVal}>{fmtPct(data.margem)}</Text></View>
+          <Section title="Resumo Financeiro — Safra" />
+          <View style={s.kpiRow}>
+            <View style={s.kpiBox}>
+              <Text style={s.kpiLabel}>Receita Bruta</Text>
+              <Text style={s.kpiValPos}>{R(recBruta)}</Text>
             </View>
-            <View style={s.kpiRow}>
-              <View style={s.kpi}><Text style={s.kpiLabel}>Serviço da Dívida/ano</Text><Text style={s.kpiVal}>{fmtBRL(data.servicoAnual)}</Text></View>
-              <View style={resPos >= 0 ? s.kpiG : s.kpiR}><Text style={s.kpiLabel}>Resultado após Endivid.</Text><Text style={resPos >= 0 ? s.kpiValG : s.kpiValR}>{fmtBRL(resPos)}</Text></View>
-              <View style={data.alavancagem > 50 ? s.kpiR : s.kpi}><Text style={s.kpiLabel}>Saldo Devedor Total</Text><Text style={data.alavancagem > 50 ? s.kpiValR : s.kpiVal}>{fmtBRL(data.totalEndividamento)}</Text></View>
-              <View style={s.kpiG}><Text style={s.kpiLabel}>Patrimônio Líquido</Text><Text style={s.kpiValG}>{fmtBRL(data.patrimonioGruto - data.totalOnus)}</Text></View>
+            <View style={s.kpiBox}>
+              <Text style={s.kpiLabel}>Custo de Produção</Text>
+              <Text style={s.kpiVal}>{R(custoTotal)}</Text>
+            </View>
+            <View style={s.kpiBox}>
+              <Text style={s.kpiLabel}>Resultado Operacional</Text>
+              <Text style={resOp >= 0 ? s.kpiValPos : s.kpiValNeg}>{R(resOp)}</Text>
+            </View>
+            <View style={s.kpiBox}>
+              <Text style={s.kpiLabel}>Margem Operacional</Text>
+              <Text style={data.margem >= 20 ? s.kpiValPos : s.kpiVal}>{pct(data.margem)}</Text>
+            </View>
+          </View>
+          <View style={s.kpiRow}>
+            <View style={s.kpiBox}>
+              <Text style={s.kpiLabel}>Serviço da Dívida / ano</Text>
+              <Text style={s.kpiVal}>{R(data.servicoAnual)}</Text>
+            </View>
+            <View style={s.kpiBox}>
+              <Text style={s.kpiLabel}>Resultado após Endivid.</Text>
+              <Text style={resPos >= 0 ? s.kpiValPos : s.kpiValNeg}>{R(resPos)}</Text>
+            </View>
+            <View style={s.kpiBox}>
+              <Text style={s.kpiLabel}>Endividamento Total</Text>
+              <Text style={data.alavancagem > 50 ? s.kpiValNeg : s.kpiVal}>{R(data.totalEndividamento)}</Text>
+            </View>
+            <View style={s.kpiBox}>
+              <Text style={s.kpiLabel}>Patrimônio Líquido</Text>
+              <Text style={s.kpiValPos}>{R(data.patrimonioGruto - data.totalOnus)}</Text>
             </View>
           </View>
 
           {/* Indicadores */}
-          <View style={s.section}>
-            <Text style={s.sectionTitle}>Indicadores Financeiros</Text>
-            <View style={s.table}>
-              <View style={s.thead}>
-                {['Indicador', 'Valor', 'Referência Saudável', 'Status'].map((h, i) => (
-                  <Text key={i} style={{ ...s.th, flex: i === 0 ? 2 : 1 }}>{h}</Text>
-                ))}
-              </View>
-              {[
-                { ind: 'Margem Operacional',       val: fmtPct(data.margem),      ref: '≥ 20%',  ok: data.margem >= 20,      at: data.margem >= 10 },
-                { ind: 'Alavancagem (Dív./Patr.)', val: fmtPct(data.alavancagem), ref: '< 30%',  ok: data.alavancagem < 30,  at: data.alavancagem < 50 },
-                { ind: 'Solvência (Patr./Dív.)',   val: fmtX(data.solvencia),     ref: '> 2,0x', ok: data.solvencia > 2,     at: data.solvencia > 1 },
-                { ind: 'Endivid./Receita Bruta',   val: fmtX(data.endivReceita),  ref: '< 1,0x', ok: data.endivReceita < 1,  at: data.endivReceita < 2 },
-                { ind: 'Capacidade de Pagamento',  val: fmtX(data.capPagamento),  ref: '> 1,5x', ok: data.capPagamento > 1.5, at: data.capPagamento > 1 },
-              ].map((row, i) => (
-                <View key={i} style={{ ...s.tr, ...(i % 2 === 0 ? s.trAlt : {}) }}>
-                  <Text style={{ ...s.td, flex: 2, fontFamily: 'Helvetica-Bold' }}>{row.ind}</Text>
-                  <Text style={{ ...s.td, fontFamily: 'Helvetica-Bold', color: sc(row.ok, row.at) }}>{row.val}</Text>
-                  <Text style={{ ...s.td, color: C.grayMid }}>{row.ref}</Text>
-                  <Text style={{ ...s.td, fontFamily: 'Helvetica-Bold', color: sc(row.ok, row.at) }}>
-                    {row.ok ? '✓ Saudável' : row.at ? '⚠ Atenção' : '✗ Risco'}
-                  </Text>
-                </View>
-              ))}
+          <Section title="Indicadores Financeiros" />
+          <View style={s.table}>
+            <View style={s.thead}>
+              <Text style={{ ...s.th, flex: 2 }}>Indicador</Text>
+              <Text style={s.th}>Valor</Text>
+              <Text style={s.th}>Referência</Text>
+              <Text style={s.th}>Status</Text>
             </View>
+            {[
+              { ind: 'Margem Operacional',       val: pct(data.margem),       ref: '≥ 20%',  ok: data.margem >= 20,      at: data.margem >= 10 },
+              { ind: 'Alavancagem (Dív./Patr.)', val: pct(data.alavancagem),  ref: '< 30%',  ok: data.alavancagem < 30,  at: data.alavancagem < 50 },
+              { ind: 'Solvência (Patr./Dív.)',   val: xv(data.solvencia),     ref: '> 2,0x', ok: data.solvencia > 2,     at: data.solvencia > 1 },
+              { ind: 'Endivid./Receita Bruta',   val: xv(data.endivReceita),  ref: '< 1,0x', ok: data.endivReceita < 1,  at: data.endivReceita < 2 },
+              { ind: 'Capacidade de Pagamento',  val: xv(data.capPagamento),  ref: '> 1,5x', ok: data.capPagamento > 1.5, at: data.capPagamento > 1 },
+            ].map((row, i) => (
+              <View key={i} style={[s.tr, i % 2 === 0 ? s.trAlt : {}]}>
+                <Text style={{ ...s.tdBold, flex: 2 }}>{row.ind}</Text>
+                <Text style={{ ...s.td, color: sc(row.ok, row.at), fontFamily: 'Helvetica-Bold' }}>{row.val}</Text>
+                <Text style={{ ...s.td, color: C.muted }}>{row.ref}</Text>
+                <Text style={{ ...s.td, color: sc(row.ok, row.at) }}>
+                  {row.ok ? 'Saudável' : row.at ? 'Atenção' : 'Risco'}
+                </Text>
+              </View>
+            ))}
           </View>
 
           {/* Culturas */}
-          <View style={s.section}>
-            <Text style={s.sectionTitle}>Resultado por Cultura</Text>
-            <View style={s.table}>
-              <View style={s.thead}>
-                {['Cultura', 'Área', 'Produt.', 'Cotação', 'Receita', 'Custo', 'Resultado', 'Margem', 'PE'].map((h, i) => (
-                  <Text key={i} style={{ ...s.th, flex: i === 0 ? 1.2 : 1, fontSize: 6 }}>{h}</Text>
-                ))}
-              </View>
-              {culturasCalc.map((c, i) => (
-                <View key={i} style={{ ...s.tr, ...(i % 2 === 0 ? s.trAlt : {}) }}>
-                  <Text style={{ ...s.td, flex: 1.2, fontFamily: 'Helvetica-Bold', fontSize: 7 }}>{c.cultura}</Text>
-                  <Text style={{ ...s.td, fontSize: 7 }}>{c.area.toLocaleString('pt-BR')}</Text>
-                  <Text style={{ ...s.td, fontSize: 7 }}>{c.produtividade} sc</Text>
-                  <Text style={{ ...s.td, fontSize: 7 }}>R$ {c.cotacao}</Text>
-                  <Text style={{ ...s.td, fontSize: 7, color: C.green }}>{fmtBRL(c.recBruta)}</Text>
-                  <Text style={{ ...s.td, fontSize: 7, color: C.red }}>{fmtBRL(c.custo)}</Text>
-                  <Text style={{ ...s.td, fontSize: 7, fontFamily: 'Helvetica-Bold', color: c.resultado >= 0 ? C.green : C.red }}>{fmtBRL(c.resultado)}</Text>
-                  <Text style={{ ...s.td, fontSize: 7, color: c.margem >= 20 ? C.green : c.margem >= 10 ? C.amber : C.red }}>{fmtPct(c.margem)}</Text>
-                  <Text style={{ ...s.td, fontSize: 7 }}>{c.pe.toFixed(1)} sc</Text>
-                </View>
+          <Section title="Resultado por Cultura" />
+          <View style={s.table}>
+            <View style={s.thead}>
+              {['Cultura', 'Área (ha)', 'Produt.', 'Cotação', 'Receita Bruta', 'Custo Total', 'Resultado', 'Margem'].map((h2, i) => (
+                <Text key={i} style={{ ...s.th, flex: i === 0 ? 1.4 : 1 }}>{h2}</Text>
               ))}
+            </View>
+            {culturasCalc.map((c, i) => (
+              <View key={i} style={[s.tr, i % 2 === 0 ? s.trAlt : {}]}>
+                <Text style={{ ...s.tdBold, flex: 1.4 }}>{c.cultura}</Text>
+                <Text style={s.td}>{c.area.toLocaleString('pt-BR')}</Text>
+                <Text style={s.td}>{c.produtividade} sc</Text>
+                <Text style={s.td}>R$ {c.cotacao}</Text>
+                <Text style={{ ...s.td, color: C.positive }}>{R(c.recBruta)}</Text>
+                <Text style={{ ...s.td, color: C.negative }}>{R(c.custo)}</Text>
+                <Text style={{ ...s.td, color: c.resultado >= 0 ? C.positive : C.negative, fontFamily: 'Helvetica-Bold' }}>{R(c.resultado)}</Text>
+                <Text style={{ ...s.td, color: c.margem >= 20 ? C.positive : c.margem >= 10 ? C.amber : C.negative }}>{pct(c.margem)}</Text>
+              </View>
+            ))}
+          </View>
+        </View>
+        <Ftr client={data.clientName} date={data.dataGeracao} hora={h} />
+      </Page>
+
+      {/* ══ PÁG 2 — CONTRATOS ══ */}
+      <Page size="A4" style={s.page}>
+        <Hdr section="Contratos de Crédito Rural" client={data.clientName} date={data.safra} />
+        <View style={s.body}>
+          <Section title="Carteira de Financiamentos" />
+          <View style={s.table}>
+            <View style={s.thead}>
+              {['Instituição', 'Modalidade', 'Valor Tomado', 'Parcela', 'Taxa a.a.', 'Parcelas', 'Vencimento'].map((h2, i) => (
+                <Text key={i} style={{ ...s.th, flex: ['Instituição', 'Modalidade'].includes(h2) ? 1.4 : 1 }}>{h2}</Text>
+              ))}
+            </View>
+            {data.contratos.map((c, i) => (
+              <View key={i} style={[s.tr, i % 2 === 0 ? s.trAlt : {}]}>
+                <Text style={{ ...s.tdBold, flex: 1.4 }}>{c.banco}</Text>
+                <Text style={{ ...s.td, flex: 1.4, fontSize: 7 }}>{c.modalidade}</Text>
+                <Text style={{ ...s.tdBold }}>{R(c.valorTomado)}</Text>
+                <Text style={s.td}>{R(c.valorParcela)}</Text>
+                <Text style={s.td}>{(c.taxa * (c.taxa < 1 ? 100 : 1)).toFixed(2)}%</Text>
+                <Text style={s.td}>{c.parcelaAtual}/{c.totalParcelas}</Text>
+                <Text style={s.td}>{c.vencimento ? new Date(c.vencimento).toLocaleDateString('pt-BR') : '—'}</Text>
+              </View>
+            ))}
+            <View style={[s.tr, s.trTotal]}>
+              <Text style={{ ...s.tdBold, flex: 1.4 }}>Total</Text>
+              <Text style={{ ...s.td, flex: 1.4 }} />
+              <Text style={{ ...s.tdBold, color: C.ink }}>{R(data.totalEndividamento)}</Text>
+              <Text style={{ ...s.tdBold, color: C.negative }}>{R(data.servicoAnual)}/ano</Text>
+              <Text style={s.td} /><Text style={s.td} /><Text style={s.td} />
+            </View>
+          </View>
+
+          {/* Resumo passivo */}
+          <View style={{ marginTop: 18 }}>
+            <Section title="Estrutura do Passivo" />
+            <View style={s.kpiRow}>
+              <View style={s.kpiBox}>
+                <Text style={s.kpiLabel}>Saldo Devedor Total</Text>
+                <Text style={s.kpiVal}>{R(data.totalEndividamento)}</Text>
+              </View>
+              <View style={s.kpiBox}>
+                <Text style={s.kpiLabel}>Serviço Anual da Dívida</Text>
+                <Text style={s.kpiValNeg}>{R(data.servicoAnual)}</Text>
+              </View>
+              <View style={s.kpiBox}>
+                <Text style={s.kpiLabel}>Alavancagem</Text>
+                <Text style={data.alavancagem < 30 ? s.kpiValPos : s.kpiValNeg}>{pct(data.alavancagem)}</Text>
+              </View>
+              <View style={s.kpiBox}>
+                <Text style={s.kpiLabel}>Cap. de Pagamento</Text>
+                <Text style={data.capPagamento > 1.5 ? s.kpiValPos : data.capPagamento > 1 ? s.kpiVal : s.kpiValNeg}>
+                  {xv(data.capPagamento)}
+                </Text>
+              </View>
             </View>
           </View>
         </View>
         <Ftr client={data.clientName} date={data.dataGeracao} hora={h} />
       </Page>
 
-      {/* ── PÁG 2 — CONTRATOS ── */}
+      {/* ══ PÁG 3 — DRE + PATRIMÔNIO ══ */}
       <Page size="A4" style={s.page}>
-        <Hdr title="Contratos de Crédito Rural" sub="Carteira de Financiamentos · Estrutura do Passivo" client={data.clientName} date={data.dataGeracao} />
+        <Hdr section="DRE Rural · Patrimônio" client={data.clientName} date={data.safra} />
         <View style={s.body}>
-          <View style={s.section}>
-            <Text style={s.sectionTitle}>Carteira de Crédito Rural</Text>
-            <View style={s.table}>
-              <View style={s.thead}>
-                {['Banco', 'Modalidade', 'Valor Tomado', 'Parcela', 'Taxa a.a.', 'Parcelas', 'Vencimento'].map((h, i) => (
-                  <Text key={i} style={{ ...s.th, flex: ['Banco', 'Modalidade'].includes(h) ? 1.3 : 1, fontSize: 6 }}>{h}</Text>
-                ))}
+
+          <Section title="Demonstrativo de Resultado Rural" />
+          <View style={{ borderWidth: 0.5, borderColor: C.border, borderRadius: 2, overflow: 'hidden', marginBottom: 18 }}>
+            {[
+              { l: 'Receita Bruta',            v: recBruta,          neg: false, total: false },
+              { l: '(-) Custo de Produção',     v: custoTotal,        neg: true,  total: false },
+              { l: '= Resultado Operacional',   v: resOp,             neg: false, total: true  },
+              { l: '(-) Serviço da Dívida/ano', v: data.servicoAnual, neg: true,  total: false },
+              { l: '= Resultado após Endivid.', v: resPos,            neg: false, total: true  },
+            ].map((row, i) => (
+              <View key={i} style={[s.dreRow, row.total ? s.dreTotal : {}, i % 2 === 0 && !row.total ? { backgroundColor: C.white } : {}]}>
+                <Text style={{
+                  fontFamily: row.total ? 'Helvetica-Bold' : 'Helvetica',
+                  fontSize: 8, color: C.body,
+                  paddingLeft: row.neg ? 16 : 0,
+                }}>{row.l}</Text>
+                <Text style={{
+                  fontFamily: row.total ? 'Helvetica-Bold' : 'Helvetica',
+                  fontSize: 8,
+                  color: row.neg ? C.negative : row.v >= 0 ? C.positive : C.negative,
+                }}>{row.neg ? `(${R(row.v)})` : R(row.v)}</Text>
               </View>
-              {data.contratos.map((c, i) => (
-                <View key={i} style={{ ...s.tr, ...(i % 2 === 0 ? s.trAlt : {}) }}>
-                  <Text style={{ ...s.td, flex: 1.3, fontFamily: 'Helvetica-Bold', fontSize: 7 }}>{c.banco}</Text>
-                  <Text style={{ ...s.td, flex: 1.3, fontSize: 6.5 }}>{c.modalidade}</Text>
-                  <Text style={{ ...s.td, fontFamily: 'Helvetica-Bold', fontSize: 7 }}>{fmtBRL(c.valorTomado)}</Text>
-                  <Text style={{ ...s.td, fontSize: 7 }}>{fmtBRL(c.valorParcela)}</Text>
-                  <Text style={{ ...s.td, fontSize: 7 }}>{(c.taxa * (c.taxa < 1 ? 100 : 1)).toFixed(2)}%</Text>
-                  <Text style={{ ...s.td, fontSize: 7 }}>{c.parcelaAtual}/{c.totalParcelas}</Text>
-                  <Text style={{ ...s.td, fontSize: 7 }}>{c.vencimento ? new Date(c.vencimento).toLocaleDateString('pt-BR') : '—'}</Text>
-                </View>
+            ))}
+          </View>
+
+          <Section title="Análise por Hectare" />
+          <View style={{ ...s.table, marginBottom: 18 }}>
+            <View style={s.thead}>
+              {['Indicador', 'Total', 'Por Hectare', 'Referência Saudável'].map((h2, i) => (
+                <Text key={i} style={{ ...s.th, flex: i === 0 ? 2 : 1 }}>{h2}</Text>
               ))}
-              <View style={{ ...s.tr, ...s.trTotal }}>
-                <Text style={{ ...s.td, flex: 1.3, fontFamily: 'Helvetica-Bold' }}>TOTAL</Text>
-                <Text style={{ ...s.td, flex: 1.3 }}>—</Text>
-                <Text style={{ ...s.td, fontFamily: 'Helvetica-Bold', color: C.green }}>{fmtBRL(data.totalEndividamento)}</Text>
-                <Text style={{ ...s.td, fontFamily: 'Helvetica-Bold', color: C.red }}>{fmtBRL(data.servicoAnual)}/ano</Text>
-                <Text style={s.td}>—</Text><Text style={s.td}>—</Text><Text style={s.td}>—</Text>
+            </View>
+            {data.areaTotal > 0 && [
+              { l: 'Receita Bruta',          tot: recBruta,              ha: recBruta / data.areaTotal,              ref: '> R$ 4.500/ha' },
+              { l: 'Custo de Produção',       tot: custoTotal,            ha: custoTotal / data.areaTotal,            ref: '< R$ 3.500/ha' },
+              { l: 'Resultado Operacional',   tot: resOp,                 ha: resOp / data.areaTotal,                 ref: '> R$ 500/ha'   },
+              { l: 'Serviço da Dívida',       tot: data.servicoAnual,     ha: data.servicoAnual / data.areaTotal,     ref: '< R$ 800/ha'   },
+              { l: 'Saldo Devedor Bancário',  tot: data.totalEndividamento, ha: data.totalEndividamento / data.areaTotal, ref: '< R$ 3.000/ha' },
+            ].map((row, i) => (
+              <View key={i} style={[s.tr, i % 2 === 0 ? s.trAlt : {}]}>
+                <Text style={{ ...s.tdBold, flex: 2 }}>{row.l}</Text>
+                <Text style={s.td}>{R(row.tot)}</Text>
+                <Text style={{ ...s.tdBold }}>{R(row.ha)}</Text>
+                <Text style={{ ...s.td, color: C.muted }}>{row.ref}</Text>
               </View>
+            ))}
+          </View>
+
+          <Section title="Patrimônio Rural" />
+          <View style={s.kpiRow}>
+            <View style={s.kpiBox}>
+              <Text style={s.kpiLabel}>Patrimônio Bruto</Text>
+              <Text style={s.kpiValPos}>{R(data.patrimonioGruto)}</Text>
+            </View>
+            <View style={s.kpiBox}>
+              <Text style={s.kpiLabel}>Ônus / Alienações</Text>
+              <Text style={data.totalOnus > 0 ? s.kpiValNeg : s.kpiVal}>{R(data.totalOnus)}</Text>
+            </View>
+            <View style={s.kpiBox}>
+              <Text style={s.kpiLabel}>Patrimônio Líquido</Text>
+              <Text style={s.kpiValPos}>{R(data.patrimonioGruto - data.totalOnus)}</Text>
+            </View>
+            <View style={s.kpiBox}>
+              <Text style={s.kpiLabel}>Cobertura da Dívida</Text>
+              <Text style={data.solvencia > 2 ? s.kpiValPos : data.solvencia > 1 ? s.kpiVal : s.kpiValNeg}>{xv(data.solvencia)}</Text>
             </View>
           </View>
-        </View>
-        <Ftr client={data.clientName} date={data.dataGeracao} hora={h} />
-      </Page>
 
-      {/* ── PÁG 3 — DRE + PATRIMÔNIO ── */}
-      <Page size="A4" style={s.page}>
-        <Hdr title="DRE Rural · Patrimônio" sub="Estrutura Financeira · Análise por Hectare" client={data.clientName} date={data.dataGeracao} />
-        <View style={s.body}>
-
-          {/* DRE */}
-          <View style={s.section}>
-            <Text style={s.sectionTitle}>DRE Rural Resumida</Text>
-            <View style={{ borderWidth: 1, borderColor: C.border, borderRadius: 6, overflow: 'hidden' }}>
-              {[
-                { l: 'Receita Bruta',             v: recBruta,          neg: false, bold: false, indent: 0 },
-                { l: '(-) Custo de Produção',      v: custoTotal,        neg: true,  bold: false, indent: 12 },
-                { l: '= Resultado Operacional',    v: resOp,             neg: false, bold: true,  indent: 0 },
-                { l: '(-) Serviço da Dívida/ano',  v: data.servicoAnual, neg: true,  bold: false, indent: 12 },
-                { l: '= Resultado após Endivid.',  v: resPos,            neg: false, bold: true,  indent: 0 },
-              ].map((row, i) => (
-                <View key={i} style={{
-                  flexDirection: 'row', justifyContent: 'space-between',
-                  paddingVertical: 7, paddingRight: 16, paddingLeft: 16 + row.indent,
-                  backgroundColor: row.bold ? C.greenPale : i % 2 === 0 ? C.cream : C.white,
-                  borderTopWidth: i > 0 ? 1 : 0, borderTopColor: C.border,
-                }}>
-                  <Text style={{ fontSize: 8.5, fontFamily: row.bold ? 'Helvetica-Bold' : 'Helvetica', color: C.dark }}>{row.l}</Text>
-                  <Text style={{ fontSize: 8.5, fontFamily: row.bold ? 'Helvetica-Bold' : 'Helvetica', color: row.neg ? C.red : row.v >= 0 ? C.green : C.red }}>
-                    {row.neg ? `(${fmtBRL(row.v)})` : fmtBRL(row.v)}
+          {data.patrimonio.length > 0 && (
+            <View style={s.table}>
+              <View style={s.thead}>
+                {['Categoria', 'Bem / Descrição', 'Valor Avaliado', 'Situação'].map((h2, i) => (
+                  <Text key={i} style={{ ...s.th, flex: i === 1 ? 2.5 : 1 }}>{h2}</Text>
+                ))}
+              </View>
+              {data.patrimonio.slice(0, 14).map((p, i) => (
+                <View key={i} style={[s.tr, i % 2 === 0 ? s.trAlt : {}]}>
+                  <Text style={s.td}>{p.categoria}</Text>
+                  <Text style={{ ...s.td, flex: 2.5 }}>{p.descricao}</Text>
+                  <Text style={{ ...s.tdBold }}>{R(p.valorAvaliado)}</Text>
+                  <Text style={{ ...s.td, color: p.possuiOnus ? C.negative : C.positive }}>
+                    {p.possuiOnus ? `Ônus: ${R(p.valorOnus)}` : 'Livre'}
                   </Text>
                 </View>
               ))}
-            </View>
-          </View>
-
-          {/* Patrimônio KPIs */}
-          <View style={s.section}>
-            <Text style={s.sectionTitle}>Patrimônio Rural</Text>
-            <View style={s.kpiRow}>
-              <View style={s.kpiG}><Text style={s.kpiLabel}>Patrimônio Bruto</Text><Text style={s.kpiValG}>{fmtBRL(data.patrimonioGruto)}</Text></View>
-              <View style={data.totalOnus > 0 ? s.kpiR : s.kpi}><Text style={s.kpiLabel}>Ônus/Alienações</Text><Text style={data.totalOnus > 0 ? s.kpiValR : s.kpiVal}>{fmtBRL(data.totalOnus)}</Text></View>
-              <View style={s.kpiG}><Text style={s.kpiLabel}>Patrimônio Líquido</Text><Text style={s.kpiValG}>{fmtBRL(data.patrimonioGruto - data.totalOnus)}</Text></View>
-              <View style={data.solvencia > 2 ? s.kpiG : data.solvencia > 1 ? s.kpi : s.kpiR}>
-                <Text style={s.kpiLabel}>Cobertura da Dívida</Text>
-                <Text style={data.solvencia > 2 ? s.kpiValG : data.solvencia > 1 ? s.kpiVal : s.kpiValR}>{fmtX(data.solvencia)}</Text>
-              </View>
-            </View>
-            {data.patrimonio.length > 0 && (
-              <View style={{ ...s.table, marginTop: 8 }}>
-                <View style={s.thead}>
-                  {['Categoria', 'Bem / Descrição', 'Valor Avaliado', 'Ônus'].map((h, i) => (
-                    <Text key={i} style={{ ...s.th, flex: i === 1 ? 2 : 1, fontSize: 6 }}>{h}</Text>
-                  ))}
+              {data.patrimonio.length > 14 && (
+                <View style={s.tr}>
+                  <Text style={{ ...s.td, color: C.muted, flex: 4 }}>
+                    + {data.patrimonio.length - 14} bens patrimoniais adicionais
+                  </Text>
                 </View>
-                {data.patrimonio.slice(0, 12).map((p, i) => (
-                  <View key={i} style={{ ...s.tr, ...(i % 2 === 0 ? s.trAlt : {}) }}>
-                    <Text style={{ ...s.td, fontSize: 7 }}>{p.categoria}</Text>
-                    <Text style={{ ...s.td, flex: 2, fontSize: 7 }}>{p.descricao}</Text>
-                    <Text style={{ ...s.td, fontFamily: 'Helvetica-Bold', fontSize: 7 }}>{fmtBRL(p.valorAvaliado)}</Text>
-                    <Text style={{ ...s.td, fontSize: 7, color: p.possuiOnus ? C.red : C.grayMid }}>{p.possuiOnus ? fmtBRL(p.valorOnus) : 'Livre'}</Text>
-                  </View>
-                ))}
-                {data.patrimonio.length > 12 && (
-                  <View style={s.tr}><Text style={{ ...s.td, color: C.grayMid, fontSize: 7 }}>... e mais {data.patrimonio.length - 12} bens patrimoniais</Text></View>
-                )}
-              </View>
-            )}
-          </View>
-
-          {/* Por ha */}
-          {data.areaTotal > 0 && (
-            <View style={s.section}>
-              <Text style={s.sectionTitle}>Análise por Hectare</Text>
-              <View style={s.table}>
-                <View style={s.thead}>
-                  {['Indicador', 'Total', 'Por Hectare', 'Referência'].map((h, i) => (
-                    <Text key={i} style={{ ...s.th, flex: i === 0 ? 2 : 1, fontSize: 6 }}>{h}</Text>
-                  ))}
-                </View>
-                {[
-                  { l: 'Receita Bruta',           tot: recBruta,              ha: recBruta / data.areaTotal,              ref: '> R$ 4.500/ha' },
-                  { l: 'Custo de Produção',        tot: custoTotal,            ha: custoTotal / data.areaTotal,            ref: '< R$ 3.500/ha' },
-                  { l: 'Resultado Operacional',    tot: resOp,                 ha: resOp / data.areaTotal,                 ref: '> R$ 500/ha' },
-                  { l: 'Serviço da Dívida',        tot: data.servicoAnual,     ha: data.servicoAnual / data.areaTotal,     ref: '< R$ 800/ha' },
-                  { l: 'Resultado após Endivid.',  tot: resPos,                ha: resPos / data.areaTotal,                ref: '> R$ 0/ha' },
-                  { l: 'Saldo Devedor Bancário',   tot: data.totalEndividamento, ha: data.totalEndividamento / data.areaTotal, ref: '< R$ 3.000/ha' },
-                ].map((row, i) => (
-                  <View key={i} style={{ ...s.tr, ...(i % 2 === 0 ? s.trAlt : {}) }}>
-                    <Text style={{ ...s.td, flex: 2, fontFamily: 'Helvetica-Bold', fontSize: 7 }}>{row.l}</Text>
-                    <Text style={{ ...s.td, fontSize: 7 }}>{fmtBRL(row.tot)}</Text>
-                    <Text style={{ ...s.td, fontFamily: 'Helvetica-Bold', fontSize: 7 }}>{fmtBRL(row.ha)}</Text>
-                    <Text style={{ ...s.td, fontSize: 7, color: C.grayMid }}>{row.ref}</Text>
-                  </View>
-                ))}
-              </View>
+              )}
             </View>
           )}
         </View>
         <Ftr client={data.clientName} date={data.dataGeracao} hora={h} />
       </Page>
 
-      {/* ── PÁG 4 — CENÁRIOS + PROJEÇÃO ── */}
+      {/* ══ PÁG 4 — CENÁRIOS + PROJEÇÃO ══ */}
       <Page size="A4" style={s.page}>
-        <Hdr title="Cenários · Projeção 10 Anos" sub="Análise de Sustentabilidade Financeira" client={data.clientName} date={data.dataGeracao} />
+        <Hdr section="Cenários · Projeção 10 Anos" client={data.clientName} date={data.safra} />
         <View style={s.body}>
 
           {data.cenarios.length > 0 && (
-            <View style={s.section}>
-              <Text style={s.sectionTitle}>Simulação de Cenários — Próximos 10 Anos</Text>
-              <View style={{ flexDirection: 'row', gap: 8 }}>
+            <>
+              <Section title="Simulação de Cenários — Próximos 10 Anos" />
+              <View style={{ flexDirection: 'row', gap: 8, marginBottom: 20 }}>
                 {data.cenarios.map(c => (
-                  <View key={c.nome} style={{ flex: 1, borderWidth: 1, borderColor: C.border, borderRadius: 6, borderLeftWidth: 4, borderLeftColor: COR[c.nome] ?? C.grayMid, padding: 12 }}>
-                    <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', color: COR[c.nome] ?? C.grayDark, marginBottom: 8 }}>{c.nome}</Text>
-                    <Text style={s.kpiLabel}>Resultado 10 Anos</Text>
-                    <Text style={{ fontSize: 11, fontFamily: 'Helvetica-Bold', color: c.resultadoTotal10Anos >= 0 ? C.green : C.red, marginBottom: 6, marginTop: 2 }}>{fmtBRL(c.resultadoTotal10Anos)}</Text>
-                    <Text style={s.kpiLabel}>Anos Positivos</Text>
-                    <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color: c.anosPositivos >= 7 ? C.green : c.anosPositivos >= 5 ? C.amber : C.red, marginBottom: 6, marginTop: 2 }}>{c.anosPositivos} de 10</Text>
-                    <View style={{ backgroundColor: (COR[c.nome] ?? C.grayMid) + '18', padding: 7, borderRadius: 5 }}>
-                      <Text style={{ fontSize: 7.5, fontFamily: 'Helvetica-Bold', color: COR[c.nome] ?? C.grayDark }}>{c.veredicto}</Text>
-                    </View>
+                  <View key={c.nome} style={{
+                    flex: 1, padding: 14,
+                    borderWidth: 0.5, borderColor: C.border, borderRadius: 2,
+                    borderTopWidth: 1.5, borderTopColor: COR[c.nome] ?? C.muted,
+                    backgroundColor: C.white,
+                  }}>
+                    <Text style={{ fontFamily: 'Helvetica-Bold', fontSize: 8, color: COR[c.nome] ?? C.muted, marginBottom: 10, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                      {c.nome}
+                    </Text>
+                    <Text style={{ fontFamily: 'Helvetica', fontSize: 6, color: C.muted, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 3 }}>
+                      Resultado 10 Anos
+                    </Text>
+                    <Text style={{ fontFamily: 'Times-Roman', fontSize: 12, color: c.resultadoTotal10Anos >= 0 ? C.positive : C.negative, marginBottom: 10 }}>
+                      {R(c.resultadoTotal10Anos)}
+                    </Text>
+                    <Text style={{ fontFamily: 'Helvetica', fontSize: 6, color: C.muted, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 3 }}>
+                      Anos Positivos
+                    </Text>
+                    <Text style={{ fontFamily: 'Times-Roman', fontSize: 12, color: c.anosPositivos >= 7 ? C.positive : c.anosPositivos >= 5 ? C.amber : C.negative, marginBottom: 10 }}>
+                      {c.anosPositivos} de 10
+                    </Text>
+                    <View style={{ height: 0.5, backgroundColor: C.border, marginBottom: 8 }} />
+                    <Text style={{ fontFamily: 'Helvetica', fontSize: 7, color: C.body, lineHeight: 1.5 }}>
+                      {c.veredicto}
+                    </Text>
                   </View>
                 ))}
               </View>
-            </View>
+            </>
           )}
 
           {data.projecaoAnos.length > 0 && (
-            <View style={s.section}>
-              <Text style={s.sectionTitle}>Projeção Anual — Cenário Base</Text>
+            <>
+              <Section title="Projeção Anual — Cenário Base" />
               <View style={s.table}>
                 <View style={s.thead}>
-                  {['Ano', 'Receita Bruta', 'Resultado Líquido', 'Status'].map((h, i) => (
-                    <Text key={i} style={s.th}>{h}</Text>
+                  {['Ano', 'Receita Bruta', 'Resultado Líquido', 'Situação'].map((h2) => (
+                    <Text key={h2} style={s.th}>{h2}</Text>
                   ))}
                 </View>
                 {data.projecaoAnos.map((r, i) => (
-                  <View key={r.ano} style={{ ...s.tr, ...(i % 2 === 0 ? s.trAlt : {}) }}>
-                    <Text style={{ ...s.td, fontFamily: 'Helvetica-Bold' }}>{r.ano}</Text>
-                    <Text style={{ ...s.td, color: C.green }}>{fmtBRL(r.recBruta)}</Text>
-                    <Text style={{ ...s.td, fontFamily: 'Helvetica-Bold', color: r.resultadoLiquido >= 0 ? C.green : C.red }}>{fmtBRL(r.resultadoLiquido)}</Text>
-                    <Text style={{ ...s.td, color: r.resultadoLiquido >= 0 ? C.green : C.red }}>{r.resultadoLiquido >= 0 ? '✓ Positivo' : '✗ Negativo'}</Text>
+                  <View key={r.ano} style={[s.tr, i % 2 === 0 ? s.trAlt : {}]}>
+                    <Text style={s.tdBold}>{r.ano}</Text>
+                    <Text style={{ ...s.td, color: C.positive }}>{R(r.recBruta)}</Text>
+                    <Text style={{ ...s.td, color: r.resultadoLiquido >= 0 ? C.positive : C.negative, fontFamily: 'Helvetica-Bold' }}>
+                      {R(r.resultadoLiquido)}
+                    </Text>
+                    <Text style={{ ...s.td, color: r.resultadoLiquido >= 0 ? C.positive : C.negative }}>
+                      {r.resultadoLiquido >= 0 ? 'Positivo' : 'Negativo'}
+                    </Text>
                   </View>
                 ))}
-                <View style={{ ...s.tr, ...s.trTotal }}>
-                  <Text style={{ ...s.td, fontFamily: 'Helvetica-Bold' }}>Total 10 Anos</Text>
-                  <Text style={{ ...s.td, fontFamily: 'Helvetica-Bold', color: C.green }}>{fmtBRL(data.projecaoAnos.reduce((acc, r) => acc + r.recBruta, 0))}</Text>
-                  <Text style={{ ...s.td, fontFamily: 'Helvetica-Bold', color: data.projecao10Anos >= 0 ? C.green : C.red }}>{fmtBRL(data.projecao10Anos)}</Text>
-                  <Text style={{ ...s.td, fontFamily: 'Helvetica-Bold', color: data.projecao10Anos >= 0 ? C.green : C.red }}>{data.projecaoAnos.filter(r => r.resultadoLiquido >= 0).length} de 10 positivos</Text>
+                <View style={[s.tr, s.trTotal]}>
+                  <Text style={s.tdBold}>Total 10 Anos</Text>
+                  <Text style={{ ...s.tdBold, color: C.positive }}>{R(data.projecaoAnos.reduce((acc, r) => acc + r.recBruta, 0))}</Text>
+                  <Text style={{ ...s.tdBold, color: data.projecao10Anos >= 0 ? C.positive : C.negative }}>{R(data.projecao10Anos)}</Text>
+                  <Text style={{ ...s.td, color: C.muted }}>{data.projecaoAnos.filter(r => r.resultadoLiquido >= 0).length} de 10 positivos</Text>
                 </View>
               </View>
-            </View>
+            </>
           )}
 
           {/* Parecer */}
-          <View style={{ backgroundColor: C.greenPale, borderRadius: 8, borderWidth: 1, borderColor: '#A5D6A7', padding: 16, marginTop: 4 }}>
-            <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', color: C.green, marginBottom: 8 }}>Parecer Consultivo — AF Gestão & Consultoria</Text>
-            <Text style={{ fontSize: 8.5, color: C.grayDark, lineHeight: 1.6 }}>
-              A propriedade <Text style={{ fontFamily: 'Helvetica-Bold' }}>{data.clientName}</Text>, com {data.areaTotal.toLocaleString('pt-BR')} ha, apresenta receita de {fmtBRL(recBruta)} na safra {data.safra}, resultado operacional de {fmtBRL(resOp)} e margem de {fmtPct(data.margem)}. O endividamento de {fmtBRL(data.totalEndividamento)} representa {fmtPct(data.alavancagem)} do patrimônio bruto (solvência: {fmtX(data.solvencia)}).
+          <View style={{
+            borderLeftWidth: 2, borderLeftColor: C.gold,
+            paddingLeft: 14, paddingVertical: 10, marginTop: 16,
+          }}>
+            <Text style={{ fontFamily: 'Helvetica', fontSize: 6, color: C.gold, letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 6 }}>
+              Parecer Consultivo
             </Text>
-            <Text style={{ fontSize: 8.5, color: C.grayDark, lineHeight: 1.6, marginTop: 8 }}>
-              Após o serviço da dívida de {fmtBRL(data.servicoAnual)}/ano, o resultado disponível é {fmtBRL(resPos)} — {resPos >= 0 ? 'indicando capacidade de honrar os compromissos com a receita da safra.' : 'indicando insuficiência de caixa operacional. Atenção imediata recomendada na renegociação das dívidas.'}
+            <Text style={{ fontFamily: 'Helvetica', fontSize: 8, color: C.body, lineHeight: 1.65 }}>
+              A propriedade <Text style={{ fontFamily: 'Helvetica-Bold' }}>{data.clientName}</Text> apresenta receita bruta de {R(recBruta)} e resultado operacional de {R(resOp)}, com margem de {pct(data.margem)}. O endividamento total de {R(data.totalEndividamento)} representa {pct(data.alavancagem)} do patrimônio bruto (solvência: {xv(data.solvencia)}).
+            </Text>
+            <Text style={{ fontFamily: 'Helvetica', fontSize: 8, color: C.body, lineHeight: 1.65, marginTop: 6 }}>
+              Após o serviço da dívida de {R(data.servicoAnual)}/ano, o resultado disponível é {R(resPos)} — {resPos >= 0
+                ? 'indicando capacidade de honrar os compromissos com a receita da safra.'
+                : 'indicando insuficiência de caixa operacional. Recomenda-se atenção imediata à renegociação do passivo.'}
+            </Text>
+            <Text style={{ fontFamily: 'Helvetica', fontSize: 7, color: C.muted, marginTop: 10 }}>
+              AF Gestão & Consultoria · {data.consultorName} · {data.dataGeracao}
             </Text>
           </View>
         </View>
