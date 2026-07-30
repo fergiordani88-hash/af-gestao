@@ -1,5 +1,5 @@
 import {
-  Document, Page, View, Text, StyleSheet, Font, Image
+  Document, Page, View, Text, StyleSheet, Image
 } from '@react-pdf/renderer'
 import type { ReactNode } from 'react'
 
@@ -24,19 +24,9 @@ export const colors = {
   border:     '#E0E0E0',
 }
 
-// Registrar fontes
-Font.register({
-  family: 'Inter',
-  fonts: [
-    { src: 'https://fonts.gstatic.com/s/inter/v13/UcCO3FwrK3iLTeHuS_fvQtMwCp50KnMw2boKoduKmMEVuLyfAZ9hiJ-Ek-_EeA.woff', fontWeight: 400 },
-    { src: 'https://fonts.gstatic.com/s/inter/v13/UcCO3FwrK3iLTeHuS_fvQtMwCp50KnMw2boKoduKmMEVuGKYAZ9hiJ-Ek-_EeA.woff', fontWeight: 600 },
-    { src: 'https://fonts.gstatic.com/s/inter/v13/UcCO3FwrK3iLTeHuS_fvQtMwCp50KnMw2boKoduKmMEVuFuYAZ9hiJ-Ek-_EeA.woff', fontWeight: 700 },
-  ]
-})
-
 export const base = StyleSheet.create({
   page: {
-    fontFamily: 'Inter',
+    fontFamily: 'Helvetica',
     fontSize: 9,
     color: colors.dark,
     backgroundColor: colors.white,
