@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import {
   Sprout, CreditCard, Shield, TrendingUp, TrendingDown,
-  MapPin, BarChart2, AlertTriangle, CheckCircle, Info, Activity, FileDown, Target
+  MapPin, BarChart2, AlertTriangle, CheckCircle, Info, Activity, FileDown, Target, Clock
 } from 'lucide-react'
 import { agroApi, type AgroProducao, type AgroPatrimonio, type AgroParcela } from '../../services/agroApi'
 import { usePDF } from '../../pdf/usePDF'
@@ -10,6 +10,42 @@ import { useStore } from '../../store/useStore'
 const fmtBRL = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 0, maximumFractionDigits: 0 })
 const fmtN   = (v: number, d = 2) => v.toLocaleString('pt-BR', { minimumFractionDigits: d, maximumFractionDigits: d })
 const fmtPct = (v: number) => `${fmtN(v, 1)}%`
+
+// ── Calendário de colheitas ────────────────────────────────────
+interface HarvestDate { month: number; day: number }
+const HARVEST_DEFAULTS: Record<string, HarvestDate> = {
+  soja:   { month: 4,  day: 15 },
+  milho:  { month: 8,  day: 15 },
+  feijao: { month: 11, day: 15 },
+}
+const HARVEST_LABELS: Record<string, string> = {
+  soja: 'Soja', milho: 'Milho', feijao: 'Feijão',
+}
+
+function culturaKey(cultura: string): string | null {
+  const s = cultura.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
+  if (s.includes('soja'))  return 'soja'
+  if (s.includes('milho')) return 'milho'
+  if (s.includes('feij'))  return 'feijao'
+  return null
+}
+
+function getColheitaDate(p: AgroProducao, datas: Record<string, HarvestDate>): Date {
+  const key = culturaKey(p.cultura)
+  const hd  = (key && datas[key]) ?? { month: 4, day: 15 }
+  const parts = p.safra.split('/')
+  const ano2  = parts[1].length === 2 ? 2000 + parseInt(parts[1]) : parseInt(parts[1])
+  return new Date(ano2, hd.month - 1, hd.day)
+}
+
+const LS_KEY = 'af-colheita-datas'
+
+function loadColheitaDatas(): Record<string, HarvestDate> {
+  try {
+    const raw = localStorage.getItem(LS_KEY)
+    return raw ? { ...HARVEST_DEFAULTS, ...JSON.parse(raw) } : { ...HARVEST_DEFAULTS }
+  } catch { return { ...HARVEST_DEFAULTS } }
+}
 
 function calcRow(p: AgroProducao) {
   const custoPorHaReais  = p.custoPorHa * p.cotacao
@@ -116,6 +152,14 @@ export function TabResumo({ clientId, clienteNome, clienteCidade }: {
   const [exportando, setExportando] = useState(false)
   const [limSaudavel, setLimSaudavel] = useState(30)
   const [limCritico,  setLimCritico]  = useState(50)
+  const [colheitaDatas, setColheitaDatas] = useState<Record<string, HarvestDate>>(loadColheitaDatas)
+  const [showCalendario, setShowCalendario] = useState(false)
+  const [colheitaEdit, setColheitaEdit] = useState<Record<string, HarvestDate>>({})
+
+  const saveColheitaDatas = (datas: Record<string, HarvestDate>) => {
+    setColheitaDatas(datas)
+    localStorage.setItem(LS_KEY, JSON.stringify(datas))
+  }
 
   useEffect(() => {
     setLoading(true)
@@ -193,12 +237,104 @@ export function TabResumo({ clientId, clienteNome, clienteCidade }: {
   const endivCusteio    = contratos.filter((c: any) => isCusteio(c.modalidade)).reduce((s: number, c: any) => s + c.valorTomado, 0)
   const endivSemCusteio = totalEndividamento - endivCusteio
 
-  // Comprometimento da receita líquida com serviço exceto custeio
-  const comprometimentoPct = resultadoLiq > 0 ? (servicoSemCusteioAnual / resultadoLiq) * 100 : 0
+  // ── Custeio excedente ─────────────────────────────────────────
+  // Se endividamento de custeio > custo real de produção, o excesso não está
+  // coberto pela atividade e deve impactar a capacidade de pagamento.
+  const custeioLimite    = custoTotal  // custo real de produção da safra selecionada
+  const custeioExcedente = Math.max(0, endivCusteio - custeioLimite)
+  const propExcedente    = endivCusteio > 0 ? custeioExcedente / endivCusteio : 0
+  // Parcela do serviço de custeio que excede a cobertura da atividade
+  const servicoCusteioExcedenteAnual = servicoCusteioAnual * propExcedente
+  // Serviço exceto custeio + custeio excedente = o que realmente compromete o resultado
+  const servicoComprometeAnual = servicoSemCusteioAnual + servicoCusteioExcedenteAnual
+
+  // Comprometimento da receita líquida com serviço exceto custeio (ajustado)
+  const comprometimentoPct = resultadoLiq > 0 ? (servicoComprometeAnual / resultadoLiq) * 100 : 0
   const capMaxSaudavel = resultadoLiq * (limSaudavel / 100)
   const capMaxCritico  = resultadoLiq * (limCritico  / 100)
-  const margemDisponivel = capMaxSaudavel - servicoSemCusteioAnual
+  const margemDisponivel = capMaxSaudavel - servicoComprometeAnual
   const statusCapEndiv: Status = comprometimentoPct <= limSaudavel ? 'ok' : comprometimentoPct <= limCritico ? 'atencao' : 'risco'
+
+  // ── CP vs LP (360 dias) ────────────────────────────────────────
+  const hoje = new Date()
+  const dataCorte360 = new Date(hoje.getTime() + 360 * 24 * 60 * 60 * 1000)
+
+  // Classifica cada entrada de produção pela data de colheita da sua cultura
+  const producaoCp = producao.filter(p => {
+    const d = getColheitaDate(p, colheitaDatas)
+    return d > hoje && d <= dataCorte360
+  })
+  const producaoLp = producao.filter(p => getColheitaDate(p, colheitaDatas) > dataCorte360)
+
+  const receitaCp   = producaoCp.reduce((s, p) => s + calcRow(p).recBruta, 0)
+  const custoCp     = producaoCp.reduce((s, p) => s + calcRow(p).custoTotal + calcRow(p).custoArrendTotal, 0)
+  const receitaLp   = producaoLp.reduce((s, p) => s + calcRow(p).recBruta, 0)
+  const custoLp     = producaoLp.reduce((s, p) => s + calcRow(p).custoTotal + calcRow(p).custoArrendTotal, 0)
+  const resultadoCp = receitaCp - custoCp
+  const resultadoLp = receitaLp - custoLp
+
+  const parcelasCp = parcelas.filter(p => new Date(p.vencimento) <= dataCorte360)
+  const parcelasLp = parcelas.filter(p => new Date(p.vencimento) > dataCorte360)
+  const servicoCp  = parcelasCp.reduce((s, p) => s + p.valorParcela, 0)
+  const servicoLp  = parcelasLp.reduce((s, p) => s + p.valorParcela, 0)
+
+  // Custeio excedente por horizonte (mesmo critério: excesso sobre custo do horizonte)
+  const servicoCusteioCp    = parcelasCp.filter(p => contratosCusteioIds.has(p.contratoId)).reduce((s, p) => s + p.valorParcela, 0)
+  const servicoCusteioLp    = parcelasLp.filter(p => contratosCusteioIds.has(p.contratoId)).reduce((s, p) => s + p.valorParcela, 0)
+
+  // Excedente proporcional de custeio em cada horizonte
+  const excCpProp = endivCusteio > 0 ? Math.min(1, Math.max(0, custeioExcedente / endivCusteio)) : 0
+  const servicoCusteioExcCp = servicoCusteioCp * excCpProp
+  const servicoCusteioExcLp = servicoCusteioLp * excCpProp
+
+  // O que efetivamente compromete a capacidade de pagamento em cada horizonte
+  const servicoCompromCp = (servicoCp - servicoCusteioCp) + servicoCusteioExcCp
+  const servicoCompromLp = (servicoLp - servicoCusteioLp) + servicoCusteioExcLp
+
+  const saldoDispCp = resultadoCp - servicoCompromCp
+  const saldoDispLp = resultadoLp - servicoCompromLp
+
+  // PEs por horizonte
+  const peSaudavelCp = resultadoCp * (limSaudavel / 100)
+  const peCriticoCp  = resultadoCp * (limCritico  / 100)
+  const peSaudavelLp = resultadoLp * (limSaudavel / 100)
+  const peCriticoLp  = resultadoLp * (limCritico  / 100)
+
+  const comprCp: Status = receitaCp === 0 ? 'ok' : resultadoCp <= 0 ? 'risco' : (servicoCompromCp / resultadoCp) * 100 <= limSaudavel ? 'ok' : (servicoCompromCp / resultadoCp) * 100 <= limCritico ? 'atencao' : 'risco'
+  const comprLp: Status = receitaLp === 0 ? 'ok' : resultadoLp <= 0 ? 'risco' : (servicoCompromLp / resultadoLp) * 100 <= limSaudavel ? 'ok' : (servicoCompromLp / resultadoLp) * 100 <= limCritico ? 'atencao' : 'risco'
+
+  // Dentro do Ano (ano calendário corrente)
+  const fimDoAno = new Date(anoAtual, 11, 31)
+  const producaoDentroAno = producao.filter(p => {
+    const d = getColheitaDate(p, colheitaDatas)
+    return d >= hoje && d <= fimDoAno
+  })
+  const receitaDentroAno   = producaoDentroAno.reduce((s, p) => s + calcRow(p).recBruta, 0)
+  const custoDentroAno     = producaoDentroAno.reduce((s, p) => s + calcRow(p).custoTotal + calcRow(p).custoArrendTotal, 0)
+  const resultadoDentroAno = receitaDentroAno - custoDentroAno
+
+  const parcelasAnoFuturas       = parcelasAnoAtual.filter(p => new Date(p.vencimento) >= hoje)
+  const servicoDentroAno         = parcelasAnoFuturas.reduce((s, p) => s + p.valorParcela, 0)
+  const servicoCusteioDentroAno  = parcelasAnoFuturas.filter(p => contratosCusteioIds.has(p.contratoId)).reduce((s, p) => s + p.valorParcela, 0)
+  const servicoCusteioExcDentroAno = servicoCusteioDentroAno * excCpProp
+  const servicoCompromDentroAno  = (servicoDentroAno - servicoCusteioDentroAno) + servicoCusteioExcDentroAno
+  const saldoDispDentroAno       = resultadoDentroAno - servicoCompromDentroAno
+  const peSaudavelAno = resultadoDentroAno * (limSaudavel / 100)
+  const peCriticoAno  = resultadoDentroAno * (limCritico  / 100)
+  const comprDentroAno: Status = receitaDentroAno === 0 ? 'ok' : resultadoDentroAno <= 0 ? 'risco' : (servicoCompromDentroAno / resultadoDentroAno) * 100 <= limSaudavel ? 'ok' : (servicoCompromDentroAno / resultadoDentroAno) * 100 <= limCritico ? 'atencao' : 'risco'
+
+  // Aliases para a tabela (mantém nomes antigos onde a UI usa exceto-custeio puro)
+  const servicoExcCusteioCp        = servicoCp - servicoCusteioCp
+  const servicoExcCusteioLp        = servicoLp - servicoCusteioLp
+  const servicoExcCusteioDentroAno = servicoDentroAno - servicoCusteioDentroAno
+
+  const safrasCpNomes  = producaoCp.map(p => p.safra).filter((v, i, a) => a.indexOf(v) === i)
+  const safrasLpNomes  = producaoLp.map(p => p.safra).filter((v, i, a) => a.indexOf(v) === i)
+  const safrasAnoNomes = producaoDentroAno.map(p => p.safra).filter((v, i, a) => a.indexOf(v) === i)
+
+  // Culturas presentes nos dados (para mostrar no calendário)
+  const culturasPresentes = [...new Set(producao.map(p => culturaKey(p.cultura)).filter(Boolean))] as string[]
+  const todasCulturasCalendario = [...new Set([...Object.keys(HARVEST_DEFAULTS), ...culturasPresentes])]
 
   const statusAlavancagem: Status = alavancagem < 30 ? 'ok' : alavancagem < 50 ? 'atencao' : 'risco'
   const statusSolvencia:   Status = solvencia > 2   ? 'ok' : solvencia > 1   ? 'atencao' : 'risco'
@@ -1032,6 +1168,302 @@ export function TabResumo({ clientId, clienteNome, clienteCidade }: {
           })()}
         </Section>
       )}
+
+      {/* ── Análise CP × LP ─────────────────────────────────────────── */}
+      <Section title="Análise Curto Prazo × Longo Prazo (visão bancária)" icon={Clock} color="text-sky-600">
+        <div className="space-y-4">
+          {/* Calendário de colheitas */}
+          <div className="border border-sky-200 rounded-xl overflow-hidden">
+            <button
+              onClick={() => {
+                if (!showCalendario) setColheitaEdit({ ...colheitaDatas })
+                setShowCalendario(v => !v)
+              }}
+              className="w-full flex items-center justify-between px-4 py-3 bg-sky-50 text-xs font-semibold text-sky-700 hover:bg-sky-100 transition-colors"
+            >
+              <div className="flex items-center gap-2">
+                <Clock size={13} />
+                <span>Calendário de receitas/despesas por cultura</span>
+                <span className="text-sky-400 font-normal">
+                  (Soja: {String(colheitaDatas.soja?.day ?? 15).padStart(2,'0')}/{String(colheitaDatas.soja?.month ?? 4).padStart(2,'0')} · Milho: {String(colheitaDatas.milho?.day ?? 15).padStart(2,'0')}/{String(colheitaDatas.milho?.month ?? 8).padStart(2,'0')} · Feijão: {String(colheitaDatas.feijao?.day ?? 15).padStart(2,'0')}/{String(colheitaDatas.feijao?.month ?? 11).padStart(2,'0')})
+                </span>
+              </div>
+              <span className="text-sky-500">{showCalendario ? '▲ Fechar' : '▼ Editar'}</span>
+            </button>
+
+            {showCalendario && (
+              <div className="px-4 py-4 bg-white space-y-3">
+                <p className="text-xs text-gray-500">
+                  Data em que a receita e os custos de cada cultura são contabilizados. Ano calculado automaticamente pela safra.
+                  Usado para classificar CP (≤ 360 dias) vs LP (&gt; 360 dias).
+                </p>
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="text-gray-400 border-b border-gray-100">
+                      <th className="text-left pb-2">Cultura</th>
+                      <th className="text-center pb-2">Dia</th>
+                      <th className="text-center pb-2">Mês</th>
+                      <th className="text-left pb-2 pl-4 text-gray-300">Exemplo (safra 2026/27)</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-50">
+                    {todasCulturasCalendario.map(key => {
+                      const current = colheitaEdit[key] ?? HARVEST_DEFAULTS[key] ?? { month: 4, day: 15 }
+                      const exDate = new Date(2027, current.month - 1, current.day)
+                      const exStr  = exDate.toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })
+                      return (
+                        <tr key={key}>
+                          <td className="py-2 font-semibold text-gray-700">{HARVEST_LABELS[key] ?? key}</td>
+                          <td className="py-2 text-center">
+                            <input
+                              type="number" min={1} max={31}
+                              value={current.day}
+                              onChange={e => setColheitaEdit(prev => ({ ...prev, [key]: { ...current, day: Math.min(31, Math.max(1, Number(e.target.value))) } }))}
+                              className="w-14 text-center border border-gray-200 rounded-lg px-2 py-1 font-bold text-gray-800 focus:outline-none focus:ring-1 focus:ring-sky-400"
+                            />
+                          </td>
+                          <td className="py-2 text-center">
+                            <input
+                              type="number" min={1} max={12}
+                              value={current.month}
+                              onChange={e => setColheitaEdit(prev => ({ ...prev, [key]: { ...current, month: Math.min(12, Math.max(1, Number(e.target.value))) } }))}
+                              className="w-14 text-center border border-gray-200 rounded-lg px-2 py-1 font-bold text-gray-800 focus:outline-none focus:ring-1 focus:ring-sky-400"
+                            />
+                          </td>
+                          <td className="py-2 pl-4 text-gray-400">{exStr}</td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+                <div className="flex gap-2 pt-1">
+                  <button
+                    onClick={() => { saveColheitaDatas(colheitaEdit); setShowCalendario(false) }}
+                    className="px-4 py-1.5 bg-sky-600 text-white text-xs font-semibold rounded-lg hover:bg-sky-700 transition-colors"
+                  >
+                    Salvar
+                  </button>
+                  <button
+                    onClick={() => { setColheitaEdit({ ...HARVEST_DEFAULTS }); }}
+                    className="px-4 py-1.5 bg-gray-100 text-gray-600 text-xs font-semibold rounded-lg hover:bg-gray-200 transition-colors"
+                  >
+                    Restaurar padrão
+                  </button>
+                  <button
+                    onClick={() => setShowCalendario(false)}
+                    className="px-4 py-1.5 text-gray-400 text-xs hover:text-gray-600 transition-colors"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Tabela CP × Dentro do Ano × LP */}
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm border-collapse">
+              <thead>
+                <tr className="bg-gray-50 border-b border-gray-200">
+                  <th className="text-left px-4 py-3 text-xs font-bold text-gray-500 uppercase">Demonstrativo</th>
+                  <th className="text-right px-4 py-3 text-xs font-bold text-sky-600 uppercase">
+                    CP — até 360 dias
+                    {safrasCpNomes.length > 0 && <div className="text-gray-400 font-normal normal-case">Safra(s): {safrasCpNomes.join(', ')}</div>}
+                  </th>
+                  <th className="text-right px-4 py-3 text-xs font-bold text-emerald-600 uppercase">
+                    Dentro do ano ({anoAtual})
+                    {safrasAnoNomes.length > 0 && <div className="text-gray-400 font-normal normal-case">Safra(s): {safrasAnoNomes.join(', ')}</div>}
+                  </th>
+                  <th className="text-right px-4 py-3 text-xs font-bold text-violet-600 uppercase">
+                    LP — acima de 360 dias
+                    {safrasLpNomes.length > 0 && <div className="text-gray-400 font-normal normal-case">Safra(s): {safrasLpNomes.join(', ')}</div>}
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                <tr className="hover:bg-gray-50/50">
+                  <td className="px-4 py-2.5 text-green-700 font-semibold">Receita bruta prevista</td>
+                  <td className="px-4 py-2.5 text-right font-semibold text-green-600">{receitaCp > 0 ? fmtBRL(receitaCp) : <span className="text-gray-300">—</span>}</td>
+                  <td className="px-4 py-2.5 text-right font-semibold text-green-600">{receitaDentroAno > 0 ? fmtBRL(receitaDentroAno) : <span className="text-gray-300">—</span>}</td>
+                  <td className="px-4 py-2.5 text-right font-semibold text-green-600">{receitaLp > 0 ? fmtBRL(receitaLp) : <span className="text-gray-300">—</span>}</td>
+                </tr>
+                <tr className="hover:bg-gray-50/50">
+                  <td className="px-4 py-2.5 text-gray-600 pl-6">(-) Custo de produção</td>
+                  <td className="px-4 py-2.5 text-right text-red-500">{custoCp > 0 ? `(${fmtBRL(custoCp)})` : <span className="text-gray-300">—</span>}</td>
+                  <td className="px-4 py-2.5 text-right text-red-500">{custoDentroAno > 0 ? `(${fmtBRL(custoDentroAno)})` : <span className="text-gray-300">—</span>}</td>
+                  <td className="px-4 py-2.5 text-right text-red-500">{custoLp > 0 ? `(${fmtBRL(custoLp)})` : <span className="text-gray-300">—</span>}</td>
+                </tr>
+                <tr className="bg-gray-50 font-semibold border-t border-gray-200">
+                  <td className="px-4 py-2.5 text-gray-700">= Resultado operacional</td>
+                  <td className={`px-4 py-2.5 text-right font-bold ${receitaCp === 0 ? 'text-gray-300' : resultadoCp >= 0 ? 'text-blue-700' : 'text-red-600'}`}>{receitaCp > 0 ? fmtBRL(resultadoCp) : '—'}</td>
+                  <td className={`px-4 py-2.5 text-right font-bold ${receitaDentroAno === 0 ? 'text-gray-300' : resultadoDentroAno >= 0 ? 'text-blue-700' : 'text-red-600'}`}>{receitaDentroAno > 0 ? fmtBRL(resultadoDentroAno) : '—'}</td>
+                  <td className={`px-4 py-2.5 text-right font-bold ${receitaLp === 0 ? 'text-gray-300' : resultadoLp >= 0 ? 'text-blue-700' : 'text-red-600'}`}>{receitaLp > 0 ? fmtBRL(resultadoLp) : '—'}</td>
+                </tr>
+                <tr className="hover:bg-gray-50/50">
+                  <td className="px-4 py-2.5 text-gray-600 pl-6">(-) Serviço da dívida total</td>
+                  <td className="px-4 py-2.5 text-right text-red-500">{servicoCp > 0 ? `(${fmtBRL(servicoCp)})` : <span className="text-gray-300">—</span>}</td>
+                  <td className="px-4 py-2.5 text-right text-red-500">{servicoDentroAno > 0 ? `(${fmtBRL(servicoDentroAno)})` : <span className="text-gray-300">—</span>}</td>
+                  <td className="px-4 py-2.5 text-right text-red-500">{servicoLp > 0 ? `(${fmtBRL(servicoLp)})` : <span className="text-gray-300">—</span>}</td>
+                </tr>
+                <tr className="hover:bg-gray-50/50">
+                  <td className="px-4 py-2.5 text-amber-600 pl-10 text-xs">do qual: custeio</td>
+                  <td className="px-4 py-2.5 text-right text-xs text-amber-600">{servicoCusteioCp > 0 ? `(${fmtBRL(servicoCusteioCp)})` : '—'}</td>
+                  <td className="px-4 py-2.5 text-right text-xs text-amber-600">{servicoCusteioDentroAno > 0 ? `(${fmtBRL(servicoCusteioDentroAno)})` : '—'}</td>
+                  <td className="px-4 py-2.5 text-right text-xs text-amber-600">{servicoCusteioLp > 0 ? `(${fmtBRL(servicoCusteioLp)})` : '—'}</td>
+                </tr>
+                <tr className="hover:bg-gray-50/50">
+                  <td className="px-4 py-2.5 text-gray-700 pl-10 text-xs">do qual: exceto custeio</td>
+                  <td className="px-4 py-2.5 text-right text-xs text-red-600 font-semibold">{servicoExcCusteioCp > 0 ? `(${fmtBRL(servicoExcCusteioCp)})` : '—'}</td>
+                  <td className="px-4 py-2.5 text-right text-xs text-red-600 font-semibold">{servicoExcCusteioDentroAno > 0 ? `(${fmtBRL(servicoExcCusteioDentroAno)})` : '—'}</td>
+                  <td className="px-4 py-2.5 text-right text-xs text-red-600 font-semibold">{servicoExcCusteioLp > 0 ? `(${fmtBRL(servicoExcCusteioLp)})` : '—'}</td>
+                </tr>
+                <tr className="border-t-2 border-gray-300 font-bold">
+                  <td className="px-4 py-3 text-gray-900">= Saldo disponível</td>
+                  <td className={`px-4 py-3 text-right text-base ${receitaCp === 0 ? 'text-gray-300' : saldoDispCp >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>{receitaCp > 0 ? fmtBRL(saldoDispCp) : '—'}</td>
+                  <td className={`px-4 py-3 text-right text-base ${receitaDentroAno === 0 ? 'text-gray-300' : saldoDispDentroAno >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>{receitaDentroAno > 0 ? fmtBRL(saldoDispDentroAno) : '—'}</td>
+                  <td className={`px-4 py-3 text-right text-base ${receitaLp === 0 ? 'text-gray-300' : saldoDispLp >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>{receitaLp > 0 ? fmtBRL(saldoDispLp) : '—'}</td>
+                </tr>
+                {/* Pontos de equilíbrio */}
+                <tr className="bg-emerald-50/60 border-t border-emerald-100">
+                  <td className="px-4 py-2 text-xs font-semibold text-emerald-700">
+                    PE saudável — máx. serviço exceto custeio ({limSaudavel}%)
+                  </td>
+                  <td className="px-4 py-2 text-right text-xs font-bold text-emerald-700">{receitaCp > 0 ? fmtBRL(peSaudavelCp) : '—'}</td>
+                  <td className="px-4 py-2 text-right text-xs font-bold text-emerald-700">{receitaDentroAno > 0 ? fmtBRL(peSaudavelAno) : '—'}</td>
+                  <td className="px-4 py-2 text-right text-xs font-bold text-emerald-700">{receitaLp > 0 ? fmtBRL(peSaudavelLp) : '—'}</td>
+                </tr>
+                <tr className="bg-red-50/40">
+                  <td className="px-4 py-2 text-xs font-semibold text-red-700">
+                    PE crítico — máx. serviço exceto custeio ({limCritico}%)
+                  </td>
+                  <td className="px-4 py-2 text-right text-xs font-bold text-red-700">{receitaCp > 0 ? fmtBRL(peCriticoCp) : '—'}</td>
+                  <td className="px-4 py-2 text-right text-xs font-bold text-red-700">{receitaDentroAno > 0 ? fmtBRL(peCriticoAno) : '—'}</td>
+                  <td className="px-4 py-2 text-right text-xs font-bold text-red-700">{receitaLp > 0 ? fmtBRL(peCriticoLp) : '—'}</td>
+                </tr>
+                <tr className="bg-blue-50/40">
+                  <td className="px-4 py-2 text-xs font-semibold text-blue-700">Situação atual</td>
+                  <td className="px-4 py-2 text-right text-xs">
+                    {receitaCp > 0 && <Badge status={comprCp} label={resultadoCp > 0 ? fmtN((servicoCompromCp / resultadoCp) * 100, 1) + '%' : 'Risco'} />}
+                  </td>
+                  <td className="px-4 py-2 text-right text-xs">
+                    {receitaDentroAno > 0 && <Badge status={comprDentroAno} label={resultadoDentroAno > 0 ? fmtN((servicoCompromDentroAno / resultadoDentroAno) * 100, 1) + '%' : 'Risco'} />}
+                  </td>
+                  <td className="px-4 py-2 text-right text-xs">
+                    {receitaLp > 0 && <Badge status={comprLp} label={resultadoLp > 0 ? fmtN((servicoCompromLp / resultadoLp) * 100, 1) + '%' : 'Risco'} />}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          {/* Alerta: custeio excede custo de produção */}
+          {custeioExcedente > 0 && (
+            <div className="bg-amber-50 border border-amber-300 rounded-xl px-4 py-3 flex gap-3 text-xs text-amber-800">
+              <AlertTriangle size={16} className="text-amber-500 mt-0.5 shrink-0" />
+              <div>
+                <p className="font-bold mb-0.5">Custeio excede o custo de produção registrado</p>
+                <p>
+                  O endividamento em custeio é <strong>{fmtBRL(endivCusteio)}</strong>, mas o custo de produção da safra {safra} é <strong>{fmtBRL(custeioLimite)}</strong>.
+                  O excedente de <strong>{fmtBRL(custeioExcedente)}</strong> ({fmtN(propExcedente * 100, 1)}% do custeio) não está coberto pela atividade produtiva
+                  e foi incluído no cálculo de comprometimento da capacidade de pagamento.
+                  {custeioExcedente > 0 && ' Verifique se os dados de produção estão completos ou se há custeios de safras anteriores em aberto.'}
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* KPIs — 3 cards */}
+          <div className="grid grid-cols-3 gap-3">
+            {/* helper inline */}
+            {([
+              { label: 'Curto Prazo (≤ 360 dias)', cor: 'sky', compr: comprCp, receita: receitaCp, resultado: resultadoCp, servico: servicoCp, nVenc: parcelasCp.length, servicoCompr: servicoCompromCp, peSaud: peSaudavelCp, peCrit: peCriticoCp },
+              { label: `Dentro do Ano (${anoAtual})`, cor: 'emerald', compr: comprDentroAno, receita: receitaDentroAno, resultado: resultadoDentroAno, servico: servicoDentroAno, nVenc: parcelasAnoFuturas.length, servicoCompr: servicoCompromDentroAno, peSaud: peSaudavelAno, peCrit: peCriticoAno },
+              { label: 'Longo Prazo (> 360 dias)', cor: 'violet', compr: comprLp, receita: receitaLp, resultado: resultadoLp, servico: servicoLp, nVenc: parcelasLp.length, servicoCompr: servicoCompromLp, peSaud: peSaudavelLp, peCrit: peCriticoLp },
+            ] as const).map(h => {
+              const pctCompr = h.resultado > 0 ? (h.servicoCompr / h.resultado) * 100 : 0
+              const folga = h.peSaud - h.servicoCompr
+              const borderCls = h.compr === 'ok'
+                ? `border-${h.cor}-200 bg-${h.cor}-50`
+                : h.compr === 'atencao' ? 'border-amber-200 bg-amber-50' : 'border-red-200 bg-red-50'
+              const titleCls = h.compr === 'ok' ? `text-${h.cor}-700` : h.compr === 'atencao' ? 'text-amber-700' : 'text-red-700'
+              return (
+                <div key={h.label} className={`rounded-xl border p-4 ${borderCls}`}>
+                  <p className={`text-xs font-bold uppercase mb-3 ${titleCls}`}>{h.label}</p>
+                  <div className="space-y-1.5">
+                    <div className="flex justify-between text-xs"><span className="text-gray-600">Parcelas vencendo</span><span className="font-bold">{fmtBRL(h.servico)}</span></div>
+                    <div className="flex justify-between text-xs"><span className="text-gray-600">Nº vencimentos</span><span className="font-semibold">{h.nVenc}</span></div>
+                    {h.receita > 0 && h.resultado > 0 && (<>
+                      <div className="pt-1 border-t border-gray-200 space-y-1">
+                        <div className="flex justify-between text-xs">
+                          <span className="text-gray-500">PE saudável ({limSaudavel}%)</span>
+                          <span className="font-semibold text-emerald-700">{fmtBRL(h.peSaud)}</span>
+                        </div>
+                        <div className="flex justify-between text-xs">
+                          <span className="text-gray-500">PE crítico ({limCritico}%)</span>
+                          <span className="font-semibold text-red-700">{fmtBRL(h.peCrit)}</span>
+                        </div>
+                        <div className="flex justify-between text-xs font-semibold pt-0.5 border-t border-gray-100">
+                          <span className="text-gray-600">Comprometimento atual</span>
+                          <span className={h.compr === 'ok' ? 'text-emerald-600' : h.compr === 'atencao' ? 'text-amber-600' : 'text-red-600'}>
+                            {fmtN(pctCompr, 1)}%
+                          </span>
+                        </div>
+                        <div className={`flex justify-between text-xs font-bold rounded-lg px-2 py-1 ${folga >= 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
+                          <span>{folga >= 0 ? 'Folga disponível' : 'Déficit'}</span>
+                          <span>{folga >= 0 ? '+' : ''}{fmtBRL(folga)}</span>
+                        </div>
+                      </div>
+                    </>)}
+                    {h.receita === 0 && <p className="text-xs text-gray-400">Sem safra lançada neste horizonte</p>}
+                    <div className="pt-1">
+                      {h.receita > 0 && <Badge status={h.compr} label={h.compr === 'ok' ? 'Saudável' : h.compr === 'atencao' ? 'Atenção' : 'Risco'} />}
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+
+          {/* Linha do tempo das dívidas */}
+          {parcelas.length > 0 && (() => {
+            const grupos: Record<string, { cp: number; lp: number }> = {}
+            for (const p of parcelas) {
+              const ano = String(new Date(p.vencimento).getFullYear())
+              if (!grupos[ano]) grupos[ano] = { cp: 0, lp: 0 }
+              if (new Date(p.vencimento) <= dataCorte360) grupos[ano].cp += p.valorParcela
+              else grupos[ano].lp += p.valorParcela
+            }
+            const anos = Object.keys(grupos).sort()
+            const maxVal = Math.max(...anos.flatMap(a => [grupos[a].cp + grupos[a].lp]), 1)
+            return (
+              <div>
+                <p className="text-xs font-bold text-gray-500 uppercase mb-2">Concentração de vencimentos por ano</p>
+                <div className="space-y-1.5">
+                  {anos.map(ano => {
+                    const total = grupos[ano].cp + grupos[ano].lp
+                    const pct = (total / maxVal) * 100
+                    const cpPct = total > 0 ? (grupos[ano].cp / total) * 100 : 0
+                    return (
+                      <div key={ano} className="flex items-center gap-3">
+                        <span className="text-xs font-semibold text-gray-500 w-10 shrink-0">{ano}</span>
+                        <div className="flex-1 h-5 bg-gray-100 rounded-full overflow-hidden flex" style={{ opacity: pct < 5 ? 0.4 : 1 }}>
+                          <div className="h-full bg-sky-400" style={{ width: `${cpPct}%` }} title={`CP: ${fmtBRL(grupos[ano].cp)}`} />
+                          <div className="h-full bg-violet-400" style={{ width: `${100 - cpPct}%` }} title={`LP: ${fmtBRL(grupos[ano].lp)}`} />
+                        </div>
+                        <span className="text-xs text-gray-600 font-semibold w-28 text-right shrink-0">{fmtBRL(total)}</span>
+                      </div>
+                    )
+                  })}
+                </div>
+                <div className="flex gap-4 mt-2 text-xs text-gray-400">
+                  <span className="flex items-center gap-1"><span className="inline-block w-3 h-2 rounded bg-sky-400" /> CP (azul)</span>
+                  <span className="flex items-center gap-1"><span className="inline-block w-3 h-2 rounded bg-violet-400" /> LP (violeta)</span>
+                </div>
+              </div>
+            )
+          })()}
+        </div>
+      </Section>
 
       <Section title="Análise de Alavancagem & Solvência" icon={BarChart2} color="text-indigo-600">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8">
