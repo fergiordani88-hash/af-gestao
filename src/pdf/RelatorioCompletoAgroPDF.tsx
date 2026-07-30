@@ -853,8 +853,8 @@ export function RelatorioCompletoAgroPDF({ data }: { data: RelatorioCompletoAgro
 
           {/* Parecer — panel + text */}
           <View style={{ flexDirection: 'row', gap: 14, marginTop: 10 }}>
-            <View style={{ width: 140, alignItems: 'center', justifyContent: 'center' }}>
-              <Image src={logoAF} style={{ width: 130 }} />
+            <View style={{ width: 150, alignItems: 'center', justifyContent: 'center' }}>
+              <Image src={logoAF} style={{ width: 150 }} />
             </View>
             <View style={{ flex: 1 }}>
               <Sec title="Parecer Consultivo" />
