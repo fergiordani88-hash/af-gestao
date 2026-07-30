@@ -1445,7 +1445,7 @@ export function TabResumo({ clientId, clienteNome, clienteCidade }: {
               if (new Date(p.vencimento) <= dataCorte360) grupos[ano].cp += p.valorParcela
               else grupos[ano].lp += p.valorParcela
             }
-            const anos = Object.keys(grupos).sort()
+            const anos = Object.keys(grupos).sort().filter(a => parseInt(a) >= 2026)
             const maxVal = Math.max(...anos.flatMap(a => [grupos[a].cp + grupos[a].lp]), 1)
             return (
               <div>
