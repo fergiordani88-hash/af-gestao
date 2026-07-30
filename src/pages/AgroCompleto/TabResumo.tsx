@@ -1099,6 +1099,7 @@ export function TabResumo({ clientId, clienteNome, clienteCidade }: {
                 {(() => {
                   const resAfterDebt = resultadoLiq - servicoAnual
                   const pctReceitaDivida = receitaBruta > 0 ? (servicoAnual / receitaBruta) * 100 : 0
+                  const jurosAnuais = parcelasAnoAtual.reduce((s, p) => s + (p.juros ?? 0), 0)
                   const rows: { label: string; tooltip: string; total: number; cor: string; ref: string; isCurrency?: boolean; isPct?: boolean }[] = [
                     {
                       label: 'Receita bruta',
@@ -1136,6 +1137,12 @@ export function TabResumo({ clientId, clienteNome, clienteCidade }: {
                       total: totalEndividamento, cor: 'text-purple-600',
                       ref: '< 1× receita bruta/ha',
                     },
+                    {
+                      label: `Juros bancários (${anoAtual})`,
+                      tooltip: 'Componente de juros das parcelas do ano — exclui amortização de capital.',
+                      total: jurosAnuais, cor: 'text-rose-600',
+                      ref: '< 15% da receita bruta/ha',
+                    },
                   ]
                   return rows.map(r => (
                     <tr key={r.label} className="hover:bg-gray-50/60">
@@ -1163,6 +1170,41 @@ export function TabResumo({ clientId, clienteNome, clienteCidade }: {
               </tbody>
             </table>
           </div>
+
+          {/* Juros em sacas de soja */}
+          {(() => {
+            const jurosAnuais = parcelasAnoAtual.reduce((s, p) => s + (p.juros ?? 0), 0)
+            if (jurosAnuais <= 0 || areaTotal <= 0) return null
+            const sojaRow = prodSafra.find(p => p.cultura.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').includes('soja'))
+            const cotacaoRef = sojaRow?.cotacao ?? prodSafra.find(p => p.ordem === 'principal')?.cotacao ?? 0
+            const culturaRef = sojaRow?.cultura ?? prodSafra.find(p => p.ordem === 'principal')?.cultura ?? 'principal'
+            const jurosPorHa = jurosAnuais / areaTotal
+            const sacasTotal = cotacaoRef > 0 ? jurosAnuais / cotacaoRef : 0
+            const sacasPorHa = cotacaoRef > 0 ? jurosPorHa / cotacaoRef : 0
+            return (
+              <div className="mt-4 p-4 bg-rose-50 rounded-xl border border-rose-100">
+                <p className="text-xs font-bold text-rose-700 uppercase tracking-wide mb-3">
+                  Custo dos juros bancários em sacas — {anoAtual}
+                  {cotacaoRef > 0 && <span className="ml-2 font-normal text-rose-400 normal-case">({culturaRef} a {fmtBRL(cotacaoRef)}/sc)</span>}
+                </p>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-xs text-rose-500 mb-0.5">Total da propriedade</p>
+                    <p className="text-lg font-bold text-rose-700">{fmtBRL(jurosAnuais)}</p>
+                    {sacasTotal > 0 && <p className="text-sm text-rose-600 font-semibold mt-0.5">{fmtN(sacasTotal, 0)} sacas de {culturaRef.toLowerCase()}</p>}
+                  </div>
+                  <div>
+                    <p className="text-xs text-rose-500 mb-0.5">Por hectare</p>
+                    <p className="text-lg font-bold text-rose-700">{fmtBRL(jurosPorHa)}/ha</p>
+                    {sacasPorHa > 0 && <p className="text-sm text-rose-600 font-semibold mt-0.5">{fmtN(sacasPorHa, 1)} sc/ha de {culturaRef.toLowerCase()}</p>}
+                  </div>
+                </div>
+                {cotacaoRef <= 0 && (
+                  <p className="text-xs text-rose-400 mt-2">Informe a cotação da soja na aba Produção para ver a conversão em sacas.</p>
+                )}
+              </div>
+            )
+          })()}
 
           {/* Comprometimento da receita */}
           {receitaBruta > 0 && servicoAnual > 0 && (() => {
