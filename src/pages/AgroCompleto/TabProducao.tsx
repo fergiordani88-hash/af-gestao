@@ -44,6 +44,16 @@ const CULTURAS = [
   { cultura: 'Milho 2ª', ordem: 'segunda' },
 ]
 
+function defaultColheitaStr(item: AgroProducao): string {
+  const k = item.cultura.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
+  let hd = { month: 4, day: 15 }
+  if (k.includes('milho')) hd = { month: 8, day: 15 }
+  else if (k.includes('feij')) hd = { month: 11, day: 15 }
+  const parts = item.safra.split('/')
+  const ano = parts[1].length === 2 ? 2000 + parseInt(parts[1]) : parseInt(parts[1])
+  return `${ano}-${String(hd.month).padStart(2, '0')}-${String(hd.day).padStart(2, '0')}`
+}
+
 function benchmarkKey(cultura: string): string {
   const c = cultura.toLowerCase()
   if (c.includes('soja'))     return 'SOJA'
@@ -157,6 +167,38 @@ function ProducaoRow({ item, onChange, onSave, onDelete, dirty, colSpan }: RowPr
             />
           </td>
         ))}
+        {/* Data Colheita (receita) */}
+        <td className="px-1 py-1">
+          <div className="flex items-center gap-0.5">
+            <input
+              type="date"
+              value={item.dataColheita ?? ''}
+              placeholder={defaultColheitaStr(item)}
+              onChange={e => onChange('dataColheita', e.target.value)}
+              className="text-xs border border-gray-200 rounded px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-sky-300 w-[118px] text-gray-700"
+            />
+            {item.dataColheita && (
+              <button onClick={() => onChange('dataColheita', '')} className="text-gray-300 hover:text-red-400 text-xs leading-none" title="Limpar">×</button>
+            )}
+            {!item.dataColheita && (
+              <span className="text-gray-300 text-xs ml-0.5" title={`Padrão: ${defaultColheitaStr(item)}`}>⚙</span>
+            )}
+          </div>
+        </td>
+        {/* Data Pagamento Custo */}
+        <td className="px-1 py-1">
+          <div className="flex items-center gap-0.5">
+            <input
+              type="date"
+              value={item.dataPagamento ?? ''}
+              onChange={e => onChange('dataPagamento', e.target.value)}
+              className="text-xs border border-gray-200 rounded px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-rose-300 w-[118px] text-gray-700"
+            />
+            {item.dataPagamento && (
+              <button onClick={() => onChange('dataPagamento', '')} className="text-gray-300 hover:text-red-400 text-xs leading-none" title="Limpar">×</button>
+            )}
+          </div>
+        </td>
         <td className="px-3 py-2 text-sm text-right text-gray-600">{c.prodTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
         <td className="px-3 py-2 text-sm text-right font-semibold text-gray-900">{fmtBRL(c.recBruta)}</td>
         <td className="px-3 py-2 text-sm text-right text-red-500">{fmtBRL(c.custoTotal + c.custoArrendTotal)}</td>
@@ -415,7 +457,7 @@ function SafraBlock({ safra, tipo, rows, clientId, onDeleteRows, onAddRows, onRe
         <table className="w-full text-xs">
           <thead>
             <tr className="bg-gray-50 border-b border-gray-100">
-              {['Cultura', 'Cotação (R$/sc)', 'Área (ha)', 'Produt. (sc/ha)', 'Custo/ha (sc) 🔍', 'Custo/ha (R$)', 'Área Arren. (ha)', 'Custo Arren/ha', 'Prod. Total (sc)', 'Rec. Bruta', 'Custo Total', 'Resultado', 'R$/ha', 'Custo/saca', 'PE (sc/ha)', 'Supráv./Déf.', 'Queda máx.', 'Margem', ''].map(h => (
+              {['Cultura', 'Cotação (R$/sc)', 'Área (ha)', 'Produt. (sc/ha)', 'Custo/ha (sc) 🔍', 'Custo/ha (R$)', 'Área Arren. (ha)', 'Custo Arren/ha', 'Data Colheita ⚙', 'Data Pgto Custo', 'Prod. Total (sc)', 'Rec. Bruta', 'Custo Total', 'Resultado', 'R$/ha', 'Custo/saca', 'PE (sc/ha)', 'Supráv./Déf.', 'Queda máx.', 'Margem', ''].map(h => (
                 <th key={h} className="px-3 py-2 text-left font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">{h}</th>
               ))}
             </tr>
@@ -429,7 +471,7 @@ function SafraBlock({ safra, tipo, rows, clientId, onDeleteRows, onAddRows, onRe
                 onSave={() => handleSave(idx)}
                 onDelete={() => handleDeleteCultura(idx)}
                 dirty={!!row.dirty}
-                colSpan={19}
+                colSpan={21}
               />
             ))}
           </tbody>

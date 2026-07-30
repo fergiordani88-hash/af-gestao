@@ -31,6 +31,7 @@ function culturaKey(cultura: string): string | null {
 }
 
 function getColheitaDate(p: AgroProducao, datas: Record<string, HarvestDate>): Date {
+  if (p.dataColheita) return new Date(p.dataColheita)
   const key = culturaKey(p.cultura)
   const hd  = (key && datas[key]) ?? { month: 4, day: 15 }
   const parts = p.safra.split('/')

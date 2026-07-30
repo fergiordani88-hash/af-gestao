@@ -38,6 +38,7 @@ export interface AgroProducao {
   cultura: string; ordem: string; cotacao: number; area: number
   produtividade: number; custoPorHa: number; areaArrendada: number; custoArrendHa: number
   dataPagamento?: string
+  dataColheita?: string
   custoItens?: CustoItem[]
 }
 
