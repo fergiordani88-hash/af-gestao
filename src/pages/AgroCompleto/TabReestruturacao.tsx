@@ -21,31 +21,50 @@ interface ContratoRow {
   selected: boolean
 }
 
-function parcelaPrice(saldo: number, taxaAa: number, meses: number): number {
-  if (meses <= 0 || saldo <= 0) return 0
-  if (taxaAa === 0) return saldo / meses
-  const tm = Math.pow(1 + taxaAa, 1 / 12) - 1
-  return saldo * (tm * Math.pow(1 + tm, meses)) / (Math.pow(1 + tm, meses) - 1)
+interface ParcelaSimulada {
+  num: number
+  data: Date
+  valor: number
+  amort: number
+  juros: number
+  saldo: number
 }
 
-function parcelaSAC1(saldo: number, taxaAa: number, meses: number): number {
-  if (meses <= 0 || saldo <= 0) return 0
-  const tm = Math.pow(1 + taxaAa, 1 / 12) - 1
-  return saldo / meses + saldo * tm
-}
-
-function servicoAnualSAC(saldo: number, taxaAa: number, meses: number): number {
-  // soma das 12 primeiras parcelas SAC
-  if (meses <= 0 || saldo <= 0) return 0
-  const tm = Math.pow(1 + taxaAa, 1 / 12) - 1
-  const amort = saldo / meses
-  let total = 0
+function gerarCronogramaSimulado(
+  saldo: number,
+  taxaAnual: number,
+  n: number,
+  periodicidade: 'Mensal' | 'Semestral' | 'Anual',
+  sistema: 'SAC' | 'Price',
+  dataPrimeira: Date
+): ParcelaSimulada[] {
+  if (n <= 0 || saldo <= 0) return []
+  const ppa = periodicidade === 'Mensal' ? 12 : periodicidade === 'Semestral' ? 2 : 1
+  const tp = Math.pow(1 + taxaAnual, 1 / ppa) - 1
+  const amortConst = saldo / n
+  const pmt = sistema === 'Price'
+    ? (tp === 0 ? saldo / n : saldo * tp * Math.pow(1 + tp, n) / (Math.pow(1 + tp, n) - 1))
+    : 0
+  const result: ParcelaSimulada[] = []
   let s = saldo
-  for (let i = 0; i < Math.min(12, meses); i++) {
-    total += amort + s * tm
-    s -= amort
+  for (let i = 0; i < n; i++) {
+    const data = new Date(dataPrimeira)
+    if (periodicidade === 'Mensal')     data.setMonth(data.getMonth() + i)
+    else if (periodicidade === 'Semestral') data.setMonth(data.getMonth() + i * 6)
+    else                                data.setFullYear(data.getFullYear() + i)
+    const juros = s * tp
+    const amort = sistema === 'SAC' ? amortConst : Math.max(0, pmt - juros)
+    const valor = sistema === 'SAC' ? amortConst + juros : pmt
+    s = i === n - 1 ? 0 : Math.max(0, s - amort)
+    result.push({
+      num: i + 1, data,
+      valor: Math.round(valor * 100) / 100,
+      amort: Math.round(amort * 100) / 100,
+      juros: Math.round(juros * 100) / 100,
+      saldo: Math.round(s * 100) / 100,
+    })
   }
-  return total
+  return result
 }
 
 export function TabReestruturacao({ clientId }: { clientId: string }) {
@@ -54,12 +73,17 @@ export function TabReestruturacao({ clientId }: { clientId: string }) {
   const [receitaAnual, setReceitaAnual] = useState(0)
 
   // Simulação unificada para os contratos selecionados
-  const [simTaxa,          setSimTaxa]          = useState('')
-  const [simTipoTaxa,      setSimTipoTaxa]      = useState<'aa' | 'am'>('aa')
-  const [simParcelas,      setSimParcelas]      = useState('')   // número de parcelas
-  const [simPeriodicidade, setSimPeriodicidade] = useState<'Mensal' | 'Semestral' | 'Anual'>('Mensal')
-  const [simIndexador,     setSimIndexador]     = useState<'Pré-fixado' | 'CDI' | 'TR' | 'IPCA'>('Pré-fixado')
-  const [simSistema,       setSimSistema]       = useState<'SAC' | 'Price'>('SAC')
+  const [simTaxa,               setSimTaxa]               = useState('')
+  const [simTipoTaxa,           setSimTipoTaxa]           = useState<'aa' | 'am'>('aa')
+  const [simParcelas,           setSimParcelas]           = useState('')
+  const [simPeriodicidade,      setSimPeriodicidade]      = useState<'Mensal' | 'Semestral' | 'Anual'>('Mensal')
+  const [simIndexador,          setSimIndexador]          = useState<'Pré-fixado' | 'CDI' | 'TR' | 'IPCA'>('Pré-fixado')
+  const [simSistema,            setSimSistema]            = useState<'SAC' | 'Price'>('SAC')
+  const [simDataPrimeira,       setSimDataPrimeira]       = useState(() => {
+    const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() + 1)
+    return d.toISOString().slice(0, 10)
+  })
+  const [mostrarCronograma,     setMostrarCronograma]     = useState(false)
 
   const TAXAS_REF: Record<string, number> = { CDI: 0.1425, TR: 0.0088, IPCA: 0.0548 }
 
@@ -72,14 +96,9 @@ export function TabReestruturacao({ clientId }: { clientId: string }) {
     return taxaNominal + taxaBase
   }, [simTaxa, simTipoTaxa, simIndexador])
 
-  // Converte nº de parcelas para meses equivalentes (para cálculos existentes)
-  const mesesEquivalentes = useMemo(() => {
-    const n = parseInt(simParcelas)
-    if (isNaN(n) || n <= 0) return null
-    if (simPeriodicidade === 'Anual')    return n * 12
-    if (simPeriodicidade === 'Semestral') return n * 6
-    return n // Mensal
-  }, [simParcelas, simPeriodicidade])
+  const nParcelas = useMemo(() => {
+    const n = parseInt(simParcelas); return isNaN(n) || n <= 0 ? null : n
+  }, [simParcelas])
 
   useEffect(() => {
     if (!clientId) return
@@ -151,29 +170,28 @@ export function TabReestruturacao({ clientId }: { clientId: string }) {
     const totalSaldo   = selecionados.reduce((s, c) => s + c.saldoDevedor, 0)
     const servicoAtual = selecionados.reduce((s, c) => s + c.servicoAnual, 0)
 
-    if (!taxaAnualEfetiva || !mesesEquivalentes) return { totalSaldo, servicoAtual, novoParcela: null, novoServicoAnual: null }
+    if (!taxaAnualEfetiva || !nParcelas) return { totalSaldo, servicoAtual, cronograma: [] as ParcelaSimulada[], novoServicoAnual: null }
 
-    const novoParcela = simSistema === 'Price'
-      ? parcelaPrice(totalSaldo, taxaAnualEfetiva, mesesEquivalentes)
-      : parcelaSAC1(totalSaldo, taxaAnualEfetiva, mesesEquivalentes)
-    const novoServicoAnual = simSistema === 'Price'
-      ? novoParcela * Math.min(12, mesesEquivalentes)
-      : servicoAnualSAC(totalSaldo, taxaAnualEfetiva, mesesEquivalentes)
+    const dataPrimeira = new Date(simDataPrimeira + 'T12:00:00')
+    const cronograma = gerarCronogramaSimulado(totalSaldo, taxaAnualEfetiva, nParcelas, simPeriodicidade, simSistema, dataPrimeira)
+
+    const em12 = new Date(dataPrimeira); em12.setFullYear(em12.getFullYear() + 1)
+    const novoServicoAnual = cronograma.filter(p => p.data <= em12).reduce((s, p) => s + p.valor, 0)
 
     const economia = servicoAtual - novoServicoAnual
-    const pctRecAtual  = receitaAnual > 0 ? servicoAtual / receitaAnual * 100 : 0
-    const pctRecNovo   = receitaAnual > 0 ? novoServicoAnual / receitaAnual * 100 : 0
+    const pctRecAtual    = receitaAnual > 0 ? servicoAtual / receitaAnual * 100 : 0
+    const pctRecNovo     = receitaAnual > 0 ? novoServicoAnual / receitaAnual * 100 : 0
     const totalSaldoGeral  = contratos.reduce((s, c) => s + c.saldoDevedor, 0)
     const servicoGeral     = contratos.reduce((s, c) => s + c.servicoAnual, 0)
     const novoServiceGeral = servicoGeral - servicoAtual + novoServicoAnual
     const pctRecNovGeral   = receitaAnual > 0 ? novoServiceGeral / receitaAnual * 100 : 0
 
     return {
-      totalSaldo, servicoAtual, novoParcela, novoServicoAnual,
-      economia, pctRecAtual, pctRecNovo, prazoSim: mesesEquivalentes, taxaSim: taxaAnualEfetiva,
+      totalSaldo, servicoAtual, cronograma, novoServicoAnual,
+      economia, pctRecAtual, pctRecNovo, taxaSim: taxaAnualEfetiva,
       totalSaldoGeral, servicoGeral, novoServiceGeral, pctRecNovGeral,
     }
-  }, [selecionados, taxaAnualEfetiva, mesesEquivalentes, simSistema, contratos, receitaAnual])
+  }, [selecionados, taxaAnualEfetiva, nParcelas, simPeriodicidade, simSistema, simDataPrimeira, contratos, receitaAnual])
 
   if (loading) return (
     <div className="flex items-center justify-center py-24 text-gray-400">
@@ -327,7 +345,7 @@ export function TabReestruturacao({ clientId }: { clientId: string }) {
             </div>
 
             {/* Inputs — linha 2 */}
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-4 gap-4">
               {/* Nº de parcelas */}
               <div>
                 <label className="block text-xs font-semibold text-gray-600 mb-1.5">Nº de Parcelas</label>
@@ -350,6 +368,15 @@ export function TabReestruturacao({ clientId }: { clientId: string }) {
                   <option value="Anual">Anual</option>
                 </select>
               </div>
+              {/* Data da 1ª parcela */}
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1.5">Data da 1ª Parcela</label>
+                <input
+                  type="date" value={simDataPrimeira}
+                  onChange={e => setSimDataPrimeira(e.target.value)}
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-300"
+                />
+              </div>
               {/* Sistema amortização */}
               <div>
                 <label className="block text-xs font-semibold text-gray-600 mb-1.5">Sistema de Amortização</label>
@@ -364,29 +391,19 @@ export function TabReestruturacao({ clientId }: { clientId: string }) {
             </div>
 
             {/* Resultado */}
-            {sim?.novoParcela != null && (
+            {sim?.cronograma && sim.cronograma.length > 0 && sim.novoServicoAnual != null && (
               <div className="space-y-4">
                 {/* Comparativo dos selecionados */}
                 <div className="grid grid-cols-2 gap-4">
                   <div className="bg-red-50 border border-red-200 rounded-xl p-4">
                     <p className="text-xs font-bold text-red-600 uppercase mb-2">Situação Atual (selecionados)</p>
                     <p className="text-xl font-bold text-red-700">{fmtBRL(sim.servicoAtual)}<span className="text-sm font-normal">/ano</span></p>
-                    <p className="text-sm text-red-500">{fmtBRL(sim.servicoAtual / 12)}/mês</p>
-                    {receitaAnual > 0 && (
-                      <p className="text-xs text-gray-500 mt-2">
-                        {fmtN(sim.pctRecAtual, 1)}% da receita anual
-                      </p>
-                    )}
+                    {receitaAnual > 0 && <p className="text-xs text-gray-500 mt-2">{fmtN(sim.pctRecAtual, 1)}% da receita anual</p>}
                   </div>
                   <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4">
-                    <p className="text-xs font-bold text-emerald-600 uppercase mb-2">Após Reestruturação</p>
-                    <p className="text-xl font-bold text-emerald-700">{fmtBRL(sim.novoServicoAnual!)}<span className="text-sm font-normal">/ano</span></p>
-                    <p className="text-sm text-emerald-500">{fmtBRL(sim.novoServicoAnual! / 12)}/mês</p>
-                    {receitaAnual > 0 && (
-                      <p className="text-xs text-gray-500 mt-2">
-                        {fmtN(sim.pctRecNovo, 1)}% da receita anual
-                      </p>
-                    )}
+                    <p className="text-xs font-bold text-emerald-600 uppercase mb-2">Após Reestruturação (1º ano)</p>
+                    <p className="text-xl font-bold text-emerald-700">{fmtBRL(sim.novoServicoAnual)}<span className="text-sm font-normal">/ano</span></p>
+                    {receitaAnual > 0 && <p className="text-xs text-gray-500 mt-2">{fmtN(sim.pctRecNovo, 1)}% da receita anual</p>}
                   </div>
                 </div>
 
@@ -394,23 +411,21 @@ export function TabReestruturacao({ clientId }: { clientId: string }) {
                 <div className={`rounded-xl p-4 flex items-center justify-between ${sim.economia >= 0 ? 'bg-emerald-50 border border-emerald-200' : 'bg-red-50 border border-red-200'}`}>
                   <div>
                     <p className={`text-sm font-bold ${sim.economia >= 0 ? 'text-emerald-800' : 'text-red-800'}`}>
-                      {sim.economia >= 0 ? 'Redução no serviço anual dos contratos selecionados' : 'Aumento no serviço anual'}
+                      {sim.economia >= 0 ? 'Redução no serviço anual' : 'Aumento no serviço anual'}
                     </p>
                     <p className="text-xs text-gray-500 mt-0.5">
                       {simParcelas} parcelas {simPeriodicidade.toLowerCase()}s · {fmtN((sim.taxaSim ?? 0) * 100, 2)}% a.a.{simIndexador !== 'Pré-fixado' ? ` (${simIndexador} + ${simTaxa}%)` : ''} · {simSistema}
                     </p>
-                    {sim.novoServicoAnual != null && (
-                      <p className="text-xs text-gray-500 mt-0.5">
-                        1ª parcela (maior no SAC): {fmtBRL(sim.novoParcela!)}
-                      </p>
-                    )}
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      1ª parcela: {fmtBRL(sim.cronograma[0].valor)} · Última: {fmtBRL(sim.cronograma[sim.cronograma.length - 1].valor)}
+                    </p>
                   </div>
                   <span className={`text-2xl font-bold ml-4 ${sim.economia >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>
                     {sim.economia >= 0 ? '-' : '+'}{fmtBRL(Math.abs(sim.economia))}/ano
                   </span>
                 </div>
 
-                {/* Impacto no total da carteira */}
+                {/* Impacto na carteira */}
                 <div className="bg-gray-50 rounded-xl p-4">
                   <p className="text-xs font-bold text-gray-600 uppercase mb-3">Impacto na carteira total ({contratos.length} contratos)</p>
                   <div className="grid grid-cols-3 gap-4 text-center">
@@ -430,6 +445,55 @@ export function TabReestruturacao({ clientId }: { clientId: string }) {
                     </div>
                   </div>
                 </div>
+
+                {/* Cronograma completo */}
+                <div className="border border-gray-200 rounded-xl overflow-hidden">
+                  <button
+                    onClick={() => setMostrarCronograma(v => !v)}
+                    className="w-full flex items-center justify-between px-4 py-3 bg-gray-50 hover:bg-gray-100 transition-colors text-left"
+                  >
+                    <span className="text-xs font-bold text-gray-700 uppercase tracking-wide">
+                      Cronograma completo — {sim.cronograma.length} parcelas
+                    </span>
+                    <span className="text-xs text-blue-600 font-semibold">{mostrarCronograma ? 'Ocultar ▲' : 'Exibir ▼'}</span>
+                  </button>
+                  {mostrarCronograma && (
+                    <div className="overflow-x-auto max-h-96 overflow-y-auto">
+                      <table className="w-full text-xs">
+                        <thead className="sticky top-0 bg-gray-100">
+                          <tr>
+                            {['Nº', 'Vencimento', 'Parcela', 'Amortização', 'Juros', 'Saldo Devedor'].map(h => (
+                              <th key={h} className="px-3 py-2 text-left font-semibold text-gray-500 uppercase whitespace-nowrap">{h}</th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-50">
+                          {sim.cronograma.map((p, idx) => (
+                            <tr key={p.num} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                              <td className="px-3 py-2 text-gray-400 font-medium">{p.num}</td>
+                              <td className="px-3 py-2 text-gray-700 whitespace-nowrap font-medium">
+                                {p.data.toLocaleDateString('pt-BR')}
+                              </td>
+                              <td className="px-3 py-2 font-bold text-gray-900">{fmtBRL(p.valor)}</td>
+                              <td className="px-3 py-2 text-blue-700">{fmtBRL(p.amort)}</td>
+                              <td className="px-3 py-2 text-red-500">{fmtBRL(p.juros)}</td>
+                              <td className="px-3 py-2 text-gray-600">{fmtBRL(p.saldo)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                        <tfoot className="bg-gray-100 border-t-2 border-gray-200 font-bold sticky bottom-0">
+                          <tr>
+                            <td colSpan={2} className="px-3 py-2 text-gray-700">Total</td>
+                            <td className="px-3 py-2 text-gray-900">{fmtBRL(sim.cronograma.reduce((s, p) => s + p.valor, 0))}</td>
+                            <td className="px-3 py-2 text-blue-700">{fmtBRL(sim.cronograma.reduce((s, p) => s + p.amort, 0))}</td>
+                            <td className="px-3 py-2 text-red-500">{fmtBRL(sim.cronograma.reduce((s, p) => s + p.juros, 0))}</td>
+                            <td className="px-3 py-2 text-gray-400">—</td>
+                          </tr>
+                        </tfoot>
+                      </table>
+                    </div>
+                  )}
+                </div>
               </div>
             )}
 
@@ -448,7 +512,7 @@ export function TabReestruturacao({ clientId }: { clientId: string }) {
 
       <div className="flex justify-end">
         <button
-          onClick={() => { setSimTaxa(''); setSimParcelas(''); setSimSistema('SAC'); setSimPeriodicidade('Mensal'); setSimIndexador('Pré-fixado'); setSimTipoTaxa('aa') }}
+          onClick={() => { setSimTaxa(''); setSimParcelas(''); setSimSistema('SAC'); setSimPeriodicidade('Mensal'); setSimIndexador('Pré-fixado'); setSimTipoTaxa('aa'); setMostrarCronograma(false) }}
           className="flex items-center gap-1.5 text-xs text-gray-500 border border-gray-200 px-3 py-2 rounded-lg hover:bg-gray-50"
         >
           <RotateCcw size={12} /> Resetar simulação
