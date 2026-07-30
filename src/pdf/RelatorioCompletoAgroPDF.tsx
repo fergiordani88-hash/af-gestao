@@ -34,9 +34,9 @@ export interface RelatorioCompletoAgroData {
 // ── Brand tokens ───────────────────────────────────────────────────────────
 const C = {
   white:   '#FFFFFF',
-  green:   '#183828',   // deep forest green — primary brand
-  greenMd: '#1F4A34',   // slightly lighter for panels
-  greenLt: '#E8F0EA',   // pale green tint for alt rows
+  green:   '#1E6B3C',   // vibrant forest green — clearly green, not black
+  greenMd: '#257A45',   // medium green for panels
+  greenLt: '#E8F4ED',   // pale green tint for alt rows
   gold:    '#B8975A',   // brand gold
   goldLt:  '#D4B87A',
   ink:     '#1A1A1A',
@@ -366,24 +366,44 @@ export function RelatorioCompletoAgroPDF({ data }: { data: RelatorioCompletoAgro
           <View style={s.tbl}>
             <View style={s.thd}>
               <Text style={{ ...s.th, flex: 2 }}>Indicador</Text>
-              <Text style={s.th}>Valor</Text>
-              <Text style={s.th}>Referência</Text>
+              <Text style={s.th}>Seu Valor</Text>
+              <Text style={{ ...s.th, flex: 1.2 }}>Saudável</Text>
+              <Text style={{ ...s.th, flex: 1.2 }}>Atenção</Text>
+              <Text style={{ ...s.th, flex: 1.2 }}>Risco</Text>
               <Text style={s.th}>Status</Text>
             </View>
             {[
-              { ind: 'Margem Operacional',        val: pct(data.margem),       ref: '≥ 20%',  ok: data.margem >= 20,      at: data.margem >= 10 },
-              { ind: 'Alavancagem (Dív./Patr.)',  val: pct(data.alavancagem),  ref: '< 30%',  ok: data.alavancagem < 30,  at: data.alavancagem < 50 },
-              { ind: 'Solvência (Patr./Dív.)',    val: xv(data.solvencia),     ref: '> 2,0x', ok: data.solvencia > 2,     at: data.solvencia > 1 },
-              { ind: 'Endivid./Receita Bruta',    val: xv(data.endivReceita),  ref: '< 1,0x', ok: data.endivReceita < 1,  at: data.endivReceita < 2 },
-              { ind: 'Capacidade de Pagamento',   val: xv(data.capPagamento),  ref: '> 1,5x', ok: data.capPagamento > 1.5, at: data.capPagamento > 1 },
+              { ind: 'Margem Operacional',       val: pct(data.margem),       saud: '≥ 20%',    at: '10–20%',   risk: '< 10%',    ok: data.margem >= 20,       warn: data.margem >= 10 },
+              { ind: 'Alavancagem (Dív./Patr.)', val: pct(data.alavancagem),  saud: '< 30%',    at: '30–50%',   risk: '> 50%',    ok: data.alavancagem < 30,   warn: data.alavancagem < 50 },
+              { ind: 'Solvência (Patr./Dív.)',   val: xv(data.solvencia),     saud: '> 2,0x',   at: '1,0–2,0x', risk: '< 1,0x',   ok: data.solvencia > 2,      warn: data.solvencia > 1 },
+              { ind: 'Endivid./Receita Bruta',   val: xv(data.endivReceita),  saud: '< 1,0x',   at: '1,0–2,0x', risk: '> 2,0x',   ok: data.endivReceita < 1,   warn: data.endivReceita < 2 },
+              { ind: 'Capacidade de Pagamento',  val: xv(data.capPagamento),  saud: '> 1,5x',   at: '1,0–1,5x', risk: '< 1,0x',   ok: data.capPagamento > 1.5, warn: data.capPagamento > 1 },
             ].map((row, i) => (
               <View key={i} style={[s.tr, i % 2 === 0 ? s.trA : {}]}>
                 <Text style={{ ...s.tdB, flex: 2 }}>{row.ind}</Text>
-                <Text style={{ ...s.td, fontFamily: 'Helvetica-Bold', color: sc(row.ok, row.at) }}>{row.val}</Text>
-                <Text style={{ ...s.td, color: C.muted }}>{row.ref}</Text>
-                <Text style={{ ...s.td, color: sc(row.ok, row.at), fontFamily: 'Helvetica-Bold' }}>
-                  {row.ok ? '✓ Saudável' : row.at ? '⚠ Atenção' : '✗ Risco'}
+                <Text style={{ ...s.td, fontFamily: 'Helvetica-Bold', color: sc(row.ok, row.warn) }}>{row.val}</Text>
+                <Text style={{ ...s.td, flex: 1.2, color: C.pos }}>{row.saud}</Text>
+                <Text style={{ ...s.td, flex: 1.2, color: C.amber }}>{row.at}</Text>
+                <Text style={{ ...s.td, flex: 1.2, color: C.neg }}>{row.risk}</Text>
+                <Text style={{ ...s.td, color: sc(row.ok, row.warn), fontFamily: 'Helvetica-Bold' }}>
+                  {row.ok ? '✓ Saudável' : row.warn ? '⚠ Atenção' : '✗ Risco'}
                 </Text>
+              </View>
+            ))}
+          </View>
+
+          {/* Legenda interpretativa para o produtor */}
+          <View style={{ flexDirection: 'row', gap: 6, marginBottom: 14 }}>
+            {[
+              { titulo: 'Margem Operacional', desc: 'De cada R$100 de receita, quanto sobra após pagar os custos de produção. Abaixo de 20% o negócio tem pouca folga para imprevistos.' },
+              { titulo: 'Alavancagem', desc: 'Quanto da propriedade está financiada com dívida. Acima de 50% significa que mais da metade do patrimônio pertence ao banco.' },
+              { titulo: 'Solvência', desc: 'Quantas vezes o patrimônio cobre o total das dívidas. Abaixo de 1x significa que as dívidas são maiores que todos os bens.' },
+              { titulo: 'Endivid./Receita', desc: 'Quantos anos de receita seriam necessários para quitar toda a dívida. Acima de 2x é sinal de endividamento elevado.' },
+              { titulo: 'Cap. de Pagamento', desc: 'Quantas vezes o resultado da safra cobre o serviço anual da dívida. Abaixo de 1x significa que a safra não paga as parcelas.' },
+            ].map((item, i) => (
+              <View key={i} style={{ flex: 1, backgroundColor: '#F7F9F7', borderRadius: 3, borderTopWidth: 1.5, borderTopColor: C.gold, padding: 8 }}>
+                <Text style={{ fontFamily: 'Helvetica-Bold', fontSize: 6.5, color: C.green, marginBottom: 4 }}>{item.titulo}</Text>
+                <Text style={{ fontFamily: 'Helvetica', fontSize: 6, color: C.muted, lineHeight: 1.55 }}>{item.desc}</Text>
               </View>
             ))}
           </View>
