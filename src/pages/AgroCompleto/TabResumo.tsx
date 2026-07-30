@@ -432,6 +432,21 @@ export function TabResumo({ clientId, clienteNome, clienteCidade }: {
         }
       }) : []
 
+      // Juros em sacas
+      const jurosAnuaisExport = parcelasAnoAtual.reduce((s, p) => s + (p.juros ?? 0), 0)
+      const sojaRowExp = prodSafra.find(p => p.cultura.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').includes('soja'))
+      const cotacaoRefExp = sojaRowExp?.cotacao ?? prodSafra.find(p => p.ordem === 'principal')?.cotacao ?? 0
+      const culturaRefExp = sojaRowExp?.cultura ?? prodSafra.find(p => p.ordem === 'principal')?.cultura ?? ''
+      const jurosPorHaExp = areaTotal > 0 ? jurosAnuaisExport / areaTotal : 0
+      const sacasTotalExp = cotacaoRefExp > 0 ? jurosAnuaisExport / cotacaoRefExp : 0
+      const sacasPorHaExp = cotacaoRefExp > 0 ? jurosPorHaExp / cotacaoRefExp : 0
+      const pctReceitaDividaExp = receitaBruta > 0 ? (servicoAnual / receitaBruta) * 100 : 0
+
+      // CP comprometimento %
+      const pctCp  = resultadoCp  > 0 ? (servicoCompromCp  / resultadoCp)  * 100 : 0
+      const pctAno = resultadoDentroAno > 0 ? (servicoCompromDentroAno / resultadoDentroAno) * 100 : 0
+      const pctLp  = resultadoLp  > 0 ? (servicoCompromLp  / resultadoLp)  * 100 : 0
+
       await pdf.exportRelatorioAgro({
         clientName:    clienteNome ?? 'Produtor',
         clientCity:    clienteCidade,
@@ -466,6 +481,34 @@ export function TabResumo({ clientId, clienteNome, clienteCidade }: {
         cenarios,
         projecao10Anos: projecaoAnos.reduce((s, r) => s + r.resultadoLiquido, 0),
         projecaoAnos,
+        // Juros em sacas
+        jurosAnuais:        jurosAnuaisExport > 0 ? jurosAnuaisExport : undefined,
+        jurosHa:            jurosPorHaExp > 0 ? jurosPorHaExp : undefined,
+        jurosAnuaisSacas:   sacasTotalExp > 0 ? sacasTotalExp : undefined,
+        jurosSacasHa:       sacasPorHaExp > 0 ? sacasPorHaExp : undefined,
+        jurosCultura:       culturaRefExp || undefined,
+        comprometimentoReceita: pctReceitaDividaExp > 0 ? pctReceitaDividaExp : undefined,
+        // CP / Ano / LP
+        cpHorizonte: parcelasCp.length > 0 ? {
+          servico: servicoCompromCp, parcelas: parcelasCp.length,
+          peSaud: peSaudavelCp, peCrit: peCriticoCp,
+          saldo: saldoDispCp, pct: pctCp, status: comprCp,
+        } : undefined,
+        anoHorizonte: parcelasAnoFuturas.length > 0 ? {
+          servico: servicoCompromDentroAno, parcelas: parcelasAnoFuturas.length,
+          peSaud: peSaudavelAno, peCrit: peCriticoAno,
+          saldo: saldoDispDentroAno, pct: pctAno, status: comprDentroAno,
+          anoRef: anoAtual,
+        } : undefined,
+        lpHorizonte: parcelasLp.length > 0 ? {
+          servico: servicoCompromLp, parcelas: parcelasLp.length,
+          peSaud: peSaudavelLp, peCrit: peCriticoLp,
+          saldo: saldoDispLp, pct: pctLp, status: comprLp,
+        } : undefined,
+        // Vencimentos por ano
+        vencimentosPorAno: Object.entries(dividasPorAno)
+          .map(([ano, valor]) => ({ ano: parseInt(ano), valor }))
+          .sort((a, b) => a.ano - b.ano),
       })
     } catch (err: any) {
       console.error('Erro ao gerar PDF:', err)
