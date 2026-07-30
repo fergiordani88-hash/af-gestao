@@ -271,19 +271,24 @@ export function TabResumo({ clientId, clienteNome, clienteCidade }: {
 
   const receitaCp   = producaoCp.reduce((s, p) => s + calcRow(p).recBruta, 0)
   const custoCp     = producaoCp.reduce((s, p) => s + calcRow(p).custoTotal + calcRow(p).custoArrendTotal, 0)
-  const receitaLp   = producaoLp.reduce((s, p) => s + calcRow(p).recBruta, 0)
-  const custoLp     = producaoLp.reduce((s, p) => s + calcRow(p).custoTotal + calcRow(p).custoArrendTotal, 0)
+  // LP: receita = safra selecionada (ciclo anual representativo do produtor)
+  // Serviço LP = total LP ÷ anos de vigência → serviço anual médio (base DSCR)
+  const receitaLp   = receitaBruta
+  const custoLp     = custoTotal
   const resultadoCp = receitaCp - custoCp
-  const resultadoLp = receitaLp - custoLp
+  const resultadoLp = resultadoLiq
 
-  const parcelasCp = parcelas.filter(p => new Date(p.vencimento) <= dataCorte360)
-  const parcelasLp = parcelas.filter(p => new Date(p.vencimento) > dataCorte360)
-  const servicoCp  = parcelasCp.reduce((s, p) => s + p.valorParcela, 0)
-  const servicoLp  = parcelasLp.reduce((s, p) => s + p.valorParcela, 0)
+  const parcelasCp     = parcelas.filter(p => new Date(p.vencimento) <= dataCorte360)
+  const parcelasLp     = parcelas.filter(p => new Date(p.vencimento) > dataCorte360)
+  const servicoCp      = parcelasCp.reduce((s, p) => s + p.valorParcela, 0)
+  const servicoLpTotal = parcelasLp.reduce((s, p) => s + p.valorParcela, 0)
+  const anosLp         = Math.max(1, new Set(parcelasLp.map(p => new Date(p.vencimento).getFullYear())).size)
+  const servicoLp      = servicoLpTotal / anosLp
 
   // Custeio excedente por horizonte (mesmo critério: excesso sobre custo do horizonte)
-  const servicoCusteioCp    = parcelasCp.filter(p => contratosCusteioIds.has(p.contratoId)).reduce((s, p) => s + p.valorParcela, 0)
-  const servicoCusteioLp    = parcelasLp.filter(p => contratosCusteioIds.has(p.contratoId)).reduce((s, p) => s + p.valorParcela, 0)
+  const servicoCusteioCp      = parcelasCp.filter(p => contratosCusteioIds.has(p.contratoId)).reduce((s, p) => s + p.valorParcela, 0)
+  const servicoCusteioLpTotal = parcelasLp.filter(p => contratosCusteioIds.has(p.contratoId)).reduce((s, p) => s + p.valorParcela, 0)
+  const servicoCusteioLp      = servicoCusteioLpTotal / anosLp
 
   // Excedente proporcional de custeio em cada horizonte
   const excCpProp = endivCusteio > 0 ? Math.min(1, Math.max(0, custeioExcedente / endivCusteio)) : 0
@@ -332,7 +337,7 @@ export function TabResumo({ clientId, clienteNome, clienteCidade }: {
   const servicoExcCusteioDentroAno = servicoDentroAno - servicoCusteioDentroAno
 
   const safrasCpNomes  = producaoCp.map(p => p.safra).filter((v, i, a) => a.indexOf(v) === i)
-  const safrasLpNomes  = producaoLp.map(p => p.safra).filter((v, i, a) => a.indexOf(v) === i)
+  const safrasLpNomes  = [safra] // LP usa safra selecionada como referência anual
   const safrasAnoNomes = producaoDentroAno.map(p => p.safra).filter((v, i, a) => a.indexOf(v) === i)
 
   // Culturas presentes nos dados (para mostrar no calendário)
@@ -1288,7 +1293,7 @@ export function TabResumo({ clientId, clienteNome, clienteCidade }: {
                   </th>
                   <th className="text-right px-4 py-3 text-xs font-bold text-violet-600 uppercase">
                     LP — acima de 360 dias
-                    {safrasLpNomes.length > 0 && <div className="text-gray-400 font-normal normal-case">Safra(s): {safrasLpNomes.join(', ')}</div>}
+                    <div className="text-gray-400 font-normal normal-case">Receita: safra {safra} · Serviço: média {anosLp} ano{anosLp > 1 ? 's' : ''}</div>
                   </th>
                 </tr>
               </thead>
@@ -1390,7 +1395,7 @@ export function TabResumo({ clientId, clienteNome, clienteCidade }: {
             {([
               { label: 'Curto Prazo (≤ 360 dias)', cor: 'sky', compr: comprCp, receita: receitaCp, resultado: resultadoCp, servico: servicoCp, nVenc: parcelasCp.length, servicoCompr: servicoCompromCp, peSaud: peSaudavelCp, peCrit: peCriticoCp },
               { label: `Dentro do Ano (${anoAtual})`, cor: 'emerald', compr: comprDentroAno, receita: receitaDentroAno, resultado: resultadoDentroAno, servico: servicoDentroAno, nVenc: parcelasAnoFuturas.length, servicoCompr: servicoCompromDentroAno, peSaud: peSaudavelAno, peCrit: peCriticoAno },
-              { label: 'Longo Prazo (> 360 dias)', cor: 'violet', compr: comprLp, receita: receitaLp, resultado: resultadoLp, servico: servicoLp, nVenc: parcelasLp.length, servicoCompr: servicoCompromLp, peSaud: peSaudavelLp, peCrit: peCriticoLp },
+              { label: `Longo Prazo (> 360 dias) · serviço médio ${anosLp}a`, cor: 'violet', compr: comprLp, receita: receitaLp, resultado: resultadoLp, servico: servicoLp, nVenc: parcelasLp.length, servicoCompr: servicoCompromLp, peSaud: peSaudavelLp, peCrit: peCriticoLp },
             ] as const).map(h => {
               const pctCompr = h.resultado > 0 ? (h.servicoCompr / h.resultado) * 100 : 0
               const folga = h.peSaud - h.servicoCompr
