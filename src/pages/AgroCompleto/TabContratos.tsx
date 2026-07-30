@@ -779,6 +779,68 @@ export function TabContratos({ clientId }: { clientId: string }) {
         </div>
       )}
 
+      {/* Verificação de Saldo por Contrato */}
+      {cronograma && cronograma.parcelas.length > 0 && (() => {
+        // Agrupa parcelas por contratoId → saldo devedor e total futuro por contrato
+        const porContrato: Record<string, { saldo: number; futuro: number; parcelas: number }> = {}
+        for (const p of cronograma.parcelas) {
+          if (!porContrato[p.contratoId]) porContrato[p.contratoId] = { saldo: 0, futuro: 0, parcelas: 0 }
+          porContrato[p.contratoId].saldo    += p.amortizacao ?? 0
+          porContrato[p.contratoId].futuro   += p.valorParcela
+          porContrato[p.contratoId].parcelas += 1
+        }
+        return (
+          <div className="bg-white border border-gray-100 rounded-xl overflow-hidden">
+            <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+              <div>
+                <p className="text-sm font-bold text-gray-800">Verificação de Saldo por Contrato</p>
+                <p className="text-xs text-gray-400 mt-0.5">Compare o Saldo Devedor calculado com o extrato do banco · Total Futuro inclui juros</p>
+              </div>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="bg-gray-50 border-b border-gray-100">
+                    {['Modalidade', 'Banco', 'Contrato', 'Valor Original', 'Parc. Atual / Total', 'Parc. Rest.', 'Saldo Devedor (principal)', 'Total Futuro (c/ juros)', 'Juros Futuros'].map(h => (
+                      <th key={h} className="px-3 py-2 text-left font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {contratos.map(c => {
+                    const g = porContrato[c.id!] ?? { saldo: 0, futuro: 0, parcelas: 0 }
+                    const juros = g.futuro - g.saldo
+                    return (
+                      <tr key={c.id} className="hover:bg-gray-50/60">
+                        <td className="px-3 py-2.5 font-medium text-gray-700 whitespace-nowrap">{c.modalidade}</td>
+                        <td className="px-3 py-2.5 text-gray-600 whitespace-nowrap">{c.banco}</td>
+                        <td className="px-3 py-2.5 text-gray-500 font-mono">{c.numeroContrato ?? '—'}</td>
+                        <td className="px-3 py-2.5 text-right text-gray-500">{fmtBRL(c.valorTomado)}</td>
+                        <td className="px-3 py-2.5 text-center text-gray-600">{c.parcelaAtual} / {c.totalParcelas}</td>
+                        <td className="px-3 py-2.5 text-center text-gray-500">{g.parcelas}</td>
+                        <td className="px-3 py-2.5 text-right font-bold text-purple-700">{fmtBRL(g.saldo)}</td>
+                        <td className="px-3 py-2.5 text-right font-semibold text-gray-700">{fmtBRL(g.futuro)}</td>
+                        <td className="px-3 py-2.5 text-right text-rose-500">{fmtBRL(juros)}</td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+                <tfoot>
+                  <tr className="bg-gray-100 border-t-2 border-gray-200 font-bold text-xs">
+                    <td colSpan={3} className="px-3 py-2.5 text-gray-700">TOTAL</td>
+                    <td className="px-3 py-2.5 text-right text-gray-500">{fmtBRL(contratos.reduce((s, c) => s + c.valorTomado, 0))}</td>
+                    <td colSpan={2} />
+                    <td className="px-3 py-2.5 text-right text-purple-700">{fmtBRL(cronograma.totalEndividamento)}</td>
+                    <td className="px-3 py-2.5 text-right text-gray-700">{fmtBRL(cronograma.totalFuturo)}</td>
+                    <td className="px-3 py-2.5 text-right text-rose-500">{fmtBRL(cronograma.totalFuturo - cronograma.totalEndividamento)}</td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </div>
+        )
+      })()}
+
       {/* Resumo por Tomador — aparece só quando há contratos com tomador diferente */}
       {(() => {
         const tomadores = Array.from(new Set(contratos.filter(c => c.tomador).map(c => c.tomador!)))
