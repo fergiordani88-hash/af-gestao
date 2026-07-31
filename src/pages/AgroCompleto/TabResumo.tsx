@@ -463,6 +463,7 @@ export function TabResumo({ clientId, clienteNome, clienteCidade }: {
           banco: c.banco, modalidade: c.modalidade, valorTomado: c.valorTomado,
           valorParcela: c.valorParcela, taxa: c.taxa, vencimento: c.vencimento,
           totalParcelas: c.totalParcelas, parcelaAtual: c.parcelaAtual,
+          tomador: c.tomador || undefined,
         })),
         totalEndividamento,
         servicoAnual,

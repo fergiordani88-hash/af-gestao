@@ -11,6 +11,7 @@ export interface RelContrato {
   banco: string; modalidade: string; valorTomado: number
   valorParcela: number; taxa: number; vencimento: string
   totalParcelas: number; parcelaAtual: number
+  tomador?: string
 }
 export interface RelPatrimonio {
   categoria: string; descricao: string; valorAvaliado: number
@@ -582,30 +583,59 @@ export function RelatorioCompletoAgroPDF({ data }: { data: RelatorioCompletoAgro
         <Hdr section="Contratos de Crédito Rural" client={data.clientName} safra={data.safra} />
         <View style={s.body}>
 
+          {/* Resumo por tomador — só aparece quando há tomadores distintos */}
+          {(() => {
+            const comTomador = data.contratos.filter(c => c.tomador)
+            if (!comTomador.length) return null
+            const tomadores = [...new Set(comTomador.map(c => c.tomador!))]
+            return (
+              <View style={{ flexDirection: 'row', gap: 6, marginBottom: 12 }}>
+                {tomadores.map((t, i) => {
+                  const cts = data.contratos.filter(c => c.tomador === t)
+                  return (
+                    <View key={i} style={{ flex: 1, backgroundColor: '#EEF4FB', borderRadius: 3, borderLeftWidth: 2.5, borderLeftColor: '#1565C0', padding: 8 }}>
+                      <Text style={{ fontFamily: 'Helvetica-Bold', fontSize: 7, color: '#1565C0', marginBottom: 3 }}>{t}</Text>
+                      <Text style={{ fontFamily: 'Times-Roman', fontSize: 10, color: C.ink }}>{R(cts.reduce((s, c) => s + c.valorTomado, 0))}</Text>
+                      <Text style={{ fontFamily: 'Helvetica', fontSize: 6, color: C.muted, marginTop: 1 }}>{cts.length} contrato{cts.length > 1 ? 's' : ''}</Text>
+                    </View>
+                  )
+                })}
+                {data.contratos.filter(c => !c.tomador).length > 0 && (
+                  <View style={{ flex: 1, backgroundColor: '#F5F5F5', borderRadius: 3, borderLeftWidth: 2.5, borderLeftColor: C.muted, padding: 8 }}>
+                    <Text style={{ fontFamily: 'Helvetica-Bold', fontSize: 7, color: C.muted, marginBottom: 3 }}>Sem tomador específico</Text>
+                    <Text style={{ fontFamily: 'Times-Roman', fontSize: 10, color: C.ink }}>{R(data.contratos.filter(c => !c.tomador).reduce((s, c) => s + c.valorTomado, 0))}</Text>
+                    <Text style={{ fontFamily: 'Helvetica', fontSize: 6, color: C.muted, marginTop: 1 }}>{data.contratos.filter(c => !c.tomador).length} contrato{data.contratos.filter(c => !c.tomador).length > 1 ? 's' : ''}</Text>
+                  </View>
+                )}
+              </View>
+            )
+          })()}
+
           <Sec title="Carteira de Financiamentos" />
           <View style={s.tbl}>
             <View style={s.thd}>
-              {['Instituição', 'Modalidade', 'Valor Tomado', 'Parcela', 'Taxa a.a.', 'Parcelas', 'Vencimento'].map((h2, i) => (
-                <Text key={i} style={{ ...s.th, flex: ['Instituição', 'Modalidade'].includes(h2) ? 1.5 : 1 }}>{h2}</Text>
+              {['Tomador', 'Instituição', 'Modalidade', 'Valor Tomado', 'Parcela', 'Taxa a.a.', 'Vencimento'].map((h2, i) => (
+                <Text key={i} style={{ ...s.th, flex: ['Instituição', 'Modalidade', 'Tomador'].includes(h2) ? 1.3 : 1 }}>{h2}</Text>
               ))}
             </View>
             {data.contratos.map((c, i) => (
               <View key={i} style={[s.tr, i % 2 === 0 ? s.trA : {}]}>
-                <Text style={{ ...s.tdB, flex: 1.5 }}>{c.banco}</Text>
-                <Text style={{ ...s.td, flex: 1.5, fontSize: 7 }}>{c.modalidade}</Text>
+                <Text style={{ ...s.td, flex: 1.3, fontSize: 7, color: c.tomador ? '#1565C0' : C.muted }}>{c.tomador || '—'}</Text>
+                <Text style={{ ...s.tdB, flex: 1.3 }}>{c.banco}</Text>
+                <Text style={{ ...s.td, flex: 1.3, fontSize: 7 }}>{c.modalidade}</Text>
                 <Text style={s.tdB}>{R(c.valorTomado)}</Text>
                 <Text style={s.td}>{R(c.valorParcela)}</Text>
                 <Text style={s.td}>{(c.taxa * (c.taxa < 1 ? 100 : 1)).toFixed(2)}%</Text>
-                <Text style={s.td}>{c.parcelaAtual}/{c.totalParcelas}</Text>
                 <Text style={s.td}>{c.vencimento ? new Date(c.vencimento).toLocaleDateString('pt-BR') : '—'}</Text>
               </View>
             ))}
             <View style={[s.tr, s.trT]}>
-              <Text style={{ ...s.tdB, flex: 1.5 }}>Total</Text>
-              <Text style={{ ...s.td, flex: 1.5 }} />
+              <Text style={{ ...s.tdB, flex: 1.3 }}>Total</Text>
+              <Text style={{ ...s.td, flex: 1.3 }} />
+              <Text style={{ ...s.td, flex: 1.3 }} />
               <Text style={s.tdG}>{R(data.totalEndividamento)}</Text>
               <Text style={s.tdR}>{R(data.servicoAnual)}/ano</Text>
-              <Text style={s.td} /><Text style={s.td} /><Text style={s.td} />
+              <Text style={s.td} /><Text style={s.td} />
             </View>
           </View>
 
