@@ -195,7 +195,7 @@ function Ftr({ client, date, hora }: { client: string; date: string; hora?: stri
 // ── Section heading ─────────────────────────────────────────────────────────
 function Sec({ title }: { title: string }) {
   return (
-    <View style={{ marginBottom: 12 }} minPresenceAhead={40}>
+    <View style={{ marginBottom: 12 }}>
       <Text style={s.secLabel}>{title}</Text>
       <View style={s.secLine} />
     </View>
@@ -535,13 +535,15 @@ export function RelatorioCompletoAgroPDF({ data }: { data: RelatorioCompletoAgro
           {/* Patrimônio table */}
           {data.patrimonio.length > 0 && (
             <>
-              <Sec title="Patrimônio Rural" />
               <View style={s.tbl}>
-                <View style={s.thd}>
-                  <Text style={s.th}>Categoria</Text>
-                  <Text style={{ ...s.th, flex: 2.5 }}>Bem / Descrição</Text>
-                  <Text style={s.th}>Valor Avaliado</Text>
-                  <Text style={s.th}>Situação</Text>
+                <View wrap={false}>
+                  <Sec title="Patrimônio Rural" />
+                  <View style={s.thd}>
+                    <Text style={s.th}>Categoria</Text>
+                    <Text style={{ ...s.th, flex: 2.5 }}>Bem / Descrição</Text>
+                    <Text style={s.th}>Valor Avaliado</Text>
+                    <Text style={s.th}>Situação</Text>
+                  </View>
                 </View>
                 {data.patrimonio.slice(0, 12).map((p, i) => (
                   <View key={i} style={[s.tr, i % 2 === 0 ? s.trA : {}]}>
