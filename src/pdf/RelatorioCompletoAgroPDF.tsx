@@ -535,42 +535,42 @@ export function RelatorioCompletoAgroPDF({ data }: { data: RelatorioCompletoAgro
           {/* Patrimônio table */}
           {data.patrimonio.length > 0 && (
             <>
-              <View style={s.tbl}>
-                <View wrap={false}>
-                  <Sec title="Patrimônio Rural" />
-                  <View style={s.thd}>
-                    <Text style={s.th}>Categoria</Text>
-                    <Text style={{ ...s.th, flex: 2.5 }}>Bem / Descrição</Text>
-                    <Text style={s.th}>Valor Avaliado</Text>
-                    <Text style={s.th}>Situação</Text>
+              {(() => {
+                const grupos: Record<string, { valor: number; onus: number }> = {}
+                for (const p of data.patrimonio) {
+                  if (!grupos[p.categoria]) grupos[p.categoria] = { valor: 0, onus: 0 }
+                  grupos[p.categoria].valor += p.valorAvaliado
+                  grupos[p.categoria].onus  += p.possuiOnus ? p.valorOnus : 0
+                }
+                const cats = Object.entries(grupos)
+                return (
+                  <View style={s.tbl}>
+                    <View wrap={false}>
+                      <Sec title="Patrimônio Rural" />
+                      <View style={s.thd}>
+                        <Text style={{ ...s.th, flex: 2 }}>Categoria</Text>
+                        <Text style={s.th}>Valor Total</Text>
+                        <Text style={s.th}>Ônus</Text>
+                        <Text style={s.th}>Patrimônio Líquido</Text>
+                      </View>
+                    </View>
+                    {cats.map(([cat, g], i) => (
+                      <View key={i} style={[s.tr, i % 2 === 0 ? s.trA : {}]}>
+                        <Text style={{ ...s.tdB, flex: 2 }}>{cat}</Text>
+                        <Text style={s.td}>{R(g.valor)}</Text>
+                        <Text style={{ ...s.td, color: g.onus > 0 ? C.neg : C.muted }}>{g.onus > 0 ? R(g.onus) : '—'}</Text>
+                        <Text style={{ ...s.td, color: C.pos }}>{R(g.valor - g.onus)}</Text>
+                      </View>
+                    ))}
+                    <View style={[s.tr, s.trT]}>
+                      <Text style={{ ...s.tdB, flex: 2 }}>Total</Text>
+                      <Text style={s.tdG}>{R(data.patrimonioGruto)}</Text>
+                      <Text style={{ ...s.td, color: data.totalOnus > 0 ? C.neg : C.muted }}>{data.totalOnus > 0 ? R(data.totalOnus) : '—'}</Text>
+                      <Text style={{ ...s.tdG }}>{R(data.patrimonioGruto - data.totalOnus)}</Text>
+                    </View>
                   </View>
-                </View>
-                {data.patrimonio.slice(0, 12).map((p, i) => (
-                  <View key={i} style={[s.tr, i % 2 === 0 ? s.trA : {}]}>
-                    <Text style={s.td}>{p.categoria}</Text>
-                    <Text style={{ ...s.td, flex: 2.5 }}>{p.descricao}</Text>
-                    <Text style={s.tdB}>{R(p.valorAvaliado)}</Text>
-                    <Text style={{ ...s.td, color: p.possuiOnus ? C.neg : C.pos }}>
-                      {p.possuiOnus ? `Ônus: ${R(p.valorOnus)}` : 'Livre'}
-                    </Text>
-                  </View>
-                ))}
-                {data.patrimonio.length > 12 && (
-                  <View style={s.tr}>
-                    <Text style={{ ...s.td, color: C.muted, flex: 4 }}>
-                      + {data.patrimonio.length - 12} bens patrimoniais adicionais
-                    </Text>
-                  </View>
-                )}
-                <View style={[s.tr, s.trT]}>
-                  <Text style={s.tdB}>Total</Text>
-                  <Text style={{ ...s.td, flex: 2.5 }} />
-                  <Text style={{ ...s.tdG }}>{R(data.patrimonioGruto)}</Text>
-                  <Text style={{ ...s.td, color: data.totalOnus > 0 ? C.neg : C.muted }}>
-                    {data.totalOnus > 0 ? `Ônus: ${R(data.totalOnus)}` : 'Sem ônus'}
-                  </Text>
-                </View>
-              </View>
+                )
+              })()}
             </>
           )}
         </View>
