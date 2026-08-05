@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import {
   Sprout, CreditCard, TrendingDown, TrendingUp, DollarSign,
   BarChart2, Calendar, Shield, ChevronDown, ChevronUp, ClipboardList, Upload, LayoutDashboard,
-  Bell, RefreshCw
+  Bell, RefreshCw, Beef
 } from 'lucide-react'
 import { AppLayout } from '../../components/Layout/AppLayout'
 import { useStore } from '../../store/useStore'
@@ -24,9 +24,12 @@ import { TabReestruturacao } from './TabReestruturacao'
 import { TabHedge } from './TabHedge'
 import { TabAlertas } from './TabAlertas'
 import { TabImportacao } from './TabImportacao'
+import { TabPecuariaRebanho } from './TabPecuariaRebanho'
+import { TabPecuariaManejo } from './TabPecuariaManejo'
+import { TabPecuariaProjecao } from './TabPecuariaProjecao'
 import { clsx } from 'clsx'
 
-type TabId = 'resumo' | 'cenarios' | 'reestruturacao' | 'hedge' | 'alertas' | 'producao' | 'dre-rural' | 'contratos' | 'despesas' | 'receitas' | 'custos' | 'fluxo-diario' | 'fluxo-mensal' | 'patrimonio' | 'questionario' | 'projecao-anual' | 'importacao'
+type TabId = 'resumo' | 'cenarios' | 'reestruturacao' | 'hedge' | 'alertas' | 'producao' | 'dre-rural' | 'contratos' | 'despesas' | 'receitas' | 'custos' | 'fluxo-diario' | 'fluxo-mensal' | 'patrimonio' | 'questionario' | 'projecao-anual' | 'importacao' | 'pec-rebanho' | 'pec-manejo' | 'pec-projecao'
 
 const TABS: { id: TabId; label: string; icon: React.ElementType; color: string }[] = [
   { id: 'resumo',          label: 'Resumo Executivo',         icon: LayoutDashboard, color: 'text-af-green' },
@@ -46,6 +49,9 @@ const TABS: { id: TabId; label: string; icon: React.ElementType; color: string }
   { id: 'fluxo-mensal',    label: 'Fluxo Mensal',             icon: BarChart2,       color: 'text-indigo-600' },
   { id: 'patrimonio',      label: 'Patrimônio',               icon: Shield,          color: 'text-orange-600' },
   { id: 'questionario',    label: 'Questionário',             icon: ClipboardList,   color: 'text-gray-600' },
+  { id: 'pec-rebanho',    label: 'Pecuária — Rebanho',       icon: Beef,            color: 'text-amber-700' },
+  { id: 'pec-manejo',     label: 'Pecuária — Manejo',        icon: Beef,            color: 'text-amber-700' },
+  { id: 'pec-projecao',   label: 'Pecuária — Projeção',      icon: Beef,            color: 'text-amber-700' },
 ]
 
 export function AgroCompleto() {
@@ -79,6 +85,9 @@ export function AgroCompleto() {
       case 'fluxo-diario': return <TabFluxoDiario clientId={clientId} />
       case 'fluxo-mensal': return <TabFluxoMensal clientId={clientId} />
       case 'patrimonio':   return <TabPatrimonio clientId={clientId} clienteNome={client?.name} />
+      case 'pec-rebanho':  return <TabPecuariaRebanho clientId={clientId} />
+      case 'pec-manejo':   return <TabPecuariaManejo clientId={clientId} />
+      case 'pec-projecao': return <TabPecuariaProjecao clientId={clientId} />
     }
   }
 
