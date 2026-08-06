@@ -30,6 +30,16 @@ interface ParcelaSimulada {
   saldo: number
 }
 
+function calcDatas(n: number, periodicidade: 'Mensal' | 'Semestral' | 'Anual', dataPrimeira: Date): Date[] {
+  return Array.from({ length: n }, (_, i) => {
+    const d = new Date(dataPrimeira)
+    if (periodicidade === 'Mensal') d.setMonth(d.getMonth() + i)
+    else if (periodicidade === 'Semestral') d.setMonth(d.getMonth() + i * 6)
+    else d.setFullYear(d.getFullYear() + i)
+    return d
+  })
+}
+
 function gerarCronogramaSimulado(
   saldo: number,
   taxaAnual: number,
@@ -45,26 +55,49 @@ function gerarCronogramaSimulado(
   const pmt = sistema === 'Price'
     ? (tp === 0 ? saldo / n : saldo * tp * Math.pow(1 + tp, n) / (Math.pow(1 + tp, n) - 1))
     : 0
-  const result: ParcelaSimulada[] = []
+  const datas = calcDatas(n, periodicidade, dataPrimeira)
   let s = saldo
-  for (let i = 0; i < n; i++) {
-    const data = new Date(dataPrimeira)
-    if (periodicidade === 'Mensal')     data.setMonth(data.getMonth() + i)
-    else if (periodicidade === 'Semestral') data.setMonth(data.getMonth() + i * 6)
-    else                                data.setFullYear(data.getFullYear() + i)
+  return datas.map((data, i) => {
     const juros = s * tp
     const amort = sistema === 'SAC' ? amortConst : Math.max(0, pmt - juros)
     const valor = sistema === 'SAC' ? amortConst + juros : pmt
     s = i === n - 1 ? 0 : Math.max(0, s - amort)
-    result.push({
+    return {
       num: i + 1, data,
       valor: Math.round(valor * 100) / 100,
       amort: Math.round(amort * 100) / 100,
       juros: Math.round(juros * 100) / 100,
       saldo: Math.round(s * 100) / 100,
-    })
-  }
-  return result
+    }
+  })
+}
+
+// Cronograma com amortizações não-lineares definidas por percentuais (% do principal)
+function gerarCronogramaCustom(
+  saldo: number,
+  taxaAnual: number,
+  pcts: number[],   // percentuais de amortização por parcela (somam 100)
+  periodicidade: 'Mensal' | 'Semestral' | 'Anual',
+  dataPrimeira: Date
+): ParcelaSimulada[] {
+  if (pcts.length === 0 || saldo <= 0) return []
+  const ppa = periodicidade === 'Mensal' ? 12 : periodicidade === 'Semestral' ? 2 : 1
+  const tp = Math.pow(1 + taxaAnual, 1 / ppa) - 1
+  const datas = calcDatas(pcts.length, periodicidade, dataPrimeira)
+  let s = saldo
+  return pcts.map((pct, i) => {
+    const juros = Math.round(s * tp * 100) / 100
+    const amort = i === pcts.length - 1 ? Math.round(s * 100) / 100 : Math.round(saldo * pct / 100 * 100) / 100
+    const valor = amort + juros
+    s = Math.max(0, s - amort)
+    return {
+      num: i + 1, data: datas[i],
+      valor: Math.round(valor * 100) / 100,
+      amort,
+      juros,
+      saldo: Math.round(s * 100) / 100,
+    }
+  })
 }
 
 export function TabReestruturacao({ clientId }: { clientId: string }) {
@@ -84,6 +117,7 @@ export function TabReestruturacao({ clientId }: { clientId: string }) {
     return d.toISOString().slice(0, 10)
   })
   const [mostrarCronograma,     setMostrarCronograma]     = useState(false)
+  const [customPcts,            setCustomPcts]            = useState<number[] | null>(null)
 
   const TAXAS_REF: Record<string, number> = { CDI: 0.1425, TR: 0.0088, IPCA: 0.0548 }
 
@@ -101,6 +135,9 @@ export function TabReestruturacao({ clientId }: { clientId: string }) {
   const nParcelas = useMemo(() => {
     const n = parseInt(simParcelas); return isNaN(n) || n <= 0 ? null : n
   }, [simParcelas])
+
+  // Limpa percentuais customizados quando nº de parcelas muda
+  useEffect(() => { setCustomPcts(null) }, [simParcelas, simSistema])
 
   useEffect(() => {
     if (!clientId) return
@@ -175,7 +212,9 @@ export function TabReestruturacao({ clientId }: { clientId: string }) {
     if (!taxaAnualEfetiva || !nParcelas) return { totalSaldo, servicoAtual, cronograma: [] as ParcelaSimulada[], novoServicoAnual: null }
 
     const dataPrimeira = new Date(simDataPrimeira + 'T12:00:00')
-    const cronograma = gerarCronogramaSimulado(totalSaldo, taxaAnualEfetiva, nParcelas, simPeriodicidade, simSistema, dataPrimeira)
+    const cronograma = customPcts && customPcts.length === nParcelas
+      ? gerarCronogramaCustom(totalSaldo, taxaAnualEfetiva, customPcts, simPeriodicidade, dataPrimeira)
+      : gerarCronogramaSimulado(totalSaldo, taxaAnualEfetiva, nParcelas, simPeriodicidade, simSistema, dataPrimeira)
 
     const em12 = new Date(dataPrimeira); em12.setFullYear(em12.getFullYear() + 1)
     const novoServicoAnual = cronograma.filter(p => p.data <= em12).reduce((s, p) => s + p.valor, 0)
@@ -193,7 +232,7 @@ export function TabReestruturacao({ clientId }: { clientId: string }) {
       economia, pctRecAtual, pctRecNovo, taxaSim: taxaAnualEfetiva,
       totalSaldoGeral, servicoGeral, novoServiceGeral, pctRecNovGeral,
     }
-  }, [selecionados, taxaAnualEfetiva, nParcelas, simPeriodicidade, simSistema, simDataPrimeira, contratos, receitaAnual])
+  }, [selecionados, taxaAnualEfetiva, nParcelas, simPeriodicidade, simSistema, simDataPrimeira, contratos, receitaAnual, customPcts])
 
   if (loading) return (
     <div className="flex items-center justify-center py-24 text-gray-400">
@@ -459,45 +498,111 @@ export function TabReestruturacao({ clientId }: { clientId: string }) {
                   >
                     <span className="text-xs font-bold text-gray-700 uppercase tracking-wide">
                       Cronograma completo — {sim.cronograma.length} parcelas
+                      {customPcts && <span className="ml-2 text-violet-600 normal-case font-normal">(amortização personalizada)</span>}
                     </span>
                     <span className="text-xs text-blue-600 font-semibold">{mostrarCronograma ? 'Ocultar ▲' : 'Exibir ▼'}</span>
                   </button>
-                  {mostrarCronograma && (
-                    <div className="overflow-x-auto max-h-96 overflow-y-auto">
-                      <table className="w-full text-xs">
-                        <thead className="sticky top-0 bg-gray-100">
-                          <tr>
-                            {['Nº', 'Vencimento', 'Parcela', 'Amortização', 'Juros', 'Saldo Devedor'].map(h => (
-                              <th key={h} className="px-3 py-2 text-left font-semibold text-gray-500 uppercase whitespace-nowrap">{h}</th>
-                            ))}
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-50">
-                          {sim.cronograma.map((p, idx) => (
-                            <tr key={p.num} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                              <td className="px-3 py-2 text-gray-400 font-medium">{p.num}</td>
-                              <td className="px-3 py-2 text-gray-700 whitespace-nowrap font-medium">
-                                {p.data.toLocaleDateString('pt-BR')}
-                              </td>
-                              <td className="px-3 py-2 font-bold text-gray-900">{fmtBRL(p.valor)}</td>
-                              <td className="px-3 py-2 text-blue-700">{fmtBRL(p.amort)}</td>
-                              <td className="px-3 py-2 text-red-500">{fmtBRL(p.juros)}</td>
-                              <td className="px-3 py-2 text-gray-600">{fmtBRL(p.saldo)}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                        <tfoot className="bg-gray-100 border-t-2 border-gray-200 font-bold sticky bottom-0">
-                          <tr>
-                            <td colSpan={2} className="px-3 py-2 text-gray-700">Total</td>
-                            <td className="px-3 py-2 text-gray-900">{fmtBRL(sim.cronograma.reduce((s, p) => s + p.valor, 0))}</td>
-                            <td className="px-3 py-2 text-blue-700">{fmtBRL(sim.cronograma.reduce((s, p) => s + p.amort, 0))}</td>
-                            <td className="px-3 py-2 text-red-500">{fmtBRL(sim.cronograma.reduce((s, p) => s + p.juros, 0))}</td>
-                            <td className="px-3 py-2 text-gray-400">—</td>
-                          </tr>
-                        </tfoot>
-                      </table>
-                    </div>
-                  )}
+                  {mostrarCronograma && (() => {
+                    // Percentuais ativos (custom ou uniformes)
+                    const n = sim.cronograma.length
+                    const pcts: number[] = customPcts && customPcts.length === n
+                      ? customPcts
+                      : sim.cronograma.map(p => Math.round(p.amort / (sim.totalSaldo || 1) * 10000) / 100)
+                    const somaCustom = pcts.reduce((s, v) => s + v, 0)
+                    const somaOk = Math.abs(somaCustom - 100) < 0.1
+
+                    const updPct = (idx: number, val: number) => {
+                      const arr = [...pcts]
+                      arr[idx] = isNaN(val) ? 0 : val
+                      setCustomPcts(arr)
+                    }
+
+                    return (
+                      <div>
+                        {/* Barra de controle dos percentuais */}
+                        <div className="px-4 py-2 bg-violet-50 border-b border-violet-100 flex items-center justify-between gap-3 flex-wrap">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-violet-700 font-semibold">
+                              Σ amortização: <span className={somaOk ? 'text-green-600' : 'text-red-600'}>{fmtN(somaCustom, 2)}%</span>
+                              {!somaOk && <span className="text-red-500 ml-1">(deve somar 100%)</span>}
+                            </span>
+                          </div>
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => setCustomPcts(null)}
+                              className="text-xs px-2.5 py-1 rounded-lg border border-violet-200 text-violet-700 hover:bg-violet-100 transition"
+                            >
+                              Resetar para {simSistema}
+                            </button>
+                            {!somaOk && customPcts && (
+                              <button
+                                onClick={() => {
+                                  const diff = 100 - somaCustom
+                                  const arr = [...pcts]
+                                  arr[arr.length - 1] = Math.round((arr[arr.length - 1] + diff) * 100) / 100
+                                  setCustomPcts(arr)
+                                }}
+                                className="text-xs px-2.5 py-1 rounded-lg bg-violet-600 text-white hover:bg-violet-700 transition"
+                              >
+                                Ajustar última parcela
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                        <div className="overflow-x-auto max-h-96 overflow-y-auto">
+                          <table className="w-full text-xs">
+                            <thead className="sticky top-0 bg-gray-100 z-10">
+                              <tr>
+                                {['Nº', 'Vencimento', '% Amort.', 'Parcela', 'Amortização', 'Juros', 'Saldo Devedor'].map(h => (
+                                  <th key={h} className="px-3 py-2 text-left font-semibold text-gray-500 uppercase whitespace-nowrap">{h}</th>
+                                ))}
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-50">
+                              {sim.cronograma.map((p, idx) => {
+                                const pctVal = pcts[idx] ?? 0
+                                const isCustom = customPcts !== null
+                                return (
+                                  <tr key={p.num} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                                    <td className="px-3 py-2 text-gray-400 font-medium">{p.num}</td>
+                                    <td className="px-3 py-2 text-gray-700 whitespace-nowrap font-medium">
+                                      {p.data.toLocaleDateString('pt-BR')}
+                                    </td>
+                                    <td className="px-2 py-1.5">
+                                      <div className="flex items-center gap-1">
+                                        <input
+                                          type="number"
+                                          min={0} max={100} step={0.01}
+                                          value={pctVal}
+                                          onChange={e => updPct(idx, parseFloat(e.target.value))}
+                                          className={`w-16 text-right border rounded-lg px-1.5 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-violet-400 ${isCustom ? 'border-violet-300 bg-violet-50' : 'border-gray-200 bg-white'}`}
+                                        />
+                                        <span className="text-gray-400">%</span>
+                                      </div>
+                                    </td>
+                                    <td className="px-3 py-2 font-bold text-gray-900">{fmtBRL(p.valor)}</td>
+                                    <td className="px-3 py-2 text-blue-700">{fmtBRL(p.amort)}</td>
+                                    <td className="px-3 py-2 text-red-500">{fmtBRL(p.juros)}</td>
+                                    <td className="px-3 py-2 text-gray-600">{fmtBRL(p.saldo)}</td>
+                                  </tr>
+                                )
+                              })}
+                            </tbody>
+                            <tfoot className="bg-gray-100 border-t-2 border-gray-200 font-bold sticky bottom-0">
+                              <tr>
+                                <td colSpan={2} className="px-3 py-2 text-gray-700">Total</td>
+                                <td className={`px-3 py-2 ${somaOk ? 'text-green-600' : 'text-red-600'}`}>{fmtN(somaCustom, 2)}%</td>
+                                <td className="px-3 py-2 text-gray-900">{fmtBRL(sim.cronograma.reduce((s, p) => s + p.valor, 0))}</td>
+                                <td className="px-3 py-2 text-blue-700">{fmtBRL(sim.cronograma.reduce((s, p) => s + p.amort, 0))}</td>
+                                <td className="px-3 py-2 text-red-500">{fmtBRL(sim.cronograma.reduce((s, p) => s + p.juros, 0))}</td>
+                                <td className="px-3 py-2 text-gray-400">—</td>
+                              </tr>
+                            </tfoot>
+                          </table>
+                        </div>
+                      </div>
+                    )
+                  })()}
                 </div>
               </div>
             )}
@@ -517,7 +622,7 @@ export function TabReestruturacao({ clientId }: { clientId: string }) {
 
       <div className="flex justify-end">
         <button
-          onClick={() => { setSimTaxa(''); setSimParcelas(''); setSimSistema('SAC'); setSimPeriodicidade('Mensal'); setSimIndexador('Pré-fixado'); setSimTipoTaxa('aa'); setMostrarCronograma(false) }}
+          onClick={() => { setSimTaxa(''); setSimParcelas(''); setSimSistema('SAC'); setSimPeriodicidade('Mensal'); setSimIndexador('Pré-fixado'); setSimTipoTaxa('aa'); setMostrarCronograma(false); setCustomPcts(null) }}
           className="flex items-center gap-1.5 text-xs text-gray-500 border border-gray-200 px-3 py-2 rounded-lg hover:bg-gray-50"
         >
           <RotateCcw size={12} /> Resetar simulação
