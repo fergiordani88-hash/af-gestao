@@ -87,14 +87,16 @@ export function TabReestruturacao({ clientId }: { clientId: string }) {
 
   const TAXAS_REF: Record<string, number> = { CDI: 0.1425, TR: 0.0088, IPCA: 0.0548 }
 
+  const limiteMaxTaxa = simTipoTaxa === 'am' ? 10 : 100
+
   // Converte inputs para taxa anual efetiva (decimal)
   const taxaAnualEfetiva = useMemo(() => {
     const t = parseFloat(simTaxa) / 100
-    if (isNaN(t)) return null
+    if (isNaN(t) || t <= 0 || t > limiteMaxTaxa / 100) return null
     const taxaNominal = simTipoTaxa === 'am' ? Math.pow(1 + t, 12) - 1 : t
     const taxaBase = simIndexador !== 'Pré-fixado' ? TAXAS_REF[simIndexador] ?? 0 : 0
     return taxaNominal + taxaBase
-  }, [simTaxa, simTipoTaxa, simIndexador])
+  }, [simTaxa, simTipoTaxa, simIndexador, limiteMaxTaxa])
 
   const nParcelas = useMemo(() => {
     const n = parseInt(simParcelas); return isNaN(n) || n <= 0 ? null : n
@@ -306,7 +308,7 @@ export function TabReestruturacao({ clientId }: { clientId: string }) {
                 <label className="block text-xs font-semibold text-gray-600 mb-1.5">Nova Taxa (spread/nominal)</label>
                 <div className="flex gap-1">
                   <input
-                    type="number" min={0} step={0.1} value={simTaxa}
+                    type="number" min={0.1} step={0.1} max={limiteMaxTaxa} value={simTaxa}
                     onChange={e => setSimTaxa(e.target.value)}
                     placeholder="ex: 8.5"
                     className="flex-1 border border-gray-200 rounded-xl px-3 py-2.5 text-sm font-semibold text-center focus:outline-none focus:ring-2 focus:ring-blue-300"
@@ -336,9 +338,12 @@ export function TabReestruturacao({ clientId }: { clientId: string }) {
                   <option value="TR">TR (0,88% a.a.)</option>
                   <option value="IPCA">IPCA (5,48% a.a.)</option>
                 </select>
-                {simIndexador !== 'Pré-fixado' && simTaxa && (
+                {simTaxa && parseFloat(simTaxa) > limiteMaxTaxa && (
+                  <p className="text-xs text-red-500 mt-1 font-semibold">Taxa inválida — máximo {limiteMaxTaxa}% {simTipoTaxa === 'am' ? 'a.m.' : 'a.a.'}</p>
+                )}
+                {simIndexador !== 'Pré-fixado' && simTaxa && taxaAnualEfetiva != null && (
                   <p className="text-xs text-blue-600 mt-1">
-                    Taxa total efetiva: {taxaAnualEfetiva != null ? (taxaAnualEfetiva * 100).toFixed(2).replace('.', ',') + '% a.a.' : '—'}
+                    Taxa total efetiva: {(taxaAnualEfetiva * 100).toFixed(2).replace('.', ',') + '% a.a.'}
                   </p>
                 )}
               </div>
