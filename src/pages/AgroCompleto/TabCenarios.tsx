@@ -65,6 +65,7 @@ function calcProjecao(
   dividasPorAno: Record<string, number>,
   custosFixosAnuais: number,
   ajuste: { preco: number; produt: number; area: number; custo: number },
+  taxaMediaContratos: number,
 ): AnoRow[] {
   const anosReais = Object.keys(producaoPorAno).map(Number).sort((a, b) => a - b)
   const ultimoAnoReal = anosReais.length > 0 ? Math.max(...anosReais) : ANO_INICIO
@@ -113,7 +114,8 @@ function calcProjecao(
 
     const receitaLiquida = lucBruto - despesasRecorrentes - dividasBancarias
     const saldoAnterior  = rows.length > 0 ? rows[rows.length - 1].resultadoLiquido : 0
-    const prejAcum       = saldoAnterior < 0 ? Math.abs(saldoAnterior) : 0
+    const prejAnoAnterior = saldoAnterior < 0 ? Math.abs(saldoAnterior) : 0
+    const prejAcum        = prejAnoAnterior * (1 + taxaMediaContratos)
     const resultadoLiquido = receitaLiquida - prejAcum
     const margLiquida    = recBruta > 0 ? resultadoLiquido / recBruta : 0
 
@@ -142,6 +144,14 @@ const PREMISSAS_DEFAULT: Premissas = {
   crescArea: 2, crescProdut: 1, varPreco: 3, infCusto: 5, infDespesas: 5,
 }
 
+// ── Matriz de Sensibilidade Cambial × Preço da Commodity ───────────────────────
+// Sem infraestrutura nova: reaproveita o mesmo motor de projeção (calcProjecao),
+// só recalculando com dois eixos de choque em vez de 3 cenários fixos.
+const CAMB_VALUES = [-10, -5, 0, 5, 10]
+const COMM_VALUES = [-10, -5, 0, 5, 10]
+// % do custo da atividade considerado sensível ao câmbio (insumo importado — fertilizante, defensivo)
+const CUSTO_SENSIBILIDADE_CAMBIAL = 0.35
+
 const COR: Record<string, { bg: string; border: string; text: string; badge: string; bar: string; line: string }> = {
   'Pessimista': { bg: 'bg-red-50',     border: 'border-red-200',    text: 'text-red-700',    badge: 'bg-red-100 text-red-700',    bar: '#EF4444', line: '#B91C1C' },
   'Base':       { bg: 'bg-blue-50',    border: 'border-blue-200',   text: 'text-blue-700',   badge: 'bg-blue-100 text-blue-700',  bar: '#3B82F6', line: '#1D4ED8' },
@@ -166,6 +176,7 @@ export function TabCenarios({ clientId }: { clientId: string }) {
   const [producaoPorAno, setProducaoPorAno] = useState<Record<number, AgroProducao[]>>({})
   const [dividasPorAno,  setDividasPorAno]  = useState<Record<string, number>>({})
   const [custosFixosAnuais, setCustosFixosAnuais] = useState(0)
+  const [taxaMediaContratos, setTaxaMediaContratos] = useState(0)
   const [showConfig, setShowConfig] = useState(true)
   const [detalheAnos, setDetalheAnos] = useState(false)
 
@@ -177,7 +188,8 @@ export function TabCenarios({ clientId }: { clientId: string }) {
       agroApi.producao.list(clientId),
       agroApi.contratos.cronograma(clientId).catch(() => null),
       agroApi.custosFixos.list(clientId).catch(() => []),
-    ]).then(([producoes, crono, custosFixos]) => {
+      agroApi.contratos.list(clientId).catch(() => []),
+    ]).then(([producoes, crono, custosFixos, contratos]) => {
       setProducaoPorAno(agruparPorAno(producoes))
       if (crono?.porAno) {
         const mapa: Record<string, number> = {}
@@ -185,6 +197,11 @@ export function TabCenarios({ clientId }: { clientId: string }) {
         setDividasPorAno(mapa)
       }
       setCustosFixosAnuais(custosFixos.reduce((s, cf) => s + cf.valorMensal, 0) * 12)
+
+      const totalTomado = contratos.reduce((s: number, c: any) => s + (c.valorTomado || 0), 0)
+      setTaxaMediaContratos(totalTomado > 0
+        ? contratos.reduce((s: number, c: any) => s + (c.taxa || 0) * (c.valorTomado || 0), 0) / totalTomado
+        : 0)
     }).finally(() => setLoading(false))
   }, [clientId])
 
@@ -208,10 +225,37 @@ export function TabCenarios({ clientId }: { clientId: string }) {
       rows: calcProjecao(
         producaoPorAno, premissas, dividasPorAno, custosFixosAnuais,
         { preco: c.varPreco, produt: c.varProdut, area: c.varArea, custo: c.varCusto },
+        taxaMediaContratos,
       ),
     })),
-    [cenarios, producaoPorAno, premissas, dividasPorAno, custosFixosAnuais],
+    [cenarios, producaoPorAno, premissas, dividasPorAno, custosFixosAnuais, taxaMediaContratos],
   )
+
+  // Matriz de sensibilidade câmbio × preço da commodity — dólar sobe → receita (grão dolarizado)
+  // sobe integralmente e custo sobe parcialmente (parte do insumo é importado); preço da
+  // commodity (CBOT) é um choque independente, só na receita.
+  const matrizSensibilidade = useMemo(() => {
+    return CAMB_VALUES.map(camb => ({
+      camb,
+      cols: COMM_VALUES.map(comm => {
+        const precoShock = ((1 + camb / 100) * (1 + comm / 100) - 1) * 100
+        const custoShock = camb * CUSTO_SENSIBILIDADE_CAMBIAL
+        const rows = calcProjecao(
+          producaoPorAno, premissas, dividasPorAno, custosFixosAnuais,
+          { preco: precoShock, produt: 0, area: 0, custo: custoShock },
+          taxaMediaContratos,
+        )
+        return { comm, total10: rows.reduce((s, r) => s + r.resultadoLiquido, 0) }
+      }),
+    }))
+  }, [producaoPorAno, premissas, dividasPorAno, custosFixosAnuais, taxaMediaContratos])
+
+  const sensMaxAbs = Math.max(1, ...matrizSensibilidade.flatMap(r => r.cols.map(c => Math.abs(c.total10))))
+  const cellBg = (v: number) => {
+    const frac = Math.min(1, Math.abs(v) / sensMaxAbs)
+    const alpha = 0.10 + frac * 0.55
+    return v >= 0 ? `rgba(16,185,129,${alpha})` : `rgba(239,68,68,${alpha})`
+  }
 
   // Dados do gráfico comparativo
   const chartData = useMemo(() => {
@@ -531,6 +575,50 @@ export function TabCenarios({ clientId }: { clientId: string }) {
             </tfoot>
           </table>
         </div>
+      </Card>
+
+      {/* Matriz de Sensibilidade Cambial × Preço da Commodity */}
+      <Card className="p-5">
+        <h4 className="font-semibold text-sm text-gray-900 mb-1">Matriz de Sensibilidade — Câmbio × Preço da Commodity</h4>
+        <p className="text-xs text-gray-400 mb-4 flex items-center gap-1">
+          <Info size={11} />
+          Resultado Líquido 10 Anos (Base) sob variação simultânea do dólar e do preço da commodity (CBOT). Linhas = câmbio, colunas = preço da commodity.
+        </p>
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs border-separate" style={{ borderSpacing: 2 }}>
+            <thead>
+              <tr>
+                <th className="px-2 py-1.5 text-xs font-semibold text-gray-500 uppercase text-right">Câmbio ↓ / Commodity →</th>
+                {COMM_VALUES.map(comm => (
+                  <th key={comm} className={`px-2 py-1.5 text-center text-xs font-bold ${comm === 0 ? 'text-blue-700' : 'text-gray-600'}`}>
+                    {comm > 0 ? '+' : ''}{comm}%
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {matrizSensibilidade.map(row => (
+                <tr key={row.camb}>
+                  <td className={`px-2 py-1.5 text-right text-xs font-bold whitespace-nowrap ${row.camb === 0 ? 'text-blue-700' : 'text-gray-600'}`}>
+                    {row.camb > 0 ? '+' : ''}{row.camb}%
+                  </td>
+                  {row.cols.map(cell => (
+                    <td
+                      key={cell.comm}
+                      className={`px-2 py-2 text-center font-semibold rounded-md whitespace-nowrap ${cell.total10 >= 0 ? 'text-emerald-800' : 'text-red-800'} ${row.camb === 0 && cell.comm === 0 ? 'ring-2 ring-blue-400' : ''}`}
+                      style={{ backgroundColor: cellBg(cell.total10) }}
+                    >
+                      {fmtK(cell.total10)}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <p className="text-xs text-gray-400 mt-3">
+          Célula destacada = cenário Base (sem choque). Premissa: alta do dólar repassa 100% ao preço do grão em reais e {fmtPct(CUSTO_SENSIBILIDADE_CAMBIAL)} ao custo da atividade (parcela de insumo importado). Variação de preço da commodity considerada independente do câmbio, incidindo só sobre a receita.
+        </p>
       </Card>
 
       {/* Painel de Decisão */}

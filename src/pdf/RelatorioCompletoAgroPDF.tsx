@@ -35,7 +35,12 @@ export interface RelatorioCompletoAgroData {
   margem: number; alavancagem: number; solvencia: number
   endivReceita: number; capPagamento: number; ratingLabel: string; ratingColor: string
   cenarios: RelCenario[]
-  projecao10Anos: number; projecaoAnos: { ano: number; resultadoLiquido: number; recBruta: number; custoAtividade?: number; endividamento?: number }[]
+  projecao10Anos: number; projecaoAnos: { ano: number; resultadoLiquido: number; recBruta: number; custoAtividade?: number; endividamento?: number; prejuizoFinanciado?: number }[]
+  reestruturacaoIdeal?: {
+    totalPassivo: number; resultadoLiquidoCapacidade: number; safraCapacidade: string
+    cenarios: { label: string; capacidadeAnual: number; inviavel: boolean; nAnos?: number; parcelaFixa?: number; totalJuros?: number }[]
+  }
+  contextoMercado?: { cambio?: string; precoRef?: string; panorama?: string; comentario?: string }
   // Análise de crédito ampliada
   jurosAnuais?: number; jurosHa?: number
   jurosAnuaisSacas?: number; jurosSacasHa?: number; jurosCultura?: string
@@ -882,6 +887,40 @@ export function RelatorioCompletoAgroPDF({ data }: { data: RelatorioCompletoAgro
         <Hdr section="Cenários · Projeção 10 Anos" client={data.clientName} safra={data.safra} />
         <View style={s.body}>
 
+          {data.contextoMercado && (data.contextoMercado.cambio || data.contextoMercado.precoRef || data.contextoMercado.panorama || data.contextoMercado.comentario) && (
+            <>
+              <Sec title="Contexto de Mercado" />
+              <View style={{ flexDirection: 'row', gap: 20, marginBottom: 8 }}>
+                {data.contextoMercado.cambio && (
+                  <View>
+                    <Text style={{ fontFamily: 'Helvetica', fontSize: 5.5, color: C.muted, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 2 }}>Câmbio (R$/US$)</Text>
+                    <Text style={{ fontFamily: 'Helvetica-Bold', fontSize: 9, color: C.ink }}>{data.contextoMercado.cambio}</Text>
+                  </View>
+                )}
+                {data.contextoMercado.precoRef && (
+                  <View>
+                    <Text style={{ fontFamily: 'Helvetica', fontSize: 5.5, color: C.muted, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 2 }}>Preço de Referência (CEPEA)</Text>
+                    <Text style={{ fontFamily: 'Helvetica-Bold', fontSize: 9, color: C.ink }}>{data.contextoMercado.precoRef}</Text>
+                  </View>
+                )}
+                {data.contextoMercado.panorama && (
+                  <View>
+                    <Text style={{ fontFamily: 'Helvetica', fontSize: 5.5, color: C.muted, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 2 }}>Panorama Climático</Text>
+                    <Text style={{ fontFamily: 'Helvetica-Bold', fontSize: 9, color: C.ink }}>{data.contextoMercado.panorama}</Text>
+                  </View>
+                )}
+              </View>
+              {data.contextoMercado.comentario && (
+                <Text style={{ fontFamily: 'Helvetica', fontSize: 7.5, color: C.body, lineHeight: 1.6, marginBottom: 6 }}>
+                  {data.contextoMercado.comentario}
+                </Text>
+              )}
+              <Text style={{ fontFamily: 'Helvetica', fontSize: 6, color: C.muted, marginBottom: 14 }}>
+                Contexto preenchido manualmente pelo consultor no momento da análise — não é atualizado automaticamente.
+              </Text>
+            </>
+          )}
+
           {data.cenarios.length > 0 && (
             <>
               <Sec title="Simulação de Cenários — Próximos 10 Anos" />
@@ -921,7 +960,7 @@ export function RelatorioCompletoAgroPDF({ data }: { data: RelatorioCompletoAgro
               <Sec title="Projeção Anual — Cenário Base" />
               <View style={s.tbl}>
                 <View style={s.thd}>
-                  {['Ano', 'Receita Bruta', 'Custos da Atividade', 'Endividamento', 'Resultado Líquido', 'Situação'].map(h2 => (
+                  {['Ano', 'Receita Bruta', 'Custos da Atividade', 'Endividamento', 'Prejuízo Financiado', 'Resultado Líquido', 'Situação'].map(h2 => (
                     <Text key={h2} style={{ ...s.th, flex: h2 === 'Ano' ? 0.6 : 1 }}>{h2}</Text>
                   ))}
                 </View>
@@ -931,6 +970,7 @@ export function RelatorioCompletoAgroPDF({ data }: { data: RelatorioCompletoAgro
                     <Text style={{ ...s.td, color: C.pos }}>{R(r.recBruta)}</Text>
                     <Text style={{ ...s.td, color: C.neg }}>{r.custoAtividade != null ? R(r.custoAtividade) : '—'}</Text>
                     <Text style={{ ...s.td, color: C.neg }}>{r.endividamento != null ? R(r.endividamento) : '—'}</Text>
+                    <Text style={{ ...s.td, color: C.neg }}>{r.prejuizoFinanciado ? R(r.prejuizoFinanciado) : '—'}</Text>
                     <Text style={{ ...s.td, fontFamily: 'Helvetica-Bold', color: r.resultadoLiquido >= 0 ? C.pos : C.neg }}>{R(r.resultadoLiquido)}</Text>
                     <Text style={{ ...s.td, color: r.resultadoLiquido >= 0 ? C.pos : C.neg }}>
                       {r.resultadoLiquido >= 0 ? '✓ Positivo' : '✗ Negativo'}
@@ -942,10 +982,14 @@ export function RelatorioCompletoAgroPDF({ data }: { data: RelatorioCompletoAgro
                   <Text style={s.tdG}>{R(data.projecaoAnos.reduce((a, r) => a + r.recBruta, 0))}</Text>
                   <Text style={{ ...s.td, color: C.neg }}>{R(data.projecaoAnos.reduce((a, r) => a + (r.custoAtividade ?? 0), 0))}</Text>
                   <Text style={{ ...s.td, color: C.neg }}>{R(data.projecaoAnos.reduce((a, r) => a + (r.endividamento ?? 0), 0))}</Text>
+                  <Text style={{ ...s.td, color: C.neg }}>{R(data.projecaoAnos.reduce((a, r) => a + (r.prejuizoFinanciado ?? 0), 0))}</Text>
                   <Text style={{ ...s.td, fontFamily: 'Helvetica-Bold', color: data.projecao10Anos >= 0 ? C.pos : C.neg }}>{R(data.projecao10Anos)}</Text>
                   <Text style={{ ...s.td, color: C.muted }}>{data.projecaoAnos.filter(r => r.resultadoLiquido >= 0).length} de 10 positivos</Text>
                 </View>
               </View>
+              <Text style={{ fontFamily: 'Helvetica', fontSize: 6, color: C.muted, marginTop: 4 }}>
+                Prejuízo Financiado: resultado negativo do ano anterior, capitalizado à taxa média dos contratos vigentes — representa o crédito necessário para cobrir o déficit.
+              </Text>
             </>
           )}
 
@@ -974,6 +1018,49 @@ export function RelatorioCompletoAgroPDF({ data }: { data: RelatorioCompletoAgro
         </View>
         <Ftr client={data.clientName} date={data.dataGeracao} hora={h} />
       </Page>
+
+      {/* ══ PÁG 6 — REESTRUTURAÇÃO DE PASSIVO ══ */}
+      {data.reestruturacaoIdeal && (
+        <Page size="A4" style={s.page}>
+          <Hdr section="Reestruturação de Passivo — Proposta Ideal" client={data.clientName} safra={data.safra} />
+          <View style={s.body}>
+            <Sec title="Proposta de Reestruturação Ideal" />
+            <Text style={{ fontFamily: 'Helvetica', fontSize: 8, color: C.body, lineHeight: 1.7, marginBottom: 12 }}>
+              Simulação de consolidação de <Text style={{ fontFamily: 'Helvetica-Bold' }}>todo o passivo contratado</Text> ({R(data.reestruturacaoIdeal.totalPassivo)}) em parcelas anuais fixas, a uma taxa de 1% a.a. <Text style={{ fontFamily: 'Helvetica-Bold' }}>sem correção monetária</Text> — cenário concessivo para orientar a negociação junto às instituições credoras. A capacidade de pagamento considera o Resultado Líquido projetado para a safra {data.reestruturacaoIdeal.safraCapacidade} ({R(data.reestruturacaoIdeal.resultadoLiquidoCapacidade)}).
+            </Text>
+
+            <View style={s.tbl}>
+              <View style={s.thd}>
+                {['Cenário', 'Capacidade Anual', 'Parcela Anual Fixa', 'Prazo', 'Total de Juros'].map(h2 => (
+                  <Text key={h2} style={{ ...s.th, flex: h2 === 'Cenário' ? 1.3 : 1 }}>{h2}</Text>
+                ))}
+              </View>
+              {data.reestruturacaoIdeal.cenarios.map((c, i) => (
+                <View key={c.label} style={[s.tr, i % 2 === 0 ? s.trA : {}]}>
+                  <Text style={{ ...s.tdB, flex: 1.3 }}>{c.label}</Text>
+                  <Text style={s.td}>{R(c.capacidadeAnual)}</Text>
+                  <Text style={{ ...s.td, fontFamily: 'Helvetica-Bold', color: c.inviavel ? C.neg : C.pos }}>
+                    {c.inviavel ? '—' : R(c.parcelaFixa ?? 0)}
+                  </Text>
+                  <Text style={s.td}>{c.inviavel ? '—' : `${c.nAnos} ${(c.nAnos ?? 0) > 1 ? 'anos' : 'ano'}`}</Text>
+                  <Text style={{ ...s.td, color: C.neg }}>{c.inviavel ? '—' : R(c.totalJuros ?? 0)}</Text>
+                </View>
+              ))}
+            </View>
+
+            {data.reestruturacaoIdeal.cenarios.some(c => c.inviavel) && (
+              <Text style={{ fontFamily: 'Helvetica', fontSize: 7.5, color: C.neg, marginTop: 10, lineHeight: 1.6 }}>
+                Atenção: em ao menos um cenário a capacidade de pagamento não cobre nem os juros de 1% a.a. sobre o saldo devedor — nesse ritmo o passivo cresceria indefinidamente. Recomenda-se aporte de capital, alienação de ativos ou redução do passivo antes de negociar a reestruturação.
+              </Text>
+            )}
+
+            <Text style={{ fontFamily: 'Helvetica', fontSize: 6.5, color: C.muted, marginTop: 10, lineHeight: 1.6 }}>
+              Simulação de caráter indicativo — parcela fixa (sistema Price) sobre o saldo total, taxa de 1% a.a. sem indexador, prazo arredondado para o número inteiro de anos seguinte. Não substitui a negociação formal das condições com cada instituição credora.
+            </Text>
+          </View>
+          <Ftr client={data.clientName} date={data.dataGeracao} hora={h} />
+        </Page>
+      )}
     </Document>
   )
 }

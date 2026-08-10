@@ -137,6 +137,20 @@ function IndiceRow({ label, value, status, tooltip }: { label: string; value: st
   )
 }
 
+// ── Contexto de Mercado (preenchido manualmente na hora de exportar) ──────────
+interface ContextoMercado {
+  cambio: string; precoRef: string; panorama: string; comentario: string
+}
+const EMPTY_CONTEXTO_MERCADO: ContextoMercado = { cambio: '', precoRef: '', panorama: '', comentario: '' }
+const PANORAMAS_CLIMATICOS = ['La Niña (tendência seca)', 'El Niño (tendência chuvosa)', 'Neutro', 'Indefinido']
+
+function loadContextoMercado(clientId: string): ContextoMercado {
+  try {
+    const raw = localStorage.getItem(`contexto-mercado-v1-${clientId}`)
+    return raw ? { ...EMPTY_CONTEXTO_MERCADO, ...JSON.parse(raw) } : EMPTY_CONTEXTO_MERCADO
+  } catch { return EMPTY_CONTEXTO_MERCADO }
+}
+
 const SAFRAS = ['2025/26', '2026/27']
 
 export function TabResumo({ clientId, clienteNome, clienteCidade }: {
@@ -157,11 +171,23 @@ export function TabResumo({ clientId, clienteNome, clienteCidade }: {
   const [colheitaDatas, setColheitaDatas] = useState<Record<string, HarvestDate>>(loadColheitaDatas)
   const [showCalendario, setShowCalendario] = useState(false)
   const [colheitaEdit, setColheitaEdit] = useState<Record<string, HarvestDate>>({})
+  const [contextoMercado, setContextoMercado] = useState<ContextoMercado>(EMPTY_CONTEXTO_MERCADO)
+  const [showContextoMercado, setShowContextoMercado] = useState(false)
 
   const saveColheitaDatas = (datas: Record<string, HarvestDate>) => {
     setColheitaDatas(datas)
     localStorage.setItem(LS_KEY, JSON.stringify(datas))
   }
+
+  const saveContextoMercado = (next: ContextoMercado) => {
+    setContextoMercado(next)
+    localStorage.setItem(`contexto-mercado-v1-${clientId}`, JSON.stringify(next))
+  }
+
+  useEffect(() => {
+    if (!clientId) return
+    setContextoMercado(loadContextoMercado(clientId))
+  }, [clientId])
 
   useEffect(() => {
     setLoading(true)
@@ -220,7 +246,13 @@ export function TabResumo({ clientId, clienteNome, clienteCidade }: {
 
   // ── Endividamento ───────────────────────────────────────────────
   const anoAtual = new Date().getFullYear()
-  const parcelasAnoAtual = parcelas.filter(p => new Date(p.vencimento).getFullYear() === anoAtual)
+  const hoje = new Date()
+  // Só o que ainda vai vencer a partir de hoje — parcelas já vencidas dentro do
+  // ano corrente já são passado e não devem inflar a capacidade de pagamento.
+  const parcelasAnoAtual = parcelas.filter(p => {
+    const v = new Date(p.vencimento)
+    return v.getFullYear() === anoAtual && v >= hoje
+  })
   const servicoAnual = parcelasAnoAtual.reduce((s, p) => s + p.valorParcela, 0)
 
   // ── Índices ────────────────────────────────────────────────────
@@ -259,7 +291,6 @@ export function TabResumo({ clientId, clienteNome, clienteCidade }: {
   const statusCapEndiv: Status = comprometimentoPct <= limSaudavel ? 'ok' : comprometimentoPct <= limCritico ? 'atencao' : 'risco'
 
   // ── CP vs LP (360 dias) ────────────────────────────────────────
-  const hoje = new Date()
   const dataCorte360 = new Date(hoje.getTime() + 360 * 24 * 60 * 60 * 1000)
 
   // Classifica cada entrada de produção pela data de colheita da sua cultura
@@ -321,9 +352,9 @@ export function TabResumo({ clientId, clienteNome, clienteCidade }: {
   const custoDentroAno     = producaoDentroAno.reduce((s, p) => s + calcRow(p).custoTotal + calcRow(p).custoArrendTotal, 0)
   const resultadoDentroAno = receitaDentroAno - custoDentroAno
 
-  const parcelasAnoFuturas       = parcelasAnoAtual.filter(p => new Date(p.vencimento) >= hoje)
-  const servicoDentroAno         = parcelasAnoFuturas.reduce((s, p) => s + p.valorParcela, 0)
-  const servicoCusteioDentroAno  = parcelasAnoFuturas.filter(p => contratosCusteioIds.has(p.contratoId)).reduce((s, p) => s + p.valorParcela, 0)
+  // parcelasAnoAtual já é só o que resta a partir de hoje (ver definição acima)
+  const servicoDentroAno         = parcelasAnoAtual.reduce((s, p) => s + p.valorParcela, 0)
+  const servicoCusteioDentroAno  = parcelasAnoAtual.filter(p => contratosCusteioIds.has(p.contratoId)).reduce((s, p) => s + p.valorParcela, 0)
   const servicoCusteioExcDentroAno = servicoCusteioDentroAno * excCpProp
   const servicoCompromDentroAno  = (servicoDentroAno - servicoCusteioDentroAno) + servicoCusteioExcDentroAno
   const saldoDispDentroAno       = resultadoDentroAno - servicoCompromDentroAno
@@ -388,7 +419,15 @@ export function TabResumo({ clientId, clienteNome, clienteCidade }: {
       const ultimoAno = Math.max(...Object.keys(prodPorAno).map(Number), 2025)
       const baseProds = prodPorAno[ultimoAno] ?? prodSafra
 
-      const projecaoAnos = Array.from({ length: 10 }, (_, i) => {
+      // Taxa média ponderada pelo valor tomado dos contratos vigentes — usada para
+      // capitalizar o prejuízo do ano anterior (ele precisa ser coberto por crédito)
+      const totalTomadoContratos = contratos.reduce((s: number, c: any) => s + (c.valorTomado || 0), 0)
+      const taxaMediaContratos = totalTomadoContratos > 0
+        ? contratos.reduce((s: number, c: any) => s + (c.taxa || 0) * (c.valorTomado || 0), 0) / totalTomadoContratos
+        : 0
+
+      const projecaoAnos: { ano: number; recBruta: number; custoAtividade: number; endividamento: number; prejuizoFinanciado: number; resultadoLiquido: number }[] = []
+      for (let i = 0; i < 10; i++) {
         const ano = 2026 + i
         let recBruta = 0, custo = 0
         if (prodPorAno[ano]) {
@@ -399,9 +438,12 @@ export function TabResumo({ clientId, clienteNome, clienteCidade }: {
         }
         const custoAtividade = custo + custosFixosAnuais
         const endividamento = dividasPorAno[String(ano)] ?? 0
-        const resultadoLiquido = recBruta - custoAtividade - endividamento
-        return { ano, recBruta, custoAtividade, endividamento, resultadoLiquido }
-      })
+        const prejuizoAnoAnterior = i > 0 && projecaoAnos[i - 1].resultadoLiquido < 0
+          ? Math.abs(projecaoAnos[i - 1].resultadoLiquido) : 0
+        const prejuizoFinanciado = prejuizoAnoAnterior * (1 + taxaMediaContratos)
+        const resultadoLiquido = recBruta - custoAtividade - endividamento - prejuizoFinanciado
+        projecaoAnos.push({ ano, recBruta, custoAtividade, endividamento, prejuizoFinanciado, resultadoLiquido })
+      }
 
       // Cenários do localStorage
       let cenariosRaw: any[] = []
@@ -412,7 +454,8 @@ export function TabResumo({ clientId, clienteNome, clienteCidade }: {
 
       const cenarios = cenariosRaw.length > 0 ? cenariosRaw.map(c => {
         const fP = 1 + c.varPreco / 100, fPr = 1 + c.varProdut / 100, fA = 1 + c.varArea / 100, fC = 1 + c.varCusto / 100
-        const rows = projecaoAnos.map((r, i) => {
+        const rows: { resultadoLiquido: number }[] = []
+        for (let i = 0; i < 10; i++) {
           const g = Math.pow(1.02, i)
           let rec = 0, cst = 0
           for (const p of baseProds) {
@@ -420,8 +463,10 @@ export function TabResumo({ clientId, clienteNome, clienteCidade }: {
             cst += p.area * fA * p.custoPorHa * fC * p.cotacao * fP * g
           }
           const div = dividasPorAno[String(2026 + i)] ?? 0
-          return { resultadoLiquido: rec - cst - custosFixosAnuais - div }
-        })
+          const prejAnterior = i > 0 && rows[i - 1].resultadoLiquido < 0 ? Math.abs(rows[i - 1].resultadoLiquido) : 0
+          const prejFinanciado = prejAnterior * (1 + taxaMediaContratos)
+          rows.push({ resultadoLiquido: rec - cst - custosFixosAnuais - div - prejFinanciado })
+        }
         const tot = rows.reduce((s, r) => s + r.resultadoLiquido, 0)
         const pos = rows.filter(r => r.resultadoLiquido > 0).length
         const marg = rows.reduce((s, r) => s + r.resultadoLiquido, 0) / (rows.reduce((s, r) => s + r.resultadoLiquido + custosFixosAnuais, 0) || 1)
@@ -448,6 +493,34 @@ export function TabResumo({ clientId, clienteNome, clienteCidade }: {
       const pctCp  = resultadoCp  > 0 ? (servicoCompromCp  / resultadoCp)  * 100 : 0
       const pctAno = resultadoDentroAno > 0 ? (servicoCompromDentroAno / resultadoDentroAno) * 100 : 0
       const pctLp  = resultadoLp  > 0 ? (servicoCompromLp  / resultadoLp)  * 100 : 0
+
+      // Reestruturação de Passivo — proposta ideal (todo o passivo, 1% a.a., sem correção)
+      const SAFRA_CAPACIDADE = '2026/27'
+      const prodCapacidade = producao.filter(p => p.safra === SAFRA_CAPACIDADE && p.area > 0)
+      const recBrutaCap = prodCapacidade.reduce((s, p) => s + p.area * p.produtividade * p.cotacao, 0)
+      const custoCap    = prodCapacidade.reduce((s, p) =>
+        s + p.area * p.custoPorHa * p.cotacao + p.areaArrendada * p.custoArrendHa * (p.cotacao || 1), 0)
+      const resultadoLiquidoCapacidade = recBrutaCap - custoCap
+      const TAXA_IDEAL = 0.01
+      const calcCenarioReestruturacao = (label: string, capacidadeAnual: number) => {
+        if (totalEndividamento <= 0 || capacidadeAnual <= totalEndividamento * TAXA_IDEAL) {
+          return { label, capacidadeAnual, inviavel: true }
+        }
+        const nContinuo   = Math.log(capacidadeAnual / (capacidadeAnual - totalEndividamento * TAXA_IDEAL)) / Math.log(1 + TAXA_IDEAL)
+        const nAnos       = Math.max(1, Math.ceil(nContinuo))
+        const parcelaFixa = totalEndividamento * TAXA_IDEAL / (1 - Math.pow(1 + TAXA_IDEAL, -nAnos))
+        const totalJuros  = parcelaFixa * nAnos - totalEndividamento
+        return { label, capacidadeAnual, inviavel: false, nAnos, parcelaFixa, totalJuros }
+      }
+      const reestruturacaoIdeal = {
+        totalPassivo: totalEndividamento,
+        resultadoLiquidoCapacidade,
+        safraCapacidade: SAFRA_CAPACIDADE,
+        cenarios: [
+          calcCenarioReestruturacao('100% do Resultado', resultadoLiquidoCapacidade),
+          calcCenarioReestruturacao('30% do Resultado (saudável)', resultadoLiquidoCapacidade * 0.30),
+        ],
+      }
 
       await pdf.exportRelatorioAgro({
         clientName:    clienteNome ?? 'Produtor',
@@ -484,6 +557,8 @@ export function TabResumo({ clientId, clienteNome, clienteCidade }: {
         cenarios,
         projecao10Anos: projecaoAnos.reduce((s, r) => s + r.resultadoLiquido, 0),
         projecaoAnos,
+        reestruturacaoIdeal,
+        contextoMercado: Object.values(contextoMercado).some(v => v.trim() !== '') ? contextoMercado : undefined,
         // Juros em sacas
         jurosAnuais:        jurosAnuaisExport > 0 ? jurosAnuaisExport : undefined,
         jurosHa:            jurosPorHaExp > 0 ? jurosPorHaExp : undefined,
@@ -497,8 +572,8 @@ export function TabResumo({ clientId, clienteNome, clienteCidade }: {
           peSaud: peSaudavelCp, peCrit: peCriticoCp,
           saldo: saldoDispCp, pct: pctCp, status: comprCp,
         } : undefined,
-        anoHorizonte: parcelasAnoFuturas.length > 0 ? {
-          servico: servicoCompromDentroAno, parcelas: parcelasAnoFuturas.length,
+        anoHorizonte: parcelasAnoAtual.length > 0 ? {
+          servico: servicoCompromDentroAno, parcelas: parcelasAnoAtual.length,
           peSaud: peSaudavelAno, peCrit: peCriticoAno,
           saldo: saldoDispDentroAno, pct: pctAno, status: comprDentroAno,
           anoRef: anoAtual,
@@ -566,6 +641,69 @@ export function TabResumo({ clientId, clienteNome, clienteCidade }: {
         </div>
       </div>
 
+      {/* Contexto de Mercado — opcional, aparece no relatório */}
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+        <button
+          onClick={() => setShowContextoMercado(v => !v)}
+          className="w-full flex items-center justify-between px-5 py-3 hover:bg-gray-50 transition-colors"
+        >
+          <span className="flex items-center gap-2 text-sm font-semibold text-gray-700">
+            <Activity size={14} className="text-blue-500" />
+            Contexto de Mercado
+            <span className="text-xs font-normal text-gray-400">— opcional, aparece no relatório</span>
+          </span>
+          <span className="text-xs text-blue-600 font-semibold">{showContextoMercado ? 'Ocultar ▲' : 'Editar ▼'}</span>
+        </button>
+        {showContextoMercado && (
+          <div className="px-5 pb-5 space-y-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1">Câmbio (R$/US$)</label>
+                <input
+                  type="text" value={contextoMercado.cambio}
+                  onChange={e => saveContextoMercado({ ...contextoMercado, cambio: e.target.value })}
+                  placeholder="ex: 5,42"
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1">Preço de referência (CEPEA, R$/sc)</label>
+                <input
+                  type="text" value={contextoMercado.precoRef}
+                  onChange={e => saveContextoMercado({ ...contextoMercado, precoRef: e.target.value })}
+                  placeholder="ex: soja 128,50"
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1">Panorama climático</label>
+                <select
+                  value={contextoMercado.panorama}
+                  onChange={e => saveContextoMercado({ ...contextoMercado, panorama: e.target.value })}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200 bg-white"
+                >
+                  <option value="">Selecione...</option>
+                  {PANORAMAS_CLIMATICOS.map(p => <option key={p} value={p}>{p}</option>)}
+                </select>
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 mb-1">Comentário de mercado</label>
+              <textarea
+                value={contextoMercado.comentario}
+                onChange={e => saveContextoMercado({ ...contextoMercado, comentario: e.target.value })}
+                placeholder="Ex: safra recorde de soja nos EUA pressiona preço; dólar em alta favorece exportador; La Niña reduz risco de excesso hídrico na colheita..."
+                rows={3}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200 resize-none"
+              />
+            </div>
+            <p className="text-xs text-gray-400">
+              Preenchido manualmente pelo consultor no momento da análise — não é atualizado automaticamente.
+            </p>
+          </div>
+        )}
+      </div>
+
       {/* Seletor de safra */}
       <div className="flex items-center gap-3">
         <label className="text-xs font-semibold text-gray-600">Safra:</label>
@@ -614,7 +752,7 @@ export function TabResumo({ clientId, clienteNome, clienteCidade }: {
         <KpiCard
           title="Endividamento Total"
           value={fmtBRL(totalEndividamento)}
-          sub={`Serviço ${anoAtual}: ${fmtBRL(servicoAnual)}`}
+          sub={`Serviço restante ${anoAtual}: ${fmtBRL(servicoAnual)}`}
           icon={CreditCard}
           color="text-blue-600"
         />
@@ -760,11 +898,11 @@ export function TabResumo({ clientId, clienteNome, clienteCidade }: {
                     <span className="font-semibold text-blue-800">{fmtBRL(totalEndividamento)}</span>
                   </div>
                   <div className="flex justify-between text-xs">
-                    <span className="text-gray-600">Parcelas em {anoAtual}</span>
+                    <span className="text-gray-600">Parcelas restantes em {anoAtual}</span>
                     <span className="font-semibold text-blue-800">{fmtBRL(servicoAnual)}</span>
                   </div>
                   <div className="flex justify-between text-xs text-gray-500">
-                    <span>{parcelasAnoAtual.length} vencimentos no ano</span>
+                    <span>{parcelasAnoAtual.length} vencimentos restantes no ano</span>
                   </div>
                 </div>
               )}
@@ -781,7 +919,7 @@ export function TabResumo({ clientId, clienteNome, clienteCidade }: {
               const nomMes = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez']
               return (
                 <div>
-                  <p className="text-xs font-semibold text-gray-500 mb-2">Concentração de vencimentos {anoAtual}</p>
+                  <p className="text-xs font-semibold text-gray-500 mb-2">Concentração de vencimentos restantes — {anoAtual}</p>
                   <div className="flex items-end gap-0.5 h-12">
                     {Array.from({ length: 12 }, (_, i) => {
                       const val = meses[i] ?? 0
@@ -846,7 +984,7 @@ export function TabResumo({ clientId, clienteNome, clienteCidade }: {
                     <span className="text-sm text-gray-600">(-) Serviço da dívida ({anoAtual})</span>
                     <span className="relative group cursor-default"><Info size={11} className="text-gray-400" />
                       <div className="absolute left-4 top-0 w-60 bg-gray-900 text-white text-xs rounded-lg px-3 py-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
-                        Total de parcelas bancárias com vencimento em {anoAtual}. Saudável: resultado operacional {'>'} 1,5× o serviço da dívida.
+                        Total de parcelas bancárias com vencimento a partir de hoje até o fim de {anoAtual}. Saudável: resultado operacional {'>'} 1,5× o serviço da dívida.
                       </div>
                     </span>
                   </div>
@@ -958,7 +1096,7 @@ export function TabResumo({ clientId, clienteNome, clienteCidade }: {
                     <span className="font-bold text-amber-800">{fmtBRL(endivCusteio)}</span>
                   </div>
                   <div className="flex justify-between text-xs">
-                    <span className="text-gray-600">Parcelas em {anoAtual}</span>
+                    <span className="text-gray-600">Parcelas restantes em {anoAtual}</span>
                     <span className="font-semibold text-amber-700">{fmtBRL(servicoCusteioAnual)}</span>
                   </div>
                   <div className="flex justify-between text-xs">
@@ -979,7 +1117,7 @@ export function TabResumo({ clientId, clienteNome, clienteCidade }: {
                     <span className="font-bold text-gray-900">{fmtBRL(endivSemCusteio)}</span>
                   </div>
                   <div className="flex justify-between text-xs">
-                    <span className="text-gray-600">Parcelas em {anoAtual}</span>
+                    <span className="text-gray-600">Parcelas restantes em {anoAtual}</span>
                     <span className="font-semibold text-gray-900">{fmtBRL(servicoSemCusteioAnual)}</span>
                   </div>
                   <div className="flex justify-between text-xs">
@@ -1170,8 +1308,8 @@ export function TabResumo({ clientId, clienteNome, clienteCidade }: {
                       ref: 'Margem > 20%',
                     },
                     {
-                      label: `Serviço da dívida (${anoAtual})`,
-                      tooltip: `Parcelas bancárias com vencimento em ${anoAtual}.`,
+                      label: `Serviço da dívida — restante ${anoAtual}`,
+                      tooltip: `Parcelas bancárias com vencimento a partir de hoje até o fim de ${anoAtual}.`,
                       total: servicoAnual, cor: 'text-red-500',
                       ref: '< 30% do resultado operacional',
                     },
@@ -1264,7 +1402,7 @@ export function TabResumo({ clientId, clienteNome, clienteCidade }: {
               <div className="mt-4 p-3 bg-gray-50 rounded-xl flex items-center justify-between">
                 <div>
                   <p className="text-xs font-semibold text-gray-700">Comprometimento da receita com banco</p>
-                  <p className="text-xs text-gray-500 mt-0.5">Parcelas {anoAtual} ÷ Receita bruta — Saudável: &lt; 20% · Atenção: 20–35% · Risco: &gt; 35%</p>
+                  <p className="text-xs text-gray-500 mt-0.5">Parcelas restantes de {anoAtual} ÷ Receita bruta — Saudável: &lt; 20% · Atenção: 20–35% · Risco: &gt; 35%</p>
                 </div>
                 <div className="text-right ml-4">
                   <p className={`text-2xl font-bold ${status === 'ok' ? 'text-emerald-600' : status === 'atencao' ? 'text-amber-600' : 'text-red-600'}`}>
@@ -1486,7 +1624,7 @@ export function TabResumo({ clientId, clienteNome, clienteCidade }: {
             {/* helper inline */}
             {([
               { label: 'Curto Prazo (≤ 360 dias)', cor: 'sky', compr: comprCp, receita: receitaCp, resultado: resultadoCp, servico: servicoCp, nVenc: parcelasCp.length, servicoCompr: servicoCompromCp, peSaud: peSaudavelCp, peCrit: peCriticoCp },
-              { label: `Dentro do Ano (${anoAtual})`, cor: 'emerald', compr: comprDentroAno, receita: receitaDentroAno, resultado: resultadoDentroAno, servico: servicoDentroAno, nVenc: parcelasAnoFuturas.length, servicoCompr: servicoCompromDentroAno, peSaud: peSaudavelAno, peCrit: peCriticoAno },
+              { label: `Dentro do Ano (${anoAtual})`, cor: 'emerald', compr: comprDentroAno, receita: receitaDentroAno, resultado: resultadoDentroAno, servico: servicoDentroAno, nVenc: parcelasAnoAtual.length, servicoCompr: servicoCompromDentroAno, peSaud: peSaudavelAno, peCrit: peCriticoAno },
               { label: `Longo Prazo (> 360 dias) · serviço médio ${anosLp}a`, cor: 'violet', compr: comprLp, receita: receitaLp, resultado: resultadoLp, servico: servicoLp, nVenc: parcelasLp.length, servicoCompr: servicoCompromLp, peSaud: peSaudavelLp, peCrit: peCriticoLp },
             ] as const).map(h => {
               const pctCompr = h.resultado > 0 ? (h.servicoCompr / h.resultado) * 100 : 0

@@ -95,6 +95,7 @@ function calcProjecao(
   custosFixosAnuais: number,
   despesasNaoBancariasBase: number,
   despesasNaoBancariasReais: Record<number, number>,
+  taxaMediaContratos: number,
 ): AnoRow[] {
   // Determina o último ano com dados reais
   const anosReais = Object.keys(producaoPorAno).map(Number).sort((a, b) => a - b)
@@ -151,9 +152,11 @@ function calcProjecao(
 
     const receitaLiquida = lucBruto - despesasRecorrentes - dividasBancarias - despesasNaoBancarias
 
-    // Prejuízo acumulado: saldo negativo do ano anterior (rolling)
+    // Prejuízo financiado: saldo negativo do ano anterior, capitalizado à taxa média
+    // dos contratos vigentes (o déficit precisa ser coberto por crédito) (rolling)
     const saldoAnterior    = rows.length > 0 ? rows[rows.length - 1].resultadoLiquido : 0
-    const prejuizoAcumulado = saldoAnterior < 0 ? Math.abs(saldoAnterior) : 0
+    const prejuizoAnoAnterior = saldoAnterior < 0 ? Math.abs(saldoAnterior) : 0
+    const prejuizoAcumulado = prejuizoAnoAnterior * (1 + taxaMediaContratos)
     const resultadoLiquido  = receitaLiquida - prejuizoAcumulado
     const margLiquida       = recBruta > 0 ? resultadoLiquido / recBruta : 0
 
@@ -179,6 +182,7 @@ export function TabProjecaoAnual({ clientId }: { clientId: string }) {
   const [custosFixosAnuais, setCustosFixosAnuais] = useState(0)
   const [despesasNaoBancariasBase, setDespesasNaoBancariasBase] = useState(0)
   const [despesasNaoBancariasReais, setDespesasNaoBancariasReais] = useState<Record<number, number>>({})
+  const [taxaMediaContratos, setTaxaMediaContratos] = useState(0)
   const [projecao, setProjecao]   = useState<AnoRow[]>([])
   const [showPremissas, setShowPremissas] = useState(true)
   const [exportando, setExportando] = useState(false)
@@ -198,8 +202,14 @@ export function TabProjecaoAnual({ clientId }: { clientId: string }) {
       agroApi.contratos.cronograma(clientId).catch(() => null),
       agroApi.custosFixos.list(clientId).catch(() => []),
       agroApi.despesas.list(clientId).catch(() => []),
-    ]).then(([producoes, crono, custosFixos, despesas]) => {
+      agroApi.contratos.list(clientId).catch(() => []),
+    ]).then(([producoes, crono, custosFixos, despesas, contratos]) => {
       setProducaoPorAno(agruparPorAno(producoes))
+
+      const totalTomado = contratos.reduce((s: number, c: any) => s + (c.valorTomado || 0), 0)
+      setTaxaMediaContratos(totalTomado > 0
+        ? contratos.reduce((s: number, c: any) => s + (c.taxa || 0) * (c.valorTomado || 0), 0) / totalTomado
+        : 0)
 
       if (crono?.porAno) {
         const mapa: Record<string, number> = {}
@@ -229,8 +239,9 @@ export function TabProjecaoAnual({ clientId }: { clientId: string }) {
     setProjecao(calcProjecao(
       producaoPorAno, premissas, dividasPorAno,
       custosFixosAnuais, despesasNaoBancariasBase, despesasNaoBancariasReais,
+      taxaMediaContratos,
     ))
-  }, [producaoPorAno, premissas, dividasPorAno, custosFixosAnuais, despesasNaoBancariasBase, despesasNaoBancariasReais])
+  }, [producaoPorAno, premissas, dividasPorAno, custosFixosAnuais, despesasNaoBancariasBase, despesasNaoBancariasReais, taxaMediaContratos])
 
   const setPrem = (k: keyof Premissas, v: number) => {
     setPremissas(prev => {
@@ -409,6 +420,9 @@ export function TabProjecaoAnual({ clientId }: { clientId: string }) {
               <span className="inline-block w-2.5 h-2.5 rounded-full bg-green-400 mr-1" />real &nbsp;
               <span className="inline-block w-2.5 h-2.5 rounded-full bg-gray-300 mr-1" />projetado
             </p>
+            <p className="text-xs text-gray-400 mt-1">
+              Prejuízo Financiado: resultado negativo do ano anterior, capitalizado à taxa média dos contratos vigentes ({fmtPct(taxaMediaContratos)} a.a.) — reflete o crédito necessário para cobrir o déficit.
+            </p>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
@@ -418,7 +432,7 @@ export function TabProjecaoAnual({ clientId }: { clientId: string }) {
                     'Ano', 'Culturas', 'Receita Bruta', 'Custo Atividade',
                     'Arrendamento', 'Lucro Bruto', 'Marg. Bruta',
                     'Desp. Recorrentes', 'Dívidas Bancárias', 'Desp. Não Bancárias',
-                    'Resultado do Ano', 'Prejuízo Acumulado', 'Resultado Líquido', 'Marg. Líquida',
+                    'Resultado do Ano', 'Prejuízo Financiado', 'Resultado Líquido', 'Marg. Líquida',
                   ].map(h => (
                     <th key={h} className="px-2.5 py-2 text-left font-semibold text-gray-500 uppercase whitespace-nowrap">{h}</th>
                   ))}

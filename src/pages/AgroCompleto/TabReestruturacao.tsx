@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
-import { RefreshCw, Settings2, CheckCircle, AlertTriangle, RotateCcw, TrendingDown } from 'lucide-react'
+import { RefreshCw, Settings2, CheckCircle, AlertTriangle, RotateCcw, TrendingDown, Target, ChevronDown, ChevronUp } from 'lucide-react'
 import { agroApi, type AgroContrato } from '../../services/agroApi'
 
 const fmtBRL = (v: number) =>
@@ -100,10 +100,119 @@ function gerarCronogramaCustom(
   })
 }
 
+// ── Proposta de Reestruturação Ideal ──────────────────────────────────────────
+// Toma o passivo total e calcula, a uma taxa fixa de 1% a.a. sem correção
+// monetária, em quantos anos ele seria quitado com parcela anual fixa,
+// dado um teto de comprometimento anual (capacidade de pagamento).
+const SAFRA_CAPACIDADE = '2026/27'
+const TAXA_IDEAL = 0.01
+const PCT_SAUDAVEL = 30
+
+interface PropostaIdeal {
+  inviavel: false
+  nAnos: number
+  parcelaFixa: number
+  totalJuros: number
+  capacidadeAnual: number
+}
+interface PropostaInviavel { inviavel: true; capacidadeAnual: number }
+
+function calcRestruturacaoIdeal(passivo: number, capacidadeAnual: number, taxa: number): PropostaIdeal | PropostaInviavel | null {
+  if (passivo <= 0 || capacidadeAnual <= 0) return null
+  if (capacidadeAnual <= passivo * taxa) return { inviavel: true, capacidadeAnual }
+  const nContinuo   = Math.log(capacidadeAnual / (capacidadeAnual - passivo * taxa)) / Math.log(1 + taxa)
+  const nAnos       = Math.max(1, Math.ceil(nContinuo))
+  const parcelaFixa = passivo * taxa / (1 - Math.pow(1 + taxa, -nAnos))
+  const totalJuros  = parcelaFixa * nAnos - passivo
+  return { inviavel: false, nAnos, parcelaFixa, totalJuros, capacidadeAnual }
+}
+
+function PropostaCard({ titulo, capacidade, proposta, cronograma, show, onToggle }: {
+  titulo: string
+  capacidade: number
+  proposta: PropostaIdeal | PropostaInviavel | null
+  cronograma: ParcelaSimulada[]
+  show: boolean
+  onToggle: () => void
+}) {
+  return (
+    <div className="border border-gray-200 rounded-xl overflow-hidden">
+      <div className="px-4 py-3 bg-gray-50 border-b border-gray-100">
+        <p className="text-xs font-bold text-gray-700 uppercase">{titulo}</p>
+        <p className="text-xs text-gray-400 mt-0.5">Capacidade anual: {fmtBRL(capacidade)}</p>
+      </div>
+      <div className="p-4">
+        {!proposta && (
+          <p className="text-xs text-gray-400">Sem dados suficientes (resultado líquido ou passivo indisponível).</p>
+        )}
+        {proposta && proposta.inviavel && (
+          <div className="flex items-start gap-2 text-red-600">
+            <AlertTriangle size={14} className="mt-0.5 flex-shrink-0" />
+            <p className="text-xs font-semibold">
+              Capacidade insuficiente até para cobrir os juros de 1% a.a. sobre o saldo — nesse ritmo a dívida nunca seria quitada.
+            </p>
+          </div>
+        )}
+        {proposta && !proposta.inviavel && (
+          <>
+            <div className="grid grid-cols-2 gap-3 mb-3">
+              <div>
+                <p className="text-xs text-gray-500">Parcela Anual Fixa</p>
+                <p className="text-lg font-bold text-emerald-700">{fmtBRL(proposta.parcelaFixa)}</p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-500">Prazo para Quitar</p>
+                <p className="text-lg font-bold text-gray-900">{proposta.nAnos} {proposta.nAnos === 1 ? 'ano' : 'anos'}</p>
+              </div>
+            </div>
+            <p className="text-xs text-gray-500 mb-3">
+              Total de juros no período: <span className="font-semibold text-red-500">{fmtBRL(proposta.totalJuros)}</span>
+            </p>
+            <button
+              onClick={onToggle}
+              className="w-full flex items-center justify-between px-3 py-2 bg-gray-50 hover:bg-gray-100 rounded-lg text-xs font-semibold text-gray-700"
+            >
+              <span>Cronograma — {cronograma.length} parcelas</span>
+              {show ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+            </button>
+            {show && (
+              <div className="mt-2 max-h-72 overflow-y-auto border border-gray-100 rounded-lg">
+                <table className="w-full text-xs">
+                  <thead className="sticky top-0 bg-gray-100">
+                    <tr>
+                      {['Nº', 'Vencimento', 'Parcela', 'Amortização', 'Juros', 'Saldo'].map(h => (
+                        <th key={h} className="px-2 py-1.5 text-left font-semibold text-gray-500 uppercase whitespace-nowrap">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-50">
+                    {cronograma.map(p => (
+                      <tr key={p.num}>
+                        <td className="px-2 py-1.5 text-gray-400">{p.num}</td>
+                        <td className="px-2 py-1.5 text-gray-700 whitespace-nowrap">{p.data.toLocaleDateString('pt-BR')}</td>
+                        <td className="px-2 py-1.5 font-semibold text-gray-900">{fmtBRL(p.valor)}</td>
+                        <td className="px-2 py-1.5 text-blue-700">{fmtBRL(p.amort)}</td>
+                        <td className="px-2 py-1.5 text-red-500">{fmtBRL(p.juros)}</td>
+                        <td className="px-2 py-1.5 text-gray-600">{fmtBRL(p.saldo)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
+
 export function TabReestruturacao({ clientId }: { clientId: string }) {
   const [loading, setLoading]   = useState(true)
   const [contratos, setContratos] = useState<ContratoRow[]>([])
   const [receitaAnual, setReceitaAnual] = useState(0)
+  const [resultadoLiquidoCapacidade, setResultadoLiquidoCapacidade] = useState(0)
+  const [showCronIdeal, setShowCronIdeal] = useState<{ total: boolean; saudavel: boolean }>({ total: false, saudavel: false })
 
   // Simulação unificada para os contratos selecionados
   const [simTaxa,               setSimTaxa]               = useState('')
@@ -192,6 +301,13 @@ export function TabReestruturacao({ clientId }: { clientId: string }) {
       }
       const top = Object.keys(anos).map(Number).sort((a, b) => b - a)
       setReceitaAnual(anos[top[0]] ?? 0)
+
+      // Resultado líquido da safra usada como base de capacidade de pagamento
+      const prodCapacidade = prods.filter(p => p.safra === SAFRA_CAPACIDADE && p.area > 0)
+      const recBrutaCap = prodCapacidade.reduce((s, p) => s + p.area * p.produtividade * p.cotacao, 0)
+      const custoCap    = prodCapacidade.reduce((s, p) =>
+        s + p.area * p.custoPorHa * p.cotacao + p.areaArrendada * p.custoArrendHa * (p.cotacao || 1), 0)
+      setResultadoLiquidoCapacidade(recBrutaCap - custoCap)
     }).finally(() => setLoading(false))
   }, [clientId])
 
@@ -234,6 +350,24 @@ export function TabReestruturacao({ clientId }: { clientId: string }) {
     }
   }, [selecionados, taxaAnualEfetiva, nParcelas, simPeriodicidade, simSistema, simDataPrimeira, contratos, receitaAnual, customPcts])
 
+  // Proposta de Reestruturação Ideal — todo o passivo, parcela fixa a 1% a.a.
+  const totalPassivoGeral = useMemo(() => contratos.reduce((s, c) => s + c.saldoDevedor, 0), [contratos])
+  const capacidadeSaudavel = resultadoLiquidoCapacidade * (PCT_SAUDAVEL / 100)
+  const dataPrimeiraIdeal = useMemo(() => {
+    const d = new Date(); d.setDate(1); d.setFullYear(d.getFullYear() + 1)
+    return d
+  }, [])
+
+  const propostaTotal    = useMemo(() => calcRestruturacaoIdeal(totalPassivoGeral, resultadoLiquidoCapacidade, TAXA_IDEAL), [totalPassivoGeral, resultadoLiquidoCapacidade])
+  const propostaSaudavel = useMemo(() => calcRestruturacaoIdeal(totalPassivoGeral, capacidadeSaudavel, TAXA_IDEAL), [totalPassivoGeral, capacidadeSaudavel])
+
+  const cronTotal    = useMemo(() => propostaTotal && !propostaTotal.inviavel
+    ? gerarCronogramaSimulado(totalPassivoGeral, TAXA_IDEAL, propostaTotal.nAnos, 'Anual', 'Price', dataPrimeiraIdeal) : [],
+    [propostaTotal, totalPassivoGeral, dataPrimeiraIdeal])
+  const cronSaudavel = useMemo(() => propostaSaudavel && !propostaSaudavel.inviavel
+    ? gerarCronogramaSimulado(totalPassivoGeral, TAXA_IDEAL, propostaSaudavel.nAnos, 'Anual', 'Price', dataPrimeiraIdeal) : [],
+    [propostaSaudavel, totalPassivoGeral, dataPrimeiraIdeal])
+
   if (loading) return (
     <div className="flex items-center justify-center py-24 text-gray-400">
       <RefreshCw size={24} className="animate-spin mr-3" />
@@ -256,6 +390,41 @@ export function TabReestruturacao({ clientId }: { clientId: string }) {
         <p className="text-xs text-gray-500 mt-0.5">
           Selecione os contratos que deseja reestruturar → defina nova taxa e prazo → veja o impacto consolidado
         </p>
+      </div>
+
+      {/* Proposta de Reestruturação Ideal — todo o passivo, parcela fixa a 1% a.a. */}
+      <div className="bg-white rounded-2xl border border-emerald-200 shadow-sm overflow-hidden">
+        <div className="px-5 py-3 border-b border-emerald-100 bg-emerald-50 flex items-center gap-2">
+          <Target size={15} className="text-emerald-700" />
+          <h4 className="font-bold text-sm text-emerald-800">
+            Proposta de Reestruturação Ideal — Parcela Fixa a 1% a.a. (sem correção)
+          </h4>
+        </div>
+        <div className="p-5 space-y-4">
+          <p className="text-xs text-gray-500">
+            Considera <strong>todo o passivo contratado</strong> ({fmtBRL(totalPassivoGeral)}) reestruturado em parcelas
+            anuais fixas, a uma taxa de 1% a.a. sem correção monetária, quitado dentro da capacidade de pagamento da
+            safra {SAFRA_CAPACIDADE} (Resultado Líquido: {fmtBRL(resultadoLiquidoCapacidade)}).
+          </p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <PropostaCard
+              titulo="Comprometendo 100% do Resultado"
+              capacidade={resultadoLiquidoCapacidade}
+              proposta={propostaTotal}
+              cronograma={cronTotal}
+              show={showCronIdeal.total}
+              onToggle={() => setShowCronIdeal(v => ({ ...v, total: !v.total }))}
+            />
+            <PropostaCard
+              titulo={`Comprometendo até ${PCT_SAUDAVEL}% do Resultado (saudável)`}
+              capacidade={capacidadeSaudavel}
+              proposta={propostaSaudavel}
+              cronograma={cronSaudavel}
+              show={showCronIdeal.saudavel}
+              onToggle={() => setShowCronIdeal(v => ({ ...v, saudavel: !v.saudavel }))}
+            />
+          </div>
+        </div>
       </div>
 
       {/* Tabela de contratos — seleção */}
