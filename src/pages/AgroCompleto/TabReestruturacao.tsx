@@ -405,12 +405,12 @@ export function TabReestruturacao({ clientId }: { clientId: string }) {
         <div className="p-5 space-y-4">
           <p className="text-xs text-gray-500">
             Considera <strong>todo o passivo contratado</strong> ({fmtBRL(totalPassivoGeral)}) reestruturado em parcelas
-            anuais fixas, a uma taxa de 1% a.a. sem correção monetária, quitado dentro da capacidade de pagamento da
+            anuais fixas, a uma taxa de 1% a.a. sem indexador, quitado dentro da capacidade de pagamento da
             safra {SAFRA_CAPACIDADE} (Resultado Líquido: {fmtBRL(resultadoLiquidoCapacidade)}).
           </p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <PropostaCard
-              titulo={`Comprometendo até ${PCT_MODERADO}% do Resultado`}
+              titulo={`Comprometendo até ${PCT_MODERADO}% do Resultado (agressivo)`}
               capacidade={capacidadeModerada}
               proposta={propostaModerada}
               cronograma={cronModerada}

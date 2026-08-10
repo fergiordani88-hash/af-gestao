@@ -1026,7 +1026,7 @@ export function RelatorioCompletoAgroPDF({ data }: { data: RelatorioCompletoAgro
           <View style={s.body}>
             <Sec title="Proposta de Reestruturação Ideal" />
             <Text style={{ fontFamily: 'Helvetica', fontSize: 8, color: C.body, lineHeight: 1.7, marginBottom: 12 }}>
-              Simulação de consolidação de <Text style={{ fontFamily: 'Helvetica-Bold' }}>todo o passivo contratado</Text> ({R(data.reestruturacaoIdeal.totalPassivo)}) em parcelas anuais fixas, a uma taxa de 1% a.a. <Text style={{ fontFamily: 'Helvetica-Bold' }}>sem correção monetária</Text> — cenário concessivo para orientar a negociação junto às instituições credoras. A capacidade de pagamento considera o Resultado Líquido projetado para a safra {data.reestruturacaoIdeal.safraCapacidade} ({R(data.reestruturacaoIdeal.resultadoLiquidoCapacidade)}).
+              Simulação de consolidação de <Text style={{ fontFamily: 'Helvetica-Bold' }}>todo o passivo contratado</Text> ({R(data.reestruturacaoIdeal.totalPassivo)}) em parcelas anuais fixas, a uma taxa de 1% a.a. <Text style={{ fontFamily: 'Helvetica-Bold' }}>sem indexador</Text> — cenário concessivo para orientar a negociação junto às instituições credoras. A capacidade de pagamento considera o Resultado Líquido projetado para a safra {data.reestruturacaoIdeal.safraCapacidade} ({R(data.reestruturacaoIdeal.resultadoLiquidoCapacidade)}).
             </Text>
 
             <View style={s.tbl}>

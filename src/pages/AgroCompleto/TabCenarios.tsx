@@ -42,10 +42,13 @@ interface AnoRow {
   ano: number
   recBruta: number
   custoAtiv: number
+  arrendamento: number
   lucBruto: number
   margBruta: number
   despesasRecorrentes: number
+  despesasNaoBancarias: number
   dividasBancarias: number
+  servicoComprometido: number
   resultadoLiquido: number
   margLiquida: number
   isReal: boolean
@@ -59,11 +62,20 @@ interface Premissas {
 const ANO_INICIO = 2026
 const ANO_FIM    = 2035
 
+// Custeio/CPR é autoliquidável pela própria safra — só o que excede o custo real
+// de produção do ano compromete a capacidade de pagamento (mesmo critério da aba Resumo).
+function isCusteio(modalidade: string): boolean {
+  return ['custeio', 'cpr'].some(k => modalidade.toLowerCase().includes(k))
+}
+
 function calcProjecao(
   producaoPorAno: Record<number, AgroProducao[]>,
   premissas: Premissas,
   dividasPorAno: Record<string, number>,
+  dividasCusteioPorAno: Record<string, number>,
   custosFixosAnuais: number,
+  despesasNaoBancariasBase: number,
+  despesasNaoBancariasReais: Record<number, number>,
   ajuste: { preco: number; produt: number; area: number; custo: number },
   taxaMediaContratos: number,
 ): AnoRow[] {
@@ -75,7 +87,7 @@ function calcProjecao(
 
   for (let ano = ANO_INICIO; ano <= ANO_FIM; ano++) {
     const isReal = !!producaoPorAno[ano]
-    let recBruta = 0, custoAtiv = 0
+    let recBruta = 0, custoAtiv = 0, arrendamento = 0
 
     const fPreco  = 1 + ajuste.preco  / 100
     const fProdut = 1 + ajuste.produt / 100
@@ -88,8 +100,10 @@ function calcProjecao(
         const produt  = prod.produtividade * fProdut
         const area    = prod.area * fArea
         const cpha    = prod.custoPorHa * fCusto
-        recBruta  += area * produt * cotacao
-        custoAtiv += area * cpha  * cotacao
+        const arrha   = prod.custoArrendHa * fCusto
+        recBruta     += area * produt * cotacao
+        custoAtiv    += area * cpha  * cotacao
+        arrendamento += prod.areaArrendada * fArea * arrha * cotacao
       }
     } else {
       const i     = ano - ultimoAnoReal
@@ -99,27 +113,40 @@ function calcProjecao(
       const gcust = Math.pow(1 + premissas.infCusto    / 100, i) * fCusto
       for (const prod of baseProducoes) {
         const area = prod.area * garea
-        recBruta  += area * prod.produtividade * gprod * prod.cotacao * gprec
-        custoAtiv += area * prod.custoPorHa * gcust * prod.cotacao * gprec
+        recBruta     += area * prod.produtividade * gprod * prod.cotacao * gprec
+        custoAtiv    += area * prod.custoPorHa * gcust * prod.cotacao * gprec
+        arrendamento += prod.areaArrendada * garea * prod.custoArrendHa * gcust * prod.cotacao * gprec
       }
     }
 
-    const lucBruto  = recBruta - custoAtiv
+    const lucBruto  = recBruta - custoAtiv - arrendamento
     const margBruta = recBruta > 0 ? lucBruto / recBruta : 0
 
     const i = Math.max(0, ano - ultimoAnoReal)
     const gdesp = Math.pow(1 + premissas.infDespesas / 100, i)
-    const despesasRecorrentes = custosFixosAnuais * (isReal ? 1 : gdesp)
-    const dividasBancarias    = dividasPorAno[String(ano)] ?? 0
+    const despesasRecorrentes  = custosFixosAnuais * (isReal ? 1 : gdesp)
+    const despesasNaoBancarias = despesasNaoBancariasReais[ano]
+      ?? (despesasNaoBancariasBase > 0 ? despesasNaoBancariasBase * (isReal ? 1 : gdesp) : 0)
+    const dividasBancarias = dividasPorAno[String(ano)] ?? 0
 
-    const receitaLiquida = lucBruto - despesasRecorrentes - dividasBancarias
+    // Custeio excedente: só a parte do custeio do ano que ultrapassa o custo real
+    // de produção (+ arrendamento) do próprio ano compromete o resultado.
+    const custeioAno       = dividasCusteioPorAno[String(ano)] ?? 0
+    const custeioExcedente = Math.max(0, custeioAno - (custoAtiv + arrendamento))
+    const servicoComprometido = (dividasBancarias - custeioAno) + custeioExcedente
+
+    const receitaLiquida = lucBruto - despesasRecorrentes - despesasNaoBancarias - servicoComprometido
     const saldoAnterior  = rows.length > 0 ? rows[rows.length - 1].resultadoLiquido : 0
     const prejAnoAnterior = saldoAnterior < 0 ? Math.abs(saldoAnterior) : 0
     const prejAcum        = prejAnoAnterior * (1 + taxaMediaContratos)
     const resultadoLiquido = receitaLiquida - prejAcum
     const margLiquida    = recBruta > 0 ? resultadoLiquido / recBruta : 0
 
-    rows.push({ ano, recBruta, custoAtiv, lucBruto, margBruta, despesasRecorrentes, dividasBancarias, resultadoLiquido, margLiquida, isReal })
+    rows.push({
+      ano, recBruta, custoAtiv, arrendamento, lucBruto, margBruta,
+      despesasRecorrentes, despesasNaoBancarias, dividasBancarias, servicoComprometido,
+      resultadoLiquido, margLiquida, isReal,
+    })
   }
 
   return rows
@@ -175,7 +202,10 @@ export function TabCenarios({ clientId }: { clientId: string }) {
   const [premissas]               = useState<Premissas>(PREMISSAS_DEFAULT)
   const [producaoPorAno, setProducaoPorAno] = useState<Record<number, AgroProducao[]>>({})
   const [dividasPorAno,  setDividasPorAno]  = useState<Record<string, number>>({})
+  const [dividasCusteioPorAno, setDividasCusteioPorAno] = useState<Record<string, number>>({})
   const [custosFixosAnuais, setCustosFixosAnuais] = useState(0)
+  const [despesasNaoBancariasBase, setDespesasNaoBancariasBase] = useState(0)
+  const [despesasNaoBancariasReais, setDespesasNaoBancariasReais] = useState<Record<number, number>>({})
   const [taxaMediaContratos, setTaxaMediaContratos] = useState(0)
   const [showConfig, setShowConfig] = useState(true)
   const [detalheAnos, setDetalheAnos] = useState(false)
@@ -189,19 +219,40 @@ export function TabCenarios({ clientId }: { clientId: string }) {
       agroApi.contratos.cronograma(clientId).catch(() => null),
       agroApi.custosFixos.list(clientId).catch(() => []),
       agroApi.contratos.list(clientId).catch(() => []),
-    ]).then(([producoes, crono, custosFixos, contratos]) => {
+      agroApi.despesas.list(clientId).catch(() => []),
+    ]).then(([producoes, crono, custosFixos, contratos, despesas]) => {
       setProducaoPorAno(agruparPorAno(producoes))
-      if (crono?.porAno) {
-        const mapa: Record<string, number> = {}
-        for (const [ano, v] of Object.entries(crono.porAno)) mapa[ano] = (v as any).total ?? 0
-        setDividasPorAno(mapa)
+
+      // Só parcelas a partir de hoje — o que já venceu é passado, não capacidade futura
+      const agora = new Date()
+      const mapaTotal: Record<string, number> = {}
+      const mapaCusteio: Record<string, number> = {}
+      for (const p of (crono?.parcelas ?? []) as any[]) {
+        if (new Date(p.vencimento) < agora) continue
+        const ano = String(new Date(p.vencimento).getFullYear())
+        mapaTotal[ano] = (mapaTotal[ano] ?? 0) + p.valorParcela
+        if (isCusteio(p.modalidade)) mapaCusteio[ano] = (mapaCusteio[ano] ?? 0) + p.valorParcela
       }
+      setDividasPorAno(mapaTotal)
+      setDividasCusteioPorAno(mapaCusteio)
+
       setCustosFixosAnuais(custosFixos.reduce((s, cf) => s + cf.valorMensal, 0) * 12)
 
       const totalTomado = contratos.reduce((s: number, c: any) => s + (c.valorTomado || 0), 0)
       setTaxaMediaContratos(totalTomado > 0
         ? contratos.reduce((s: number, c: any) => s + (c.taxa || 0) * (c.valorTomado || 0), 0) / totalTomado
         : 0)
+
+      if (despesas.length > 0) {
+        const porAno: Record<number, number> = {}
+        for (const d of despesas) {
+          const ano = new Date(d.data).getFullYear()
+          porAno[ano] = (porAno[ano] ?? 0) + d.valor
+        }
+        setDespesasNaoBancariasReais(porAno)
+        const anosDesc = Object.keys(porAno).map(Number).sort((a, b) => b - a)
+        setDespesasNaoBancariasBase(porAno[anosDesc[0]] ?? 0)
+      }
     }).finally(() => setLoading(false))
   }, [clientId])
 
@@ -223,12 +274,13 @@ export function TabCenarios({ clientId }: { clientId: string }) {
     cenarios.map(c => ({
       ...c,
       rows: calcProjecao(
-        producaoPorAno, premissas, dividasPorAno, custosFixosAnuais,
+        producaoPorAno, premissas, dividasPorAno, dividasCusteioPorAno,
+        custosFixosAnuais, despesasNaoBancariasBase, despesasNaoBancariasReais,
         { preco: c.varPreco, produt: c.varProdut, area: c.varArea, custo: c.varCusto },
         taxaMediaContratos,
       ),
     })),
-    [cenarios, producaoPorAno, premissas, dividasPorAno, custosFixosAnuais, taxaMediaContratos],
+    [cenarios, producaoPorAno, premissas, dividasPorAno, dividasCusteioPorAno, custosFixosAnuais, despesasNaoBancariasBase, despesasNaoBancariasReais, taxaMediaContratos],
   )
 
   // Matriz de sensibilidade câmbio × preço da commodity — dólar sobe → receita (grão dolarizado)
@@ -241,14 +293,15 @@ export function TabCenarios({ clientId }: { clientId: string }) {
         const precoShock = ((1 + camb / 100) * (1 + comm / 100) - 1) * 100
         const custoShock = camb * CUSTO_SENSIBILIDADE_CAMBIAL
         const rows = calcProjecao(
-          producaoPorAno, premissas, dividasPorAno, custosFixosAnuais,
+          producaoPorAno, premissas, dividasPorAno, dividasCusteioPorAno,
+          custosFixosAnuais, despesasNaoBancariasBase, despesasNaoBancariasReais,
           { preco: precoShock, produt: 0, area: 0, custo: custoShock },
           taxaMediaContratos,
         )
         return { comm, total10: rows.reduce((s, r) => s + r.resultadoLiquido, 0) }
       }),
     }))
-  }, [producaoPorAno, premissas, dividasPorAno, custosFixosAnuais, taxaMediaContratos])
+  }, [producaoPorAno, premissas, dividasPorAno, dividasCusteioPorAno, custosFixosAnuais, despesasNaoBancariasBase, despesasNaoBancariasReais, taxaMediaContratos])
 
   const sensMaxAbs = Math.max(1, ...matrizSensibilidade.flatMap(r => r.cols.map(c => Math.abs(c.total10))))
   const cellBg = (v: number) => {
