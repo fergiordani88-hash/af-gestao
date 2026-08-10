@@ -106,6 +106,7 @@ function gerarCronogramaCustom(
 // dado um teto de comprometimento anual (capacidade de pagamento).
 const SAFRA_CAPACIDADE = '2026/27'
 const TAXA_IDEAL = 0.01
+const PCT_MODERADO = 50
 const PCT_SAUDAVEL = 30
 
 interface PropostaIdeal {
@@ -212,7 +213,7 @@ export function TabReestruturacao({ clientId }: { clientId: string }) {
   const [contratos, setContratos] = useState<ContratoRow[]>([])
   const [receitaAnual, setReceitaAnual] = useState(0)
   const [resultadoLiquidoCapacidade, setResultadoLiquidoCapacidade] = useState(0)
-  const [showCronIdeal, setShowCronIdeal] = useState<{ total: boolean; saudavel: boolean }>({ total: false, saudavel: false })
+  const [showCronIdeal, setShowCronIdeal] = useState<{ moderado: boolean; saudavel: boolean }>({ moderado: false, saudavel: false })
 
   // Simulação unificada para os contratos selecionados
   const [simTaxa,               setSimTaxa]               = useState('')
@@ -352,18 +353,19 @@ export function TabReestruturacao({ clientId }: { clientId: string }) {
 
   // Proposta de Reestruturação Ideal — todo o passivo, parcela fixa a 1% a.a.
   const totalPassivoGeral = useMemo(() => contratos.reduce((s, c) => s + c.saldoDevedor, 0), [contratos])
+  const capacidadeModerada = resultadoLiquidoCapacidade * (PCT_MODERADO / 100)
   const capacidadeSaudavel = resultadoLiquidoCapacidade * (PCT_SAUDAVEL / 100)
   const dataPrimeiraIdeal = useMemo(() => {
     const d = new Date(); d.setDate(1); d.setFullYear(d.getFullYear() + 1)
     return d
   }, [])
 
-  const propostaTotal    = useMemo(() => calcRestruturacaoIdeal(totalPassivoGeral, resultadoLiquidoCapacidade, TAXA_IDEAL), [totalPassivoGeral, resultadoLiquidoCapacidade])
+  const propostaModerada = useMemo(() => calcRestruturacaoIdeal(totalPassivoGeral, capacidadeModerada, TAXA_IDEAL), [totalPassivoGeral, capacidadeModerada])
   const propostaSaudavel = useMemo(() => calcRestruturacaoIdeal(totalPassivoGeral, capacidadeSaudavel, TAXA_IDEAL), [totalPassivoGeral, capacidadeSaudavel])
 
-  const cronTotal    = useMemo(() => propostaTotal && !propostaTotal.inviavel
-    ? gerarCronogramaSimulado(totalPassivoGeral, TAXA_IDEAL, propostaTotal.nAnos, 'Anual', 'Price', dataPrimeiraIdeal) : [],
-    [propostaTotal, totalPassivoGeral, dataPrimeiraIdeal])
+  const cronModerada = useMemo(() => propostaModerada && !propostaModerada.inviavel
+    ? gerarCronogramaSimulado(totalPassivoGeral, TAXA_IDEAL, propostaModerada.nAnos, 'Anual', 'Price', dataPrimeiraIdeal) : [],
+    [propostaModerada, totalPassivoGeral, dataPrimeiraIdeal])
   const cronSaudavel = useMemo(() => propostaSaudavel && !propostaSaudavel.inviavel
     ? gerarCronogramaSimulado(totalPassivoGeral, TAXA_IDEAL, propostaSaudavel.nAnos, 'Anual', 'Price', dataPrimeiraIdeal) : [],
     [propostaSaudavel, totalPassivoGeral, dataPrimeiraIdeal])
@@ -408,12 +410,12 @@ export function TabReestruturacao({ clientId }: { clientId: string }) {
           </p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <PropostaCard
-              titulo="Comprometendo 100% do Resultado"
-              capacidade={resultadoLiquidoCapacidade}
-              proposta={propostaTotal}
-              cronograma={cronTotal}
-              show={showCronIdeal.total}
-              onToggle={() => setShowCronIdeal(v => ({ ...v, total: !v.total }))}
+              titulo={`Comprometendo até ${PCT_MODERADO}% do Resultado`}
+              capacidade={capacidadeModerada}
+              proposta={propostaModerada}
+              cronograma={cronModerada}
+              show={showCronIdeal.moderado}
+              onToggle={() => setShowCronIdeal(v => ({ ...v, moderado: !v.moderado }))}
             />
             <PropostaCard
               titulo={`Comprometendo até ${PCT_SAUDAVEL}% do Resultado (saudável)`}

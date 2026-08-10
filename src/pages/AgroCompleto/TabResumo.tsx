@@ -517,7 +517,7 @@ export function TabResumo({ clientId, clienteNome, clienteCidade }: {
         resultadoLiquidoCapacidade,
         safraCapacidade: SAFRA_CAPACIDADE,
         cenarios: [
-          calcCenarioReestruturacao('100% do Resultado', resultadoLiquidoCapacidade),
+          calcCenarioReestruturacao('50% do Resultado', resultadoLiquidoCapacidade * 0.50),
           calcCenarioReestruturacao('30% do Resultado (saudável)', resultadoLiquidoCapacidade * 0.30),
         ],
       }
