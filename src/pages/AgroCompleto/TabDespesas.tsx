@@ -6,7 +6,7 @@ import { Card } from '../../components/ui/Card'
 const fmtBRL = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 })
 const fmtDate = (d: string | Date) => new Date(d).toLocaleDateString('pt-BR')
 
-const TIPOS = ['Custo da atividade', 'Salários', 'Investimento', 'Cartão de crédito', 'Contas comércio', 'Previsões', 'Financeiro', 'Outros']
+const TIPOS = ['Custo da atividade', 'Salários', 'Investimento', 'Cartão de crédito', 'Contas comércio', 'Previsões', 'Financeiro', 'Arrendamento', 'Outros']
 
 const TIPO_COLOR: Record<string, string> = {
   'Custo da atividade': 'bg-red-100 text-red-700',
@@ -16,6 +16,7 @@ const TIPO_COLOR: Record<string, string> = {
   'Contas comércio':    'bg-amber-100 text-amber-700',
   'Previsões':          'bg-gray-100 text-gray-700',
   'Financeiro':         'bg-pink-100 text-pink-700',
+  'Arrendamento':       'bg-teal-100 text-teal-700',
   'Outros':             'bg-slate-100 text-slate-700',
 }
 

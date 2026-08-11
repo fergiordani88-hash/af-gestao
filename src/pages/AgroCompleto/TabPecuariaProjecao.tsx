@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react'
-import { Save, CheckCircle, TrendingUp, TrendingDown, Minus } from 'lucide-react'
+import { Save, CheckCircle, TrendingUp, TrendingDown, Minus, RefreshCw } from 'lucide-react'
 import {
   pecStorage, ParametrosPecuaria, CustosPecuaria,
   CICLO_LABELS, PRACAS_MT, DEFAULT_PARAMS, DEFAULT_CUSTOS,
   calcularProjecao, ProjecaoAnoPec,
 } from '../../services/pecuariaStorage'
+import { agroApi } from '../../services/agroApi'
 
 const R = (n: number) => n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })
 const N = (n: number, dec = 1) => n.toLocaleString('pt-BR', { minimumFractionDigits: dec, maximumFractionDigits: dec })
@@ -19,6 +20,8 @@ export function TabPecuariaProjecao({ clientId }: Props) {
   const [projecao, setProjecao] = useState<ProjecaoAnoPec[]>([])
   const [salvo, setSalvo] = useState(false)
   const [secao, setSecao] = useState<Secao>('ciclo')
+  const [sincronizando, setSincronizando] = useState(false)
+  const [sincronizado, setSincronizado] = useState(false)
 
   useEffect(() => {
     setParams(pecStorage.getParams(clientId))
@@ -39,6 +42,51 @@ export function TabPecuariaProjecao({ clientId }: Props) {
     pecStorage.saveCustos(clientId, custos)
     setSalvo(true)
     setTimeout(() => setSalvo(false), 2000)
+  }
+
+  // Empurra a receita bruta e os custos (operacionais + arrendamento) do ano corrente
+  // da projeção para as abas gerais de Despesas/Receitas (backend), como a Pecuária
+  // hoje só vive no localStorage e não aparece em Fluxo de Caixa / outras telas.
+  async function sincronizarFinanceiro() {
+    if (projecao.length === 0) return
+    setSincronizando(true)
+    try {
+      const anoAtual = projecao[0]
+      const marcador = `[Pecuária ${anoAtual.ano}]`
+      const dataRef = `${anoAtual.ano}-12-31`
+
+      // remove sincronizações anteriores desse mesmo ano pra não duplicar lançamento a cada clique
+      const [despesasExistentes, receitasExistentes] = await Promise.all([
+        agroApi.despesas.list(clientId),
+        agroApi.receitas.list(clientId),
+      ])
+      await Promise.all([
+        ...despesasExistentes.filter(d => d.descricao.startsWith(marcador)).map(d => agroApi.despesas.delete(d.id!)),
+        ...receitasExistentes.filter(r => r.descricao.startsWith(marcador)).map(r => agroApi.receitas.delete(r.id!)),
+      ])
+
+      const custoOperacional = anoAtual.custoTotal - anoAtual.custoArrendamento
+      const novasDespesas = [
+        { valor: custoOperacional, tipo: 'Custo da atividade', desc: 'Custos Operacionais (sanidade + pastagem + mão de obra + suplementos)' },
+        { valor: anoAtual.custoArrendamento, tipo: 'Arrendamento', desc: 'Arrendamento de Pasto' },
+      ].filter(d => d.valor > 0)
+
+      await Promise.all([
+        anoAtual.receitaBruta > 0 && agroApi.receitas.create({
+          clientId, data: dataRef, origem: 'Pecuária', tipo: 'Recebimento',
+          descricao: `${marcador} Receita Bruta (abate + descarte + bezerros)`, valor: anoAtual.receitaBruta,
+        }),
+        ...novasDespesas.map(d => agroApi.despesas.create({
+          clientId, data: dataRef, origem: 'Pecuária', tipo: d.tipo,
+          descricao: `${marcador} ${d.desc}`, valor: d.valor,
+        })),
+      ].filter(Boolean))
+
+      setSincronizado(true)
+      setTimeout(() => setSincronizado(false), 2500)
+    } finally {
+      setSincronizando(false)
+    }
   }
 
   function setP<K extends keyof ParametrosPecuaria>(k: K, v: ParametrosPecuaria[K]) {
@@ -180,6 +228,13 @@ export function TabPecuariaProjecao({ clientId }: Props) {
               </div>
             </div>
             <div>
+              <p className="text-xs font-semibold text-gray-600 mb-2 mt-1">Arrendamento de Pasto</p>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                {numInput('Área Arrendada', custos.areaArrendadaHa, v => setC('areaArrendadaHa', v), { suffix: 'ha', step: 1 })}
+                {numInput('Custo do Arrendamento', custos.custoArrendamentoHaAno, v => setC('custoArrendamentoHaAno', v), { suffix: 'R$/ha/ano', step: 10 })}
+              </div>
+            </div>
+            <div>
               <p className="text-xs font-semibold text-gray-600 mb-2 mt-1">Mão de Obra</p>
               <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                 {numInput('Nº Funcionários', custos.numFuncionarios, v => setC('numFuncionarios', v))}
@@ -199,7 +254,14 @@ export function TabPecuariaProjecao({ clientId }: Props) {
         )}
       </div>
 
-      <div className="flex justify-end">
+      <div className="flex justify-end gap-2">
+        <button onClick={sincronizarFinanceiro} disabled={projecao.length === 0 || sincronizando}
+          title="Envia a receita bruta e os custos (operacionais + arrendamento) do ano corrente para as abas Despesas/Receitas"
+          className="flex items-center gap-2 border border-gray-300 text-gray-600 px-5 py-2.5 rounded-xl text-sm font-semibold hover:bg-gray-50 transition disabled:opacity-50">
+          {sincronizado
+            ? <><CheckCircle size={16} className="text-af-green"/> Sincronizado!</>
+            : <><RefreshCw size={16} className={sincronizando ? 'animate-spin' : ''}/> {sincronizando ? 'Sincronizando…' : 'Sincronizar com Despesas/Receitas'}</>}
+        </button>
         <button onClick={salvar}
           className="flex items-center gap-2 bg-af-green text-white px-5 py-2.5 rounded-xl text-sm font-semibold hover:bg-af-green/90 transition">
           {salvo ? <><CheckCircle size={16}/> Salvo!</> : <><Save size={16}/> Salvar e Calcular</>}

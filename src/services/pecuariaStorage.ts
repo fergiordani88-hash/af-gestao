@@ -82,6 +82,8 @@ export interface CustosPecuaria {
   manutencaoPastagemHaAno: number
   reformaPastagemHa: number
   percentualReformaAno: number
+  areaArrendadaHa: number
+  custoArrendamentoHaAno: number
   numFuncionarios: number
   salarioMedioMensal: number
   encargosPct: number
@@ -102,6 +104,7 @@ export interface ProjecaoAnoPec {
   receitaDescarte: number
   receitaBezerros: number
   receitaBruta: number
+  custoArrendamento: number
   custoTotal: number
   resultadoLiquido: number
   taxaDesfrute: number
@@ -209,6 +212,7 @@ export const DEFAULT_CUSTOS: CustosPecuaria = {
   vacinacaoAftosaAnoCab: 12, vacinacaoBrucelaAnoCab: 4,
   vermifugacaoAnoCab: 8, outrosSanidadeAnoCab: 6,
   manutencaoPastagemHaAno: 80, reformaPastagemHa: 1200, percentualReformaAno: 5,
+  areaArrendadaHa: 0, custoArrendamentoHaAno: 0,
   numFuncionarios: 1, salarioMedioMensal: 2400, encargosPct: 33,
   combustivelMensal: 800, manutencaoEquipMensal: 400, outrosMensal: 300,
 }
@@ -323,7 +327,8 @@ export function calcularProjecao(
       const meses = sup.mesesAplicacao.length || 6
       return s + rebanhoTotal * (sup.consumoGDiaCab / 1000) * 30 * meses * sup.custoKg
     }, 0)
-    const custoTotal = custoSanidade + custoPastagem + custoMO + custoOutros + custoSuplem
+    const custoArrendamento = custos.areaArrendadaHa * custos.custoArrendamentoHaAno
+    const custoTotal = custoSanidade + custoPastagem + custoMO + custoOutros + custoSuplem + custoArrendamento
 
     const uaTotal = calcUA(rebanho) // simplificado — usa rebanho inicial como proxy da UA média
     const taxaDesfrute = rebanhoTotal > 0 ? ((abates + descartes) / rebanhoTotal) * 100 : 0
@@ -332,7 +337,7 @@ export function calcularProjecao(
       ano, rebanhoTotal, uaTotal: Math.round(uaTotal * 10) / 10,
       nascimentos, desmamados, abates, descartes,
       receitaAbate, receitaDescarte, receitaBezerros, receitaBruta,
-      custoTotal, resultadoLiquido: receitaBruta - custoTotal,
+      custoArrendamento, custoTotal, resultadoLiquido: receitaBruta - custoTotal,
       taxaDesfrute: Math.round(taxaDesfrute * 10) / 10,
     })
   }
