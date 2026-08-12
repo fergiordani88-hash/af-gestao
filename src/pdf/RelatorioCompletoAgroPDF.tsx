@@ -896,27 +896,51 @@ export function RelatorioCompletoAgroPDF({ data }: { data: RelatorioCompletoAgro
           )}
 
           {/* Parecer — panel + text */}
-          <View style={{ flexDirection: 'row', gap: 14, marginTop: 10 }}>
-            <View style={{ width: 170, alignItems: 'center', justifyContent: 'center' }}>
-              <Image src={logoAF} style={{ width: 220 }} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Sec title="Parecer Consultivo" />
-              <Text style={{ fontFamily: 'Helvetica', fontSize: 8, color: C.body, lineHeight: 1.7, marginBottom: 8 }}>
-                A propriedade <Text style={{ fontFamily: 'Helvetica-Bold' }}>{data.clientName}</Text> apresenta receita bruta de {R(recBruta)} e resultado operacional de {R(resOp)}, com margem de {pct(data.margem)}. O endividamento total de {R(data.totalEndividamento)} representa {pct(data.alavancagem)} do patrimônio bruto, com solvência de {xv(data.solvencia)}.
-              </Text>
-              <Text style={{ fontFamily: 'Helvetica', fontSize: 8, color: C.body, lineHeight: 1.7, marginBottom: 8 }}>
-                Após o serviço da dívida de {R(data.servicoAnual)}/ano, o resultado disponível é {R(resPos)} — {resPos >= 0
-                  ? 'indicando capacidade de honrar os compromissos com a receita da safra.'
-                  : 'indicando insuficiência de caixa operacional. Recomenda-se atenção imediata à renegociação do passivo.'}
-              </Text>
-              <View style={{ backgroundColor: C.greenLt, borderLeftWidth: 2, borderLeftColor: C.green, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 2 }}>
-                <Text style={{ fontFamily: 'Helvetica', fontSize: 7, color: C.green, lineHeight: 1.6 }}>
-                  Relatório gerado em {data.dataGeracao}{data.horaGeracao ? ` às ${data.horaGeracao}` : ''} por {data.consultorName} · AF Gestão & Consultoria · Campo Grande/MS
-                </Text>
+          {(() => {
+            const custoHa    = data.areaTotal > 0 ? custoTotal / data.areaTotal : 0
+            const servicoHa  = data.areaTotal > 0 ? data.servicoAnual / data.areaTotal : 0
+            const saldoHa    = data.areaTotal > 0 ? data.totalEndividamento / data.areaTotal : 0
+            const foraDoSaudavel: string[] = []
+            if (custoHa   > 3500) foraDoSaudavel.push('custo de produção')
+            if (servicoHa > 800)  foraDoSaudavel.push('serviço da dívida')
+            if (saldoHa   > 3000) foraDoSaudavel.push('saldo devedor bancário')
+
+            const anosPositivos = data.projecaoAnos.filter(r => r.resultadoLiquido >= 0).length
+            const totalAnosProj = data.projecaoAnos.length
+            const cenarioViavel = data.reestruturacaoIdeal?.cenarios.find(c => !c.inviavel)
+
+            const p1 = `A propriedade ${data.clientName} apresenta receita bruta de ${R(recBruta)} e resultado operacional de ${R(resOp)}, com margem de ${pct(data.margem)} — ${data.margem >= 20 ? 'nível saudável para a atividade' : 'abaixo da referência saudável de 20% para o setor'}.`
+
+            const p2 = `O endividamento total de ${R(data.totalEndividamento)} representa ${pct(data.alavancagem)} do patrimônio bruto (saudável: < 30%), com solvência de ${xv(data.solvencia)} (saudável: > 2,0x) e relação endividamento/receita bruta de ${xv(data.endivReceita)} (saudável: < 1,0x). A capacidade de pagamento está em ${xv(data.capPagamento)} (saudável: > 1,5x)${(data.comprometimentoReceita ?? 0) > 0 ? `, com ${pct(data.comprometimentoReceita!)} da receita bruta comprometida com bancos` : ''}. Após o serviço da dívida de ${R(data.servicoAnual)}/ano, o resultado disponível é ${R(resPos)}${foraDoSaudavel.length ? `. Na análise por hectare, ${foraDoSaudavel.join(', ')} estão fora da referência saudável` : ''}.`
+
+            const p3 = totalAnosProj > 0
+              ? `Mantida a estrutura de dívida atual, sem qualquer reestruturação, a projeção de 10 anos indica ${anosPositivos} de ${totalAnosProj} anos com resultado líquido positivo, com resultado acumulado de ${R(data.projecao10Anos)} no período — o desequilíbrio não se corrige com o tempo caso nenhuma ação seja tomada.`
+              : ''
+
+            const p4 = `Diante do diagnóstico "${data.ratingLabel}", recomenda-se a reestruturação do passivo nos termos apresentados a seguir${cenarioViavel ? `, com prazo estimado de ${cenarioViavel.nAnos} anos comprometendo ${cenarioViavel.label}` : ''}, de modo a alinhar o cronograma financeiro à real capacidade de geração de caixa da atividade.`
+
+            const pStyle = { fontFamily: 'Helvetica' as const, fontSize: 8, color: C.body, lineHeight: 1.6, marginBottom: 6 }
+
+            return (
+              <View style={{ flexDirection: 'row', gap: 14, marginTop: 10 }}>
+                <View style={{ width: 170, alignItems: 'center', justifyContent: 'center' }}>
+                  <Image src={logoAF} style={{ width: 220 }} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Sec title="Parecer Consultivo" />
+                  <Text style={pStyle}>{p1}</Text>
+                  <Text style={pStyle}>{p2}</Text>
+                  {p3 && <Text style={pStyle}>{p3}</Text>}
+                  <Text style={{ ...pStyle, marginBottom: 8 }}>{p4}</Text>
+                  <View style={{ backgroundColor: C.greenLt, borderLeftWidth: 2, borderLeftColor: C.green, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 2 }}>
+                    <Text style={{ fontFamily: 'Helvetica', fontSize: 7, color: C.green, lineHeight: 1.6 }}>
+                      Relatório gerado em {data.dataGeracao}{data.horaGeracao ? ` às ${data.horaGeracao}` : ''} por {data.consultorName} · AF Gestão & Consultoria · Campo Grande/MS
+                    </Text>
+                  </View>
+                </View>
               </View>
-            </View>
-          </View>
+            )
+          })()}
         </View>
         <Ftr client={data.clientName} date={data.dataGeracao} hora={h} />
       </Page>
