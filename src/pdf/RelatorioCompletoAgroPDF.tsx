@@ -907,7 +907,14 @@ export function RelatorioCompletoAgroPDF({ data }: { data: RelatorioCompletoAgro
 
             const anosPositivos = data.projecaoAnos.filter(r => r.resultadoLiquido >= 0).length
             const totalAnosProj = data.projecaoAnos.length
-            const cenarioViavel = data.reestruturacaoIdeal?.cenarios.find(c => !c.inviavel)
+
+            // Sempre prioriza o cenário mais conservador (30% do resultado) — menor
+            // comprometimento preserva margem de segurança contra oscilação de preço,
+            // clima e câmbio. Só recorre a um cenário mais agressivo se o conservador
+            // não for viável (nem cobre os juros do passivo nesse ritmo).
+            const cenarios = data.reestruturacaoIdeal?.cenarios ?? []
+            const cenarioConservador = cenarios.find(c => c.label.includes('30%'))
+            const cenarioAlternativo = cenarios.find(c => !c.inviavel)
 
             const p1 = `A propriedade ${data.clientName} apresenta receita bruta de ${R(recBruta)} e resultado operacional de ${R(resOp)}, com margem de ${pct(data.margem)} — ${data.margem >= 20 ? 'nível saudável para a atividade' : 'abaixo da referência saudável de 20% para o setor'}.`
 
@@ -917,7 +924,14 @@ export function RelatorioCompletoAgroPDF({ data }: { data: RelatorioCompletoAgro
               ? `Mantida a estrutura de dívida atual, sem qualquer reestruturação, a projeção de 10 anos indica ${anosPositivos} de ${totalAnosProj} anos com resultado líquido positivo, com resultado acumulado de ${R(data.projecao10Anos)} no período — o desequilíbrio não se corrige com o tempo caso nenhuma ação seja tomada.`
               : ''
 
-            const p4 = `Diante do diagnóstico "${data.ratingLabel}", recomenda-se a reestruturação do passivo nos termos apresentados a seguir${cenarioViavel ? `, com prazo estimado de ${cenarioViavel.nAnos} anos comprometendo ${cenarioViavel.label}` : ''}, de modo a alinhar o cronograma financeiro à real capacidade de geração de caixa da atividade.`
+            let p4: string
+            if (cenarioConservador && !cenarioConservador.inviavel) {
+              p4 = `Diante do diagnóstico "${data.ratingLabel}", recomenda-se a reestruturação do passivo no cenário mais conservador simulado — comprometendo ${cenarioConservador.label}, com prazo estimado de ${cenarioConservador.nAnos} anos. Prioriza-se o menor comprometimento do resultado porque preserva maior margem de segurança diante de oscilações de preço, clima e câmbio ao longo do período, reduzindo o risco de nova inadimplência mesmo que o prazo de amortização seja mais longo.`
+            } else if (cenarioAlternativo) {
+              p4 = `Diante do diagnóstico "${data.ratingLabel}", o cenário mais conservador simulado (30% do resultado) não é suficiente para cobrir os juros do passivo nesse ritmo — recomenda-se comprometer ${cenarioAlternativo.label}, com prazo estimado de ${cenarioAlternativo.nAnos} anos, de modo a alinhar o cronograma financeiro à real capacidade de geração de caixa da atividade.`
+            } else {
+              p4 = `Diante do diagnóstico "${data.ratingLabel}", recomenda-se atenção imediata à renegociação do passivo junto às instituições credoras — nos cenários simulados, mesmo comprometendo a totalidade do resultado líquido não é possível cobrir os juros do passivo ao ritmo atual, reforçando a urgência de uma reestruturação negociada individualmente com cada credor.`
+            }
 
             const pStyle = { fontFamily: 'Helvetica' as const, fontSize: 8, color: C.body, lineHeight: 1.6, marginBottom: 6 }
 
