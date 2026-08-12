@@ -22,6 +22,44 @@ const HARVEST_LABELS: Record<string, string> = {
   soja: 'Soja', milho: 'Milho', feijao: 'Feijão',
 }
 
+// ── Juros pró-rata por ano civil ────────────────────────────────
+// "Juros bancários do ano" não pode ser só a soma das parcelas cujo vencimento
+// cai no ano corrente — a maioria dos contratos rurais é anual com aniversários
+// espalhados, então boa parte dos contratos nunca teria uma parcela "no ano" e
+// ficaria de fora, subestimando muito o custo real de juros do período.
+// Em vez disso, cada parcela tem seu juro repartido proporcionalmente aos dias
+// do seu período de acúmulo (data da parcela anterior → vencimento desta) que
+// caem dentro do ano civil pedido.
+function periodoInicioParcela(p: AgroParcela): Date {
+  // 1ª parcela restante: o período de acúmulo começa na contratação (cobre
+  // corretamente tanto carência longa quanto contratos "Único"/bullet).
+  if (p.parcelaNum === 1) return new Date(p.dataContratacao)
+  const d = new Date(p.vencimento)
+  if (p.periodicidade === 'Mensal')          d.setMonth(d.getMonth() - 1)
+  else if (p.periodicidade === 'Semestral')  d.setMonth(d.getMonth() - 6)
+  else if (p.periodicidade === 'Trimestral') d.setMonth(d.getMonth() - 3)
+  else                                        d.setFullYear(d.getFullYear() - 1) // Anual
+  return d
+}
+
+function jurosProrataAno(p: AgroParcela, ano: number): number {
+  const fim = new Date(p.vencimento)
+  const inicio = periodoInicioParcela(p)
+  const totalMs = fim.getTime() - inicio.getTime()
+  if (totalMs <= 0) return 0
+  const anoInicio = new Date(ano, 0, 1)
+  const anoFimExcl = new Date(ano + 1, 0, 1)
+  const overlapStart = inicio > anoInicio ? inicio : anoInicio
+  const overlapEnd = fim < anoFimExcl ? fim : anoFimExcl
+  const overlapMs = overlapEnd.getTime() - overlapStart.getTime()
+  if (overlapMs <= 0) return 0
+  return (p.juros ?? 0) * (overlapMs / totalMs)
+}
+
+function jurosAnoProrata(todasParcelas: AgroParcela[], ano: number): number {
+  return todasParcelas.reduce((s, p) => s + jurosProrataAno(p, ano), 0)
+}
+
 function culturaKey(cultura: string): string | null {
   const s = cultura.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
   if (s.includes('soja'))  return 'soja'
@@ -480,7 +518,7 @@ export function TabResumo({ clientId, clienteNome, clienteCidade }: {
       }) : []
 
       // Juros em sacas
-      const jurosAnuaisExport = parcelasAnoAtual.reduce((s, p) => s + (p.juros ?? 0), 0)
+      const jurosAnuaisExport = jurosAnoProrata(parcelas, anoAtual)
       const sojaRowExp = prodSafra.find(p => p.cultura.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').includes('soja'))
       const cotacaoRefExp = sojaRowExp?.cotacao ?? prodSafra.find(p => p.ordem === 'principal')?.cotacao ?? 0
       const culturaRefExp = sojaRowExp?.cultura ?? prodSafra.find(p => p.ordem === 'principal')?.cultura ?? ''
@@ -1298,7 +1336,7 @@ export function TabResumo({ clientId, clienteNome, clienteCidade }: {
                 {(() => {
                   const resAfterDebt = resultadoLiq - servicoAnual
                   const pctReceitaDivida = receitaBruta > 0 ? (servicoAnual / receitaBruta) * 100 : 0
-                  const jurosAnuais = parcelasAnoAtual.reduce((s, p) => s + (p.juros ?? 0), 0)
+                  const jurosAnuais = jurosAnoProrata(parcelas, anoAtual)
                   const rows: { label: string; tooltip: string; total: number; cor: string; ref: string; isCurrency?: boolean; isPct?: boolean }[] = [
                     {
                       label: 'Receita bruta',
@@ -1372,7 +1410,7 @@ export function TabResumo({ clientId, clienteNome, clienteCidade }: {
 
           {/* Juros em sacas de soja */}
           {(() => {
-            const jurosAnuais = parcelasAnoAtual.reduce((s, p) => s + (p.juros ?? 0), 0)
+            const jurosAnuais = jurosAnoProrata(parcelas, anoAtual)
             if (jurosAnuais <= 0 || areaTotal <= 0) return null
             const sojaRow = prodSafra.find(p => p.cultura.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').includes('soja'))
             const cotacaoRef = sojaRow?.cotacao ?? prodSafra.find(p => p.ordem === 'principal')?.cotacao ?? 0
