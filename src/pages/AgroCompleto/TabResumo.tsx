@@ -492,7 +492,13 @@ export function TabResumo({ clientId, clienteNome, clienteCidade }: {
         const ano = 2026 + i
         let recBruta = 0, custo = 0
         if (prodPorAno[ano]) {
-          for (const p of prodPorAno[ano]) { recBruta += p.area * p.produtividade * p.cotacao; custo += p.area * p.custoPorHa * p.cotacao }
+          // No ano corrente (o que já está em curso hoje), só conta cultura cuja
+          // colheita ainda não aconteceu — a já realizada (ex: soja em abril, com
+          // hoje em agosto) já é passado, não é resultado ainda a vir a partir de agora.
+          const prodsDoAno = ano === 2026
+            ? prodPorAno[ano].filter(p => getColheitaDate(p, colheitaDatas) > hoje)
+            : prodPorAno[ano]
+          for (const p of prodsDoAno) { recBruta += p.area * p.produtividade * p.cotacao; custo += p.area * p.custoPorHa * p.cotacao }
         } else {
           const g = Math.pow(1.02, i)
           for (const p of baseProds) { recBruta += p.area * p.produtividade * p.cotacao * g; custo += p.area * p.custoPorHa * p.cotacao * g }

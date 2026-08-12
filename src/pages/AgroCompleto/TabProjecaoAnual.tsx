@@ -18,6 +18,29 @@ const fmtK = (v: number) =>
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
+// Calendário de colheita padrão (mesmos valores de TabResumo.tsx) — usado só para
+// saber se a colheita de uma cultura do ano corrente já aconteceu ou ainda está
+// em aberto (ex: hoje em agosto, soja de abril já foi realizada, milho 2ª de
+// agosto ainda não).
+const HARVEST_DEFAULTS: Record<string, { month: number; day: number }> = {
+  soja: { month: 4, day: 15 }, milho: { month: 8, day: 15 }, feijao: { month: 11, day: 15 },
+}
+function culturaKeyLocal(cultura: string): string | null {
+  const s = cultura.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
+  if (s.includes('soja')) return 'soja'
+  if (s.includes('milho')) return 'milho'
+  if (s.includes('feij')) return 'feijao'
+  return null
+}
+function getColheitaDateLocal(p: AgroProducao): Date {
+  if (p.dataColheita) return new Date(p.dataColheita)
+  const key = culturaKeyLocal(p.cultura)
+  const hd = (key && HARVEST_DEFAULTS[key]) || { month: 4, day: 15 }
+  const parts = p.safra.split('/')
+  const ano2 = parts[1].length === 2 ? 2000 + parseInt(parts[1]) : parseInt(parts[1])
+  return new Date(ano2, hd.month - 1, hd.day)
+}
+
 function anoFromSafra(safra: string): number {
   const parts = safra.split('/')
   if (parts.length === 2) {
@@ -110,8 +133,15 @@ function calcProjecao(
     let culturas: string[] = []
 
     if (isReal) {
-      // Usa dados reais cadastrados na Produção
-      for (const prod of producaoPorAno[ano]) {
+      // Usa dados reais cadastrados na Produção — no ano corrente (o que já está
+      // em curso hoje), só conta culturas cuja colheita ainda não aconteceu; a
+      // que já foi realizada (ex: soja em abril, com hoje em agosto) já ficou no
+      // passado e não é "o que ainda vai gerar resultado a partir de agora".
+      const hoje = new Date()
+      const producoesDoAno = ano === ANO_INICIO
+        ? producaoPorAno[ano].filter(prod => getColheitaDateLocal(prod) > hoje)
+        : producaoPorAno[ano]
+      for (const prod of producoesDoAno) {
         const calc = calcProducaoRow(prod)
         recBruta    += calc.recBruta
         custoAtiv   += calc.custoAtiv
