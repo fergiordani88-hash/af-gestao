@@ -703,7 +703,7 @@ export function RelatorioCompletoAgroPDF({ data }: { data: RelatorioCompletoAgro
               <View style={{ flexDirection: 'row', gap: 8, marginBottom: 16 }}>
                 {[
                   { label: 'Curto Prazo', sub: '≤ 360 dias', h: data.cpHorizonte },
-                  { label: `Dentro do Ano`, sub: String(data.anoHorizonte?.anoRef ?? ''), h: data.anoHorizonte },
+                  { label: `Até 31/12`, sub: String(data.anoHorizonte?.anoRef ?? ''), h: data.anoHorizonte },
                   { label: 'Longo Prazo', sub: '> 360 dias · serviço médio anual', h: data.lpHorizonte },
                 ].filter(item => item.h).map((item, i) => {
                   const h2 = item.h!

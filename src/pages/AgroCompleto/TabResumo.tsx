@@ -293,6 +293,9 @@ export function TabResumo({ clientId, clienteNome, clienteCidade }: {
   const safraInicio = new Date(safraAnoIni, 6, 1)          // 01/jul
   const safraFimExcl = new Date(safraAnoIni + 1, 6, 1)     // 01/jul do ano seguinte (limite exclusivo)
   const safraFim = new Date(safraFimExcl.getTime() - 1)    // 30/jun 23:59:59
+  // Janela auxiliar só para o card "Até 31/12" do demonstrativo CP × LP (não afeta
+  // os demais indicadores, que seguem a safra).
+  const fimAno31Dez = new Date(anoAtual, 11, 31)
   // Só o que ainda vai vencer a partir de hoje — parcelas já vencidas dentro da
   // safra corrente já são passado e não devem inflar a capacidade de pagamento.
   const parcelasAnoAtual = parcelas.filter(p => {
@@ -388,8 +391,8 @@ export function TabResumo({ clientId, clienteNome, clienteCidade }: {
   const comprCp: Status = receitaCp === 0 ? 'ok' : resultadoCp <= 0 ? 'risco' : (servicoCompromCp / resultadoCp) * 100 <= limSaudavel ? 'ok' : (servicoCompromCp / resultadoCp) * 100 <= limCritico ? 'atencao' : 'risco'
   const comprLp: Status = receitaLp === 0 ? 'ok' : resultadoLp <= 0 ? 'risco' : (servicoCompromLp / resultadoLp) * 100 <= limSaudavel ? 'ok' : (servicoCompromLp / resultadoLp) * 100 <= limCritico ? 'atencao' : 'risco'
 
-  // Dentro do Ano (= dentro da safra selecionada, não do ano civil)
-  const fimDoAno = safraFim
+  // Dentro do Ano (até 31/12 do ano civil corrente)
+  const fimDoAno = new Date(anoAtual, 11, 31)
   const producaoDentroAno = producao.filter(p => {
     const d = getColheitaDate(p, colheitaDatas)
     return d >= hoje && d <= fimDoAno
@@ -398,9 +401,15 @@ export function TabResumo({ clientId, clienteNome, clienteCidade }: {
   const custoDentroAno     = producaoDentroAno.reduce((s, p) => s + calcRow(p).custoTotal + calcRow(p).custoArrendTotal, 0)
   const resultadoDentroAno = receitaDentroAno - custoDentroAno
 
-  // parcelasAnoAtual já é só o que resta a partir de hoje (ver definição acima)
-  const servicoDentroAno         = parcelasAnoAtual.reduce((s, p) => s + p.valorParcela, 0)
-  const servicoCusteioDentroAno  = parcelasAnoAtual.filter(p => contratosCusteioIds.has(p.contratoId)).reduce((s, p) => s + p.valorParcela, 0)
+  // Parcelas com vencimento a partir de hoje até 31/12 — só para este card do
+  // demonstrativo (independente de parcelasAnoAtual, que segue a safra e alimenta
+  // os demais indicadores da tela).
+  const parcelasAte31Dez = parcelas.filter(p => {
+    const v = new Date(p.vencimento)
+    return v >= hoje && v <= fimDoAno
+  })
+  const servicoDentroAno         = parcelasAte31Dez.reduce((s, p) => s + p.valorParcela, 0)
+  const servicoCusteioDentroAno  = parcelasAte31Dez.filter(p => contratosCusteioIds.has(p.contratoId)).reduce((s, p) => s + p.valorParcela, 0)
   const servicoCusteioExcDentroAno = servicoCusteioDentroAno * excCpProp
   const servicoCompromDentroAno  = (servicoDentroAno - servicoCusteioDentroAno) + servicoCusteioExcDentroAno
   const saldoDispDentroAno       = resultadoDentroAno - servicoCompromDentroAno
@@ -629,8 +638,8 @@ export function TabResumo({ clientId, clienteNome, clienteCidade }: {
           peSaud: peSaudavelCp, peCrit: peCriticoCp,
           saldo: saldoDispCp, pct: pctCp, status: comprCp,
         } : undefined,
-        anoHorizonte: parcelasAnoAtual.length > 0 ? {
-          servico: servicoCompromDentroAno, parcelas: parcelasAnoAtual.length,
+        anoHorizonte: parcelasAte31Dez.length > 0 ? {
+          servico: servicoCompromDentroAno, parcelas: parcelasAte31Dez.length,
           peSaud: peSaudavelAno, peCrit: peCriticoAno,
           saldo: saldoDispDentroAno, pct: pctAno, status: comprDentroAno,
           anoRef: anoAtual,
@@ -1575,7 +1584,7 @@ export function TabResumo({ clientId, clienteNome, clienteCidade }: {
                     {safrasCpNomes.length > 0 && <div className="text-gray-400 font-normal normal-case">Safra(s): {safrasCpNomes.join(', ')}</div>}
                   </th>
                   <th className="text-right px-4 py-3 text-xs font-bold text-emerald-600 uppercase">
-                    Dentro da safra ({safra})
+                    Até 31/12/{anoAtual}
                     {safrasAnoNomes.length > 0 && <div className="text-gray-400 font-normal normal-case">Safra(s): {safrasAnoNomes.join(', ')}</div>}
                   </th>
                   <th className="text-right px-4 py-3 text-xs font-bold text-violet-600 uppercase">
@@ -1681,7 +1690,7 @@ export function TabResumo({ clientId, clienteNome, clienteCidade }: {
             {/* helper inline */}
             {([
               { label: 'Curto Prazo (≤ 360 dias)', cor: 'sky', compr: comprCp, receita: receitaCp, resultado: resultadoCp, servico: servicoCp, nVenc: parcelasCp.length, servicoCompr: servicoCompromCp, peSaud: peSaudavelCp, peCrit: peCriticoCp },
-              { label: `Dentro da Safra (${safra})`, cor: 'emerald', compr: comprDentroAno, receita: receitaDentroAno, resultado: resultadoDentroAno, servico: servicoDentroAno, nVenc: parcelasAnoAtual.length, servicoCompr: servicoCompromDentroAno, peSaud: peSaudavelAno, peCrit: peCriticoAno },
+              { label: `Até 31/12/${anoAtual}`, cor: 'emerald', compr: comprDentroAno, receita: receitaDentroAno, resultado: resultadoDentroAno, servico: servicoDentroAno, nVenc: parcelasAte31Dez.length, servicoCompr: servicoCompromDentroAno, peSaud: peSaudavelAno, peCrit: peCriticoAno },
               { label: `Longo Prazo (> 360 dias) · serviço médio ${anosLp}a`, cor: 'violet', compr: comprLp, receita: receitaLp, resultado: resultadoLp, servico: servicoLp, nVenc: parcelasLp.length, servicoCompr: servicoCompromLp, peSaud: peSaudavelLp, peCrit: peCriticoLp },
             ] as const).map(h => {
               const pctCompr = h.resultado > 0 ? (h.servicoCompr / h.resultado) * 100 : 0
