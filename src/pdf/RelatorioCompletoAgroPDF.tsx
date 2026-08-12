@@ -522,20 +522,23 @@ export function RelatorioCompletoAgroPDF({ data }: { data: RelatorioCompletoAgro
               <Text style={{ ...s.th, flex: 1.5 }}>Referência Saudável</Text>
             </View>
             {data.areaTotal > 0 && [
-              { l: 'Receita Bruta',          tot: recBruta,                 ha: recBruta / data.areaTotal,                 ref: '> R$ 4.500/ha' },
-              { l: 'Custo de Produção',       tot: custoTotal,               ha: custoTotal / data.areaTotal,               ref: '< R$ 3.500/ha' },
-              { l: 'Resultado Operacional',   tot: resOp,                    ha: resOp / data.areaTotal,                    ref: '> R$ 500/ha'   },
-              { l: 'Serviço da Dívida',       tot: data.servicoAnual,        ha: data.servicoAnual / data.areaTotal,        ref: '< R$ 800/ha'   },
-              { l: 'Resultado após Endivid.', tot: resPos,                   ha: resPos / data.areaTotal,                   ref: '> R$ 0/ha'     },
-              { l: 'Saldo Devedor Bancário',  tot: data.totalEndividamento,  ha: data.totalEndividamento / data.areaTotal,  ref: '< R$ 3.000/ha' },
-            ].map((row, i) => (
-              <View key={i} style={[s.tr, i % 2 === 0 ? s.trA : {}]}>
-                <Text style={{ ...s.tdB, flex: 2 }}>{row.l}</Text>
-                <Text style={s.td}>{R(row.tot)}</Text>
-                <Text style={{ ...s.td, fontFamily: 'Helvetica-Bold', color: row.ha >= 0 ? C.pos : C.neg }}>{R(row.ha)}</Text>
-                <Text style={{ ...s.td, flex: 1.5, color: C.muted }}>{row.ref}</Text>
-              </View>
-            ))}
+              { l: 'Receita Bruta',          tot: recBruta,                 ha: recBruta / data.areaTotal,                 ref: '> R$ 4.500/ha',  dir: 'min' as const, limite: 4500 },
+              { l: 'Custo de Produção',       tot: custoTotal,               ha: custoTotal / data.areaTotal,               ref: '< R$ 3.500/ha',  dir: 'max' as const, limite: 3500 },
+              { l: 'Resultado Operacional',   tot: resOp,                    ha: resOp / data.areaTotal,                    ref: '> R$ 500/ha',    dir: 'min' as const, limite: 500  },
+              { l: 'Serviço da Dívida',       tot: data.servicoAnual,        ha: data.servicoAnual / data.areaTotal,        ref: '< R$ 800/ha',    dir: 'max' as const, limite: 800  },
+              { l: 'Resultado após Endivid.', tot: resPos,                   ha: resPos / data.areaTotal,                   ref: '> R$ 0/ha',      dir: 'min' as const, limite: 0    },
+              { l: 'Saldo Devedor Bancário',  tot: data.totalEndividamento,  ha: data.totalEndividamento / data.areaTotal,  ref: '< R$ 3.000/ha',  dir: 'max' as const, limite: 3000 },
+            ].map((row, i) => {
+              const ok = row.dir === 'min' ? row.ha >= row.limite : row.ha <= row.limite
+              return (
+                <View key={i} style={[s.tr, i % 2 === 0 ? s.trA : {}]}>
+                  <Text style={{ ...s.tdB, flex: 2 }}>{row.l}</Text>
+                  <Text style={s.td}>{R(row.tot)}</Text>
+                  <Text style={{ ...s.td, fontFamily: 'Helvetica-Bold', color: ok ? C.pos : C.neg }}>{R(row.ha)}</Text>
+                  <Text style={{ ...s.td, flex: 1.5, color: C.muted }}>{row.ref}</Text>
+                </View>
+              )
+            })}
           </View>
 
         </View>
