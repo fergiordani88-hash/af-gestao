@@ -606,13 +606,22 @@ export function TabResumo({ clientId, clienteNome, clienteCidade }: {
           // futuras (mesmo critério do totalEndividamento do backend) — não o
           // valorTomado original, que não reflete o que já foi amortizado.
           const saldoPorContrato: Record<string, number> = {}
+          // Serviço nos próximos 12 meses por contrato = soma das parcelas do
+          // cronograma com vencimento até dataCorte360 (mesmo critério do servicoCp
+          // usado no resto do relatório) — não o campo valorParcela gravado no
+          // contrato, que fica desatualizado/zerado quando não foi informado na
+          // criação (ex: contratos lançados sem extrato de parcela confirmado).
+          const servicoAnoPorContrato: Record<string, number> = {}
           for (const p of parcelas as any[]) {
             saldoPorContrato[p.contratoId] = (saldoPorContrato[p.contratoId] ?? 0) + (p.amortizacao ?? 0)
+            if (new Date(p.vencimento) <= dataCorte360) {
+              servicoAnoPorContrato[p.contratoId] = (servicoAnoPorContrato[p.contratoId] ?? 0) + (p.valorParcela ?? 0)
+            }
           }
           return contratos.map((c: any) => ({
             banco: c.banco, modalidade: c.modalidade,
             saldoDevedor: saldoPorContrato[c.id] ?? 0,
-            valorParcela: c.valorParcela, taxa: c.taxa, vencimento: c.vencimento,
+            valorParcela: servicoAnoPorContrato[c.id] ?? 0, taxa: c.taxa, vencimento: c.vencimento,
             totalParcelas: c.totalParcelas, parcelaAtual: c.parcelaAtual,
             tomador: c.tomador || undefined,
           }))
