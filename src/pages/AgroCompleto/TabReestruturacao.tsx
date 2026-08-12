@@ -101,11 +101,13 @@ function gerarCronogramaCustom(
 }
 
 // ── Proposta de Reestruturação Ideal ──────────────────────────────────────────
-// Toma o passivo total e calcula, a uma taxa fixa de 1% a.a. sem correção
-// monetária, em quantos anos ele seria quitado com parcela anual fixa,
-// dado um teto de comprometimento anual (capacidade de pagamento).
+// Toma o passivo total e calcula, a uma taxa fixa de 1% a.m. (12,68% a.a.
+// efetivo) sem correção monetária, em quantos anos ele seria quitado com
+// parcela anual fixa, dado um teto de comprometimento anual (capacidade de
+// pagamento).
 const SAFRA_CAPACIDADE = '2026/27'
-const TAXA_IDEAL = 0.01
+const TAXA_MENSAL_IDEAL = 0.01
+const TAXA_IDEAL = Math.pow(1 + TAXA_MENSAL_IDEAL, 12) - 1
 const PCT_MODERADO = 50
 const PCT_SAUDAVEL = 30
 
@@ -150,7 +152,7 @@ function PropostaCard({ titulo, capacidade, proposta, cronograma, show, onToggle
           <div className="flex items-start gap-2 text-red-600">
             <AlertTriangle size={14} className="mt-0.5 flex-shrink-0" />
             <p className="text-xs font-semibold">
-              Capacidade insuficiente até para cobrir os juros de 1% a.a. sobre o saldo — nesse ritmo a dívida nunca seria quitada.
+              Capacidade insuficiente até para cobrir os juros de 1% a.m. (12,68% a.a. efetivo) sobre o saldo — nesse ritmo a dívida nunca seria quitada.
             </p>
           </div>
         )}
@@ -351,7 +353,7 @@ export function TabReestruturacao({ clientId }: { clientId: string }) {
     }
   }, [selecionados, taxaAnualEfetiva, nParcelas, simPeriodicidade, simSistema, simDataPrimeira, contratos, receitaAnual, customPcts])
 
-  // Proposta de Reestruturação Ideal — todo o passivo, parcela fixa a 1% a.a.
+  // Proposta de Reestruturação Ideal — todo o passivo, parcela fixa a 1% a.m.
   const totalPassivoGeral = useMemo(() => contratos.reduce((s, c) => s + c.saldoDevedor, 0), [contratos])
   const capacidadeModerada = resultadoLiquidoCapacidade * (PCT_MODERADO / 100)
   const capacidadeSaudavel = resultadoLiquidoCapacidade * (PCT_SAUDAVEL / 100)
@@ -394,18 +396,18 @@ export function TabReestruturacao({ clientId }: { clientId: string }) {
         </p>
       </div>
 
-      {/* Proposta de Reestruturação Ideal — todo o passivo, parcela fixa a 1% a.a. */}
+      {/* Proposta de Reestruturação Ideal — todo o passivo, parcela fixa a 1% a.m. */}
       <div className="bg-white rounded-2xl border border-emerald-200 shadow-sm overflow-hidden">
         <div className="px-5 py-3 border-b border-emerald-100 bg-emerald-50 flex items-center gap-2">
           <Target size={15} className="text-emerald-700" />
           <h4 className="font-bold text-sm text-emerald-800">
-            Proposta de Reestruturação Ideal — Parcela Fixa a 1% a.a. (sem correção)
+            Proposta de Reestruturação Ideal — Parcela Fixa a 1% a.m. (sem correção)
           </h4>
         </div>
         <div className="p-5 space-y-4">
           <p className="text-xs text-gray-500">
             Considera <strong>todo o passivo contratado</strong> ({fmtBRL(totalPassivoGeral)}) reestruturado em parcelas
-            anuais fixas, a uma taxa de 1% a.a. sem indexador, quitado dentro da capacidade de pagamento da
+            anuais fixas, a uma taxa de 1% a.m. (12,68% a.a. efetivo) sem indexador, quitado dentro da capacidade de pagamento da
             safra {SAFRA_CAPACIDADE} (Resultado Líquido: {fmtBRL(resultadoLiquidoCapacidade)}).
           </p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

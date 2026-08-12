@@ -494,14 +494,15 @@ export function TabResumo({ clientId, clienteNome, clienteCidade }: {
       const pctAno = resultadoDentroAno > 0 ? (servicoCompromDentroAno / resultadoDentroAno) * 100 : 0
       const pctLp  = resultadoLp  > 0 ? (servicoCompromLp  / resultadoLp)  * 100 : 0
 
-      // Reestruturação de Passivo — proposta ideal (todo o passivo, 1% a.a., sem correção)
+      // Reestruturação de Passivo — proposta ideal (todo o passivo, 1% a.m., sem correção)
       const SAFRA_CAPACIDADE = '2026/27'
       const prodCapacidade = producao.filter(p => p.safra === SAFRA_CAPACIDADE && p.area > 0)
       const recBrutaCap = prodCapacidade.reduce((s, p) => s + p.area * p.produtividade * p.cotacao, 0)
       const custoCap    = prodCapacidade.reduce((s, p) =>
         s + p.area * p.custoPorHa * p.cotacao + p.areaArrendada * p.custoArrendHa * (p.cotacao || 1), 0)
       const resultadoLiquidoCapacidade = recBrutaCap - custoCap
-      const TAXA_IDEAL = 0.01
+      const TAXA_MENSAL_IDEAL = 0.01
+      const TAXA_IDEAL = Math.pow(1 + TAXA_MENSAL_IDEAL, 12) - 1
       const calcCenarioReestruturacao = (label: string, capacidadeAnual: number) => {
         if (totalEndividamento <= 0 || capacidadeAnual <= totalEndividamento * TAXA_IDEAL) {
           return { label, capacidadeAnual, inviavel: true }

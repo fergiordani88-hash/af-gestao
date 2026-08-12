@@ -966,7 +966,7 @@ export function RelatorioCompletoAgroPDF({ data }: { data: RelatorioCompletoAgro
           <View style={s.body}>
             <Sec title="Proposta de Reestruturação Ideal" />
             <Text style={{ fontFamily: 'Helvetica', fontSize: 8, color: C.body, lineHeight: 1.7, marginBottom: 12 }}>
-              Simulação de consolidação de <Text style={{ fontFamily: 'Helvetica-Bold' }}>todo o passivo contratado</Text> ({R(data.reestruturacaoIdeal.totalPassivo)}) em parcelas anuais fixas, a uma taxa de 1% a.a. <Text style={{ fontFamily: 'Helvetica-Bold' }}>sem indexador</Text> — cenário concessivo para orientar a negociação junto às instituições credoras. A capacidade de pagamento considera o Resultado Líquido projetado para a safra {data.reestruturacaoIdeal.safraCapacidade} ({R(data.reestruturacaoIdeal.resultadoLiquidoCapacidade)}).
+              Simulação de consolidação de <Text style={{ fontFamily: 'Helvetica-Bold' }}>todo o passivo contratado</Text> ({R(data.reestruturacaoIdeal.totalPassivo)}) em parcelas anuais fixas, a uma taxa de 1% a.m. (12,68% a.a. efetivo) <Text style={{ fontFamily: 'Helvetica-Bold' }}>sem indexador</Text> — cenário concessivo para orientar a negociação junto às instituições credoras. A capacidade de pagamento considera o Resultado Líquido projetado para a safra {data.reestruturacaoIdeal.safraCapacidade} ({R(data.reestruturacaoIdeal.resultadoLiquidoCapacidade)}).
             </Text>
 
             <View style={s.tbl}>
@@ -990,12 +990,12 @@ export function RelatorioCompletoAgroPDF({ data }: { data: RelatorioCompletoAgro
 
             {data.reestruturacaoIdeal.cenarios.some(c => c.inviavel) && (
               <Text style={{ fontFamily: 'Helvetica', fontSize: 7.5, color: C.neg, marginTop: 10, lineHeight: 1.6 }}>
-                Atenção: em ao menos um cenário a capacidade de pagamento não cobre nem os juros de 1% a.a. sobre o saldo devedor — nesse ritmo o passivo cresceria indefinidamente. Recomenda-se aporte de capital, alienação de ativos ou redução do passivo antes de negociar a reestruturação.
+                Atenção: em ao menos um cenário a capacidade de pagamento não cobre nem os juros de 1% a.m. (12,68% a.a. efetivo) sobre o saldo devedor — nesse ritmo o passivo cresceria indefinidamente. Recomenda-se aporte de capital, alienação de ativos ou redução do passivo antes de negociar a reestruturação.
               </Text>
             )}
 
             <Text style={{ fontFamily: 'Helvetica', fontSize: 6.5, color: C.muted, marginTop: 10, lineHeight: 1.6 }}>
-              Simulação de caráter indicativo — parcela fixa (sistema Price) sobre o saldo total, taxa de 1% a.a. sem indexador, prazo arredondado para o número inteiro de anos seguinte. Não substitui a negociação formal das condições com cada instituição credora.
+              Simulação de caráter indicativo — parcela fixa (sistema Price) sobre o saldo total, taxa de 1% a.m. (12,68% a.a. efetivo) sem indexador, prazo arredondado para o número inteiro de anos seguinte. Não substitui a negociação formal das condições com cada instituição credora.
             </Text>
           </View>
           <Ftr client={data.clientName} date={data.dataGeracao} hora={h} />
