@@ -521,15 +521,19 @@ export function RelatorioCompletoAgroPDF({ data }: { data: RelatorioCompletoAgro
               <Text style={s.th}>Por Hectare</Text>
               <Text style={{ ...s.th, flex: 1.5 }}>Referência Saudável</Text>
             </View>
+            {/* Referências em PROPORÇÃO (% da receita/resultado), não R$/ha fixo — a mesma área
+                física costuma rodar 2 safras (ex: soja + milho 2ª), então um limite fixo em R$/ha
+                penalizaria injustamente qualquer propriedade com dupla safra, que naturalmente tem
+                receita e custo por hectare mais altos que um cultivo único. */}
             {data.areaTotal > 0 && [
-              { l: 'Receita Bruta',          tot: recBruta,                 ha: recBruta / data.areaTotal,                 ref: '> R$ 4.500/ha',  dir: 'min' as const, limite: 4500 },
-              { l: 'Custo de Produção',       tot: custoTotal,               ha: custoTotal / data.areaTotal,               ref: '< R$ 3.500/ha',  dir: 'max' as const, limite: 3500 },
-              { l: 'Resultado Operacional',   tot: resOp,                    ha: resOp / data.areaTotal,                    ref: '> R$ 500/ha',    dir: 'min' as const, limite: 500  },
-              { l: 'Serviço da Dívida',       tot: data.servicoAnual,        ha: data.servicoAnual / data.areaTotal,        ref: '< R$ 800/ha',    dir: 'max' as const, limite: 800  },
-              { l: 'Resultado após Endivid.', tot: resPos,                   ha: resPos / data.areaTotal,                   ref: '> R$ 0/ha',      dir: 'min' as const, limite: 0    },
-              { l: 'Saldo Devedor Bancário',  tot: data.totalEndividamento,  ha: data.totalEndividamento / data.areaTotal,  ref: '< R$ 3.000/ha',  dir: 'max' as const, limite: 3000 },
+              { l: 'Receita Bruta',          tot: recBruta,                 ha: recBruta / data.areaTotal,                 ref: 'Benchmark regional',              ok: true },
+              { l: 'Custo de Produção',       tot: custoTotal,               ha: custoTotal / data.areaTotal,               ref: '< 75% da receita bruta',          ok: recBruta > 0 && custoTotal <= 0.75 * recBruta },
+              { l: 'Resultado Operacional',   tot: resOp,                    ha: resOp / data.areaTotal,                    ref: 'Margem > 20%',                    ok: recBruta > 0 && resOp / recBruta > 0.20 },
+              { l: 'Serviço da Dívida',       tot: data.servicoAnual,        ha: data.servicoAnual / data.areaTotal,        ref: '< 30% do resultado operacional',  ok: resOp > 0 ? data.servicoAnual / resOp < 0.30 : data.servicoAnual === 0 },
+              { l: 'Resultado após Endivid.', tot: resPos,                   ha: resPos / data.areaTotal,                   ref: 'Valor positivo',                  ok: resPos >= 0 },
+              { l: 'Saldo Devedor Bancário',  tot: data.totalEndividamento,  ha: data.totalEndividamento / data.areaTotal,  ref: '< 1× Receita Bruta',              ok: recBruta > 0 && data.totalEndividamento <= recBruta },
             ].map((row, i) => {
-              const ok = row.dir === 'min' ? row.ha >= row.limite : row.ha <= row.limite
+              const ok = row.ok
               return (
                 <View key={i} style={[s.tr, i % 2 === 0 ? s.trA : {}]}>
                   <Text style={{ ...s.tdB, flex: 2 }}>{row.l}</Text>
