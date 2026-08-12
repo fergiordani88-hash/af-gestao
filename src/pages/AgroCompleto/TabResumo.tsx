@@ -42,22 +42,22 @@ function periodoInicioParcela(p: AgroParcela): Date {
   return d
 }
 
-function jurosProrataAno(p: AgroParcela, ano: number): number {
+function jurosProrataPeriodo(p: AgroParcela, periodoInicio: Date, periodoFimExcl: Date): number {
   const fim = new Date(p.vencimento)
   const inicio = periodoInicioParcela(p)
   const totalMs = fim.getTime() - inicio.getTime()
   if (totalMs <= 0) return 0
-  const anoInicio = new Date(ano, 0, 1)
-  const anoFimExcl = new Date(ano + 1, 0, 1)
-  const overlapStart = inicio > anoInicio ? inicio : anoInicio
-  const overlapEnd = fim < anoFimExcl ? fim : anoFimExcl
+  const overlapStart = inicio > periodoInicio ? inicio : periodoInicio
+  const overlapEnd = fim < periodoFimExcl ? fim : periodoFimExcl
   const overlapMs = overlapEnd.getTime() - overlapStart.getTime()
   if (overlapMs <= 0) return 0
   return (p.juros ?? 0) * (overlapMs / totalMs)
 }
 
-function jurosAnoProrata(todasParcelas: AgroParcela[], ano: number): number {
-  return todasParcelas.reduce((s, p) => s + jurosProrataAno(p, ano), 0)
+// periodoInicio/periodoFimExcl: janela de referência (normalmente a safra selecionada,
+// 01/jul a 30/jun — não o ano civil, que não corresponde ao ciclo produtivo/financeiro).
+function jurosPeriodoProrata(todasParcelas: AgroParcela[], periodoInicio: Date, periodoFimExcl: Date): number {
+  return todasParcelas.reduce((s, p) => s + jurosProrataPeriodo(p, periodoInicio, periodoFimExcl), 0)
 }
 
 function culturaKey(cultura: string): string | null {
@@ -283,13 +283,21 @@ export function TabResumo({ clientId, clienteNome, clienteCidade }: {
   const patrimonioLiqPat = patrimonioGruto - totalOnus
 
   // ── Endividamento ───────────────────────────────────────────────
+  // "Ano corrente" aqui = a SAFRA selecionada (01/jul do 1º ano a 30/jun do 2º),
+  // não o ano civil — o ciclo produtivo/financeiro do produtor roda nessa janela,
+  // não em janeiro-dezembro.
   const anoAtual = new Date().getFullYear()
   const hoje = new Date()
-  // Só o que ainda vai vencer a partir de hoje — parcelas já vencidas dentro do
-  // ano corrente já são passado e não devem inflar a capacidade de pagamento.
+  const [safraAnoIniStr] = safra.split('/')
+  const safraAnoIni = parseInt(safraAnoIniStr, 10)
+  const safraInicio = new Date(safraAnoIni, 6, 1)          // 01/jul
+  const safraFimExcl = new Date(safraAnoIni + 1, 6, 1)     // 01/jul do ano seguinte (limite exclusivo)
+  const safraFim = new Date(safraFimExcl.getTime() - 1)    // 30/jun 23:59:59
+  // Só o que ainda vai vencer a partir de hoje — parcelas já vencidas dentro da
+  // safra corrente já são passado e não devem inflar a capacidade de pagamento.
   const parcelasAnoAtual = parcelas.filter(p => {
     const v = new Date(p.vencimento)
-    return v.getFullYear() === anoAtual && v >= hoje
+    return v >= safraInicio && v < safraFimExcl && v >= hoje
   })
   const servicoAnual = parcelasAnoAtual.reduce((s, p) => s + p.valorParcela, 0)
 
@@ -380,8 +388,8 @@ export function TabResumo({ clientId, clienteNome, clienteCidade }: {
   const comprCp: Status = receitaCp === 0 ? 'ok' : resultadoCp <= 0 ? 'risco' : (servicoCompromCp / resultadoCp) * 100 <= limSaudavel ? 'ok' : (servicoCompromCp / resultadoCp) * 100 <= limCritico ? 'atencao' : 'risco'
   const comprLp: Status = receitaLp === 0 ? 'ok' : resultadoLp <= 0 ? 'risco' : (servicoCompromLp / resultadoLp) * 100 <= limSaudavel ? 'ok' : (servicoCompromLp / resultadoLp) * 100 <= limCritico ? 'atencao' : 'risco'
 
-  // Dentro do Ano (ano calendário corrente)
-  const fimDoAno = new Date(anoAtual, 11, 31)
+  // Dentro do Ano (= dentro da safra selecionada, não do ano civil)
+  const fimDoAno = safraFim
   const producaoDentroAno = producao.filter(p => {
     const d = getColheitaDate(p, colheitaDatas)
     return d >= hoje && d <= fimDoAno
@@ -518,7 +526,7 @@ export function TabResumo({ clientId, clienteNome, clienteCidade }: {
       }) : []
 
       // Juros em sacas
-      const jurosAnuaisExport = jurosAnoProrata(parcelas, anoAtual)
+      const jurosAnuaisExport = jurosPeriodoProrata(parcelas, safraInicio, safraFimExcl)
       const sojaRowExp = prodSafra.find(p => p.cultura.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').includes('soja'))
       const cotacaoRefExp = sojaRowExp?.cotacao ?? prodSafra.find(p => p.ordem === 'principal')?.cotacao ?? 0
       const culturaRefExp = sojaRowExp?.cultura ?? prodSafra.find(p => p.ordem === 'principal')?.cultura ?? ''
@@ -801,7 +809,7 @@ export function TabResumo({ clientId, clienteNome, clienteCidade }: {
         <KpiCard
           title="Endividamento Total"
           value={fmtBRL(totalEndividamento)}
-          sub={`Serviço restante ${anoAtual}: ${fmtBRL(servicoAnual)}`}
+          sub={`Serviço restante safra ${safra}: ${fmtBRL(servicoAnual)}`}
           icon={CreditCard}
           color="text-blue-600"
         />
@@ -947,7 +955,7 @@ export function TabResumo({ clientId, clienteNome, clienteCidade }: {
                     <span className="font-semibold text-blue-800">{fmtBRL(totalEndividamento)}</span>
                   </div>
                   <div className="flex justify-between text-xs">
-                    <span className="text-gray-600">Parcelas restantes em {anoAtual}</span>
+                    <span className="text-gray-600">Parcelas restantes na safra {safra}</span>
                     <span className="font-semibold text-blue-800">{fmtBRL(servicoAnual)}</span>
                   </div>
                   <div className="flex justify-between text-xs text-gray-500">
@@ -968,7 +976,7 @@ export function TabResumo({ clientId, clienteNome, clienteCidade }: {
               const nomMes = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez']
               return (
                 <div>
-                  <p className="text-xs font-semibold text-gray-500 mb-2">Concentração de vencimentos restantes — {anoAtual}</p>
+                  <p className="text-xs font-semibold text-gray-500 mb-2">Concentração de vencimentos restantes — Safra {safra}</p>
                   <div className="flex items-end gap-0.5 h-12">
                     {Array.from({ length: 12 }, (_, i) => {
                       const val = meses[i] ?? 0
@@ -1030,10 +1038,10 @@ export function TabResumo({ clientId, clienteNome, clienteCidade }: {
                 </div>
                 <div className="flex justify-between items-center py-1">
                   <div className="flex items-center gap-1.5">
-                    <span className="text-sm text-gray-600">(-) Serviço da dívida ({anoAtual})</span>
+                    <span className="text-sm text-gray-600">(-) Serviço da dívida (safra {safra})</span>
                     <span className="relative group cursor-default"><Info size={11} className="text-gray-400" />
                       <div className="absolute left-4 top-0 w-60 bg-gray-900 text-white text-xs rounded-lg px-3 py-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
-                        Total de parcelas bancárias com vencimento a partir de hoje até o fim de {anoAtual}. Saudável: resultado operacional {'>'} 1,5× o serviço da dívida.
+                        Total de parcelas bancárias com vencimento a partir de hoje até o fim da safra {safra} (30/06). Saudável: resultado operacional {'>'} 1,5× o serviço da dívida.
                       </div>
                     </span>
                   </div>
@@ -1145,7 +1153,7 @@ export function TabResumo({ clientId, clienteNome, clienteCidade }: {
                     <span className="font-bold text-amber-800">{fmtBRL(endivCusteio)}</span>
                   </div>
                   <div className="flex justify-between text-xs">
-                    <span className="text-gray-600">Parcelas restantes em {anoAtual}</span>
+                    <span className="text-gray-600">Parcelas restantes na safra {safra}</span>
                     <span className="font-semibold text-amber-700">{fmtBRL(servicoCusteioAnual)}</span>
                   </div>
                   <div className="flex justify-between text-xs">
@@ -1166,7 +1174,7 @@ export function TabResumo({ clientId, clienteNome, clienteCidade }: {
                     <span className="font-bold text-gray-900">{fmtBRL(endivSemCusteio)}</span>
                   </div>
                   <div className="flex justify-between text-xs">
-                    <span className="text-gray-600">Parcelas restantes em {anoAtual}</span>
+                    <span className="text-gray-600">Parcelas restantes na safra {safra}</span>
                     <span className="font-semibold text-gray-900">{fmtBRL(servicoSemCusteioAnual)}</span>
                   </div>
                   <div className="flex justify-between text-xs">
@@ -1336,7 +1344,7 @@ export function TabResumo({ clientId, clienteNome, clienteCidade }: {
                 {(() => {
                   const resAfterDebt = resultadoLiq - servicoAnual
                   const pctReceitaDivida = receitaBruta > 0 ? (servicoAnual / receitaBruta) * 100 : 0
-                  const jurosAnuais = jurosAnoProrata(parcelas, anoAtual)
+                  const jurosAnuais = jurosPeriodoProrata(parcelas, safraInicio, safraFimExcl)
                   const rows: { label: string; tooltip: string; total: number; cor: string; ref: string; isCurrency?: boolean; isPct?: boolean }[] = [
                     {
                       label: 'Receita bruta',
@@ -1357,8 +1365,8 @@ export function TabResumo({ clientId, clienteNome, clienteCidade }: {
                       ref: 'Margem > 20%',
                     },
                     {
-                      label: `Serviço da dívida — restante ${anoAtual}`,
-                      tooltip: `Parcelas bancárias com vencimento a partir de hoje até o fim de ${anoAtual}.`,
+                      label: `Serviço da dívida — restante safra ${safra}`,
+                      tooltip: `Parcelas bancárias com vencimento a partir de hoje até o fim da safra ${safra} (30/06).`,
                       total: servicoAnual, cor: 'text-red-500',
                       ref: '< 30% do resultado operacional',
                     },
@@ -1375,7 +1383,7 @@ export function TabResumo({ clientId, clienteNome, clienteCidade }: {
                       ref: '< 1× receita bruta/ha',
                     },
                     {
-                      label: `Juros bancários (${anoAtual})`,
+                      label: `Juros bancários (safra ${safra})`,
                       tooltip: 'Componente de juros das parcelas do ano — exclui amortização de capital.',
                       total: jurosAnuais, cor: 'text-rose-600',
                       ref: '< 15% da receita bruta/ha',
@@ -1410,7 +1418,7 @@ export function TabResumo({ clientId, clienteNome, clienteCidade }: {
 
           {/* Juros em sacas de soja */}
           {(() => {
-            const jurosAnuais = jurosAnoProrata(parcelas, anoAtual)
+            const jurosAnuais = jurosPeriodoProrata(parcelas, safraInicio, safraFimExcl)
             if (jurosAnuais <= 0 || areaTotal <= 0) return null
             const sojaRow = prodSafra.find(p => p.cultura.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').includes('soja'))
             const cotacaoRef = sojaRow?.cotacao ?? prodSafra.find(p => p.ordem === 'principal')?.cotacao ?? 0
@@ -1421,7 +1429,7 @@ export function TabResumo({ clientId, clienteNome, clienteCidade }: {
             return (
               <div className="mt-4 p-4 bg-rose-50 rounded-xl border border-rose-100">
                 <p className="text-xs font-bold text-rose-700 uppercase tracking-wide mb-3">
-                  Custo dos juros bancários em sacas — {anoAtual}
+                  Custo dos juros bancários em sacas — Safra {safra}
                   {cotacaoRef > 0 && <span className="ml-2 font-normal text-rose-400 normal-case">({culturaRef} a {fmtBRL(cotacaoRef)}/sc)</span>}
                 </p>
                 <div className="grid grid-cols-2 gap-4">
@@ -1451,7 +1459,7 @@ export function TabResumo({ clientId, clienteNome, clienteCidade }: {
               <div className="mt-4 p-3 bg-gray-50 rounded-xl flex items-center justify-between">
                 <div>
                   <p className="text-xs font-semibold text-gray-700">Comprometimento da receita com banco</p>
-                  <p className="text-xs text-gray-500 mt-0.5">Parcelas restantes de {anoAtual} ÷ Receita bruta — Saudável: &lt; 20% · Atenção: 20–35% · Risco: &gt; 35%</p>
+                  <p className="text-xs text-gray-500 mt-0.5">Parcelas restantes da safra {safra} ÷ Receita bruta — Saudável: &lt; 20% · Atenção: 20–35% · Risco: &gt; 35%</p>
                 </div>
                 <div className="text-right ml-4">
                   <p className={`text-2xl font-bold ${status === 'ok' ? 'text-emerald-600' : status === 'atencao' ? 'text-amber-600' : 'text-red-600'}`}>
@@ -1567,7 +1575,7 @@ export function TabResumo({ clientId, clienteNome, clienteCidade }: {
                     {safrasCpNomes.length > 0 && <div className="text-gray-400 font-normal normal-case">Safra(s): {safrasCpNomes.join(', ')}</div>}
                   </th>
                   <th className="text-right px-4 py-3 text-xs font-bold text-emerald-600 uppercase">
-                    Dentro do ano ({anoAtual})
+                    Dentro da safra ({safra})
                     {safrasAnoNomes.length > 0 && <div className="text-gray-400 font-normal normal-case">Safra(s): {safrasAnoNomes.join(', ')}</div>}
                   </th>
                   <th className="text-right px-4 py-3 text-xs font-bold text-violet-600 uppercase">
@@ -1673,7 +1681,7 @@ export function TabResumo({ clientId, clienteNome, clienteCidade }: {
             {/* helper inline */}
             {([
               { label: 'Curto Prazo (≤ 360 dias)', cor: 'sky', compr: comprCp, receita: receitaCp, resultado: resultadoCp, servico: servicoCp, nVenc: parcelasCp.length, servicoCompr: servicoCompromCp, peSaud: peSaudavelCp, peCrit: peCriticoCp },
-              { label: `Dentro do Ano (${anoAtual})`, cor: 'emerald', compr: comprDentroAno, receita: receitaDentroAno, resultado: resultadoDentroAno, servico: servicoDentroAno, nVenc: parcelasAnoAtual.length, servicoCompr: servicoCompromDentroAno, peSaud: peSaudavelAno, peCrit: peCriticoAno },
+              { label: `Dentro da Safra (${safra})`, cor: 'emerald', compr: comprDentroAno, receita: receitaDentroAno, resultado: resultadoDentroAno, servico: servicoDentroAno, nVenc: parcelasAnoAtual.length, servicoCompr: servicoCompromDentroAno, peSaud: peSaudavelAno, peCrit: peCriticoAno },
               { label: `Longo Prazo (> 360 dias) · serviço médio ${anosLp}a`, cor: 'violet', compr: comprLp, receita: receitaLp, resultado: resultadoLp, servico: servicoLp, nVenc: parcelasLp.length, servicoCompr: servicoCompromLp, peSaud: peSaudavelLp, peCrit: peCriticoLp },
             ] as const).map(h => {
               const pctCompr = h.resultado > 0 ? (h.servicoCompr / h.resultado) * 100 : 0
