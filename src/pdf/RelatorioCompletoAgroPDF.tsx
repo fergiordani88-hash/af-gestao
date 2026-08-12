@@ -8,7 +8,7 @@ export interface RelCultura {
   custoItens?: { categoria: string; valorHa: number }[]
 }
 export interface RelContrato {
-  banco: string; modalidade: string; valorTomado: number
+  banco: string; modalidade: string; saldoDevedor: number
   valorParcela: number; taxa: number; vencimento: string
   totalParcelas: number; parcelaAtual: number
   tomador?: string
@@ -555,7 +555,7 @@ export function RelatorioCompletoAgroPDF({ data }: { data: RelatorioCompletoAgro
             for (const c of data.contratos) {
               if (!porBanco[c.banco]) porBanco[c.banco] = { n: 0, valor: 0, servico: 0 }
               porBanco[c.banco].n++
-              porBanco[c.banco].valor += c.valorTomado
+              porBanco[c.banco].valor += c.saldoDevedor
               porBanco[c.banco].servico += c.valorParcela
             }
             const bancos = Object.entries(porBanco).sort((a, b) => b[1].valor - a[1].valor)
@@ -567,7 +567,7 @@ export function RelatorioCompletoAgroPDF({ data }: { data: RelatorioCompletoAgro
                 const nome = c.tomador ?? 'Sem tomador específico'
                 if (!porTomador[nome]) porTomador[nome] = { n: 0, valor: 0, servico: 0 }
                 porTomador[nome].n++
-                porTomador[nome].valor += c.valorTomado
+                porTomador[nome].valor += c.saldoDevedor
                 porTomador[nome].servico += c.valorParcela
               }
               tomadoresResumo = Object.entries(porTomador).sort((a, b) => b[1].valor - a[1].valor)

@@ -532,12 +532,22 @@ export function TabResumo({ clientId, clienteNome, clienteCidade }: {
         culturas:      prodSafra.map(p => ({ ...p, custoItens: p.custoItens })),
         areaTotal,
         areaArrendada,
-        contratos:     contratos.map((c: any) => ({
-          banco: c.banco, modalidade: c.modalidade, valorTomado: c.valorTomado,
-          valorParcela: c.valorParcela, taxa: c.taxa, vencimento: c.vencimento,
-          totalParcelas: c.totalParcelas, parcelaAtual: c.parcelaAtual,
-          tomador: c.tomador || undefined,
-        })),
+        contratos:     (() => {
+          // Saldo devedor real por contrato = soma da amortização das parcelas
+          // futuras (mesmo critério do totalEndividamento do backend) — não o
+          // valorTomado original, que não reflete o que já foi amortizado.
+          const saldoPorContrato: Record<string, number> = {}
+          for (const p of parcelas as any[]) {
+            saldoPorContrato[p.contratoId] = (saldoPorContrato[p.contratoId] ?? 0) + (p.amortizacao ?? 0)
+          }
+          return contratos.map((c: any) => ({
+            banco: c.banco, modalidade: c.modalidade,
+            saldoDevedor: saldoPorContrato[c.id] ?? 0,
+            valorParcela: c.valorParcela, taxa: c.taxa, vencimento: c.vencimento,
+            totalParcelas: c.totalParcelas, parcelaAtual: c.parcelaAtual,
+            tomador: c.tomador || undefined,
+          }))
+        })(),
         totalEndividamento,
         servicoAnual,
         saldoDevedor: totalEndividamento,
