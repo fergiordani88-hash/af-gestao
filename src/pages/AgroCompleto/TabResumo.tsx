@@ -298,11 +298,19 @@ export function TabResumo({ clientId, clienteNome, clienteCidade }: {
   const fimAno31Dez = new Date(anoAtual, 11, 31)
   // Só o que ainda vai vencer a partir de hoje — parcelas já vencidas dentro da
   // safra corrente já são passado e não devem inflar a capacidade de pagamento.
+  // Usado só pelo card "Parcelas restantes na safra" e pelo painel de Juros Bancários.
   const parcelasAnoAtual = parcelas.filter(p => {
     const v = new Date(p.vencimento)
     return v >= safraInicio && v < safraFimExcl && v >= hoje
   })
-  const servicoAnual = parcelasAnoAtual.reduce((s, p) => s + p.valorParcela, 0)
+  // "Serviço anual" para a Capacidade de Pagamento (KPI topo, DRE, Contratos) usa uma
+  // janela rolante de 360 dias a partir de HOJE, não a safra selecionada — se a safra
+  // escolhida já tiver terminado (ex: relatório gerado após 30/06 com a safra antiga
+  // ainda selecionada), a janela da safra fica vazia e zerava esse indicador inteiro.
+  const dataCorte360 = new Date(hoje.getTime() + 360 * 24 * 60 * 60 * 1000)
+  const parcelasCp    = parcelas.filter(p => new Date(p.vencimento) <= dataCorte360)
+  const servicoCp      = parcelasCp.reduce((s, p) => s + p.valorParcela, 0)
+  const servicoAnual = servicoCp
 
   // ── Índices ────────────────────────────────────────────────────
   const alavancagem   = patrimonioGruto > 0 ? (totalEndividamento / patrimonioGruto) * 100 : 0
@@ -316,7 +324,7 @@ export function TabResumo({ clientId, clienteNome, clienteCidade }: {
   const contratosCusteioIds = new Set(
     contratos.filter((c: any) => isCusteio(c.modalidade)).map((c: any) => c.id)
   )
-  const servicoCusteioAnual    = parcelasAnoAtual.filter(p => contratosCusteioIds.has(p.contratoId)).reduce((s, p) => s + p.valorParcela, 0)
+  const servicoCusteioAnual    = parcelasCp.filter(p => contratosCusteioIds.has(p.contratoId)).reduce((s, p) => s + p.valorParcela, 0)
   const servicoSemCusteioAnual = servicoAnual - servicoCusteioAnual
   const endivCusteio    = contratos.filter((c: any) => isCusteio(c.modalidade)).reduce((s: number, c: any) => s + c.valorTomado, 0)
   const endivSemCusteio = totalEndividamento - endivCusteio
@@ -340,7 +348,7 @@ export function TabResumo({ clientId, clienteNome, clienteCidade }: {
   const statusCapEndiv: Status = comprometimentoPct <= limSaudavel ? 'ok' : comprometimentoPct <= limCritico ? 'atencao' : 'risco'
 
   // ── CP vs LP (360 dias) ────────────────────────────────────────
-  const dataCorte360 = new Date(hoje.getTime() + 360 * 24 * 60 * 60 * 1000)
+  // dataCorte360/parcelasCp/servicoCp já foram definidos acima (servicoAnual reusa servicoCp)
 
   // Classifica cada entrada de produção pela data de colheita da sua cultura
   const producaoCp = producao.filter(p => {
@@ -358,9 +366,7 @@ export function TabResumo({ clientId, clienteNome, clienteCidade }: {
   const resultadoCp = receitaCp - custoCp
   const resultadoLp = resultadoLiq
 
-  const parcelasCp     = parcelas.filter(p => new Date(p.vencimento) <= dataCorte360)
   const parcelasLp     = parcelas.filter(p => new Date(p.vencimento) > dataCorte360)
-  const servicoCp      = parcelasCp.reduce((s, p) => s + p.valorParcela, 0)
   const servicoLpTotal = parcelasLp.reduce((s, p) => s + p.valorParcela, 0)
   const anosLp         = Math.max(1, new Set(parcelasLp.map(p => new Date(p.vencimento).getFullYear())).size)
   const servicoLp      = servicoLpTotal / anosLp
@@ -559,8 +565,15 @@ export function TabResumo({ clientId, clienteNome, clienteCidade }: {
       const TAXA_MENSAL_IDEAL = 0.01
       const TAXA_IDEAL = Math.pow(1 + TAXA_MENSAL_IDEAL, 12) - 1
       const calcCenarioReestruturacao = (label: string, capacidadeAnual: number) => {
-        if (totalEndividamento <= 0 || capacidadeAnual <= totalEndividamento * TAXA_IDEAL) {
-          return { label, capacidadeAnual, inviavel: true }
+        const jurosAnuaisSaldo = totalEndividamento * TAXA_IDEAL
+        if (totalEndividamento <= 0 || capacidadeAnual <= jurosAnuaisSaldo) {
+          // Payment não cobre nem os juros — com termos fixos a dívida nunca amortiza
+          // (cresce indefinidamente). Não existe "prazo" matematicamente válido; em vez
+          // de esconder isso com um traço, mostramos o déficit real.
+          return {
+            label, capacidadeAnual, inviavel: true,
+            jurosAnuaisSaldo, deficitAnual: jurosAnuaisSaldo - capacidadeAnual,
+          }
         }
         const nContinuo   = Math.log(capacidadeAnual / (capacidadeAnual - totalEndividamento * TAXA_IDEAL)) / Math.log(1 + TAXA_IDEAL)
         const nAnos       = Math.max(1, Math.ceil(nContinuo))
@@ -818,7 +831,7 @@ export function TabResumo({ clientId, clienteNome, clienteCidade }: {
         <KpiCard
           title="Endividamento Total"
           value={fmtBRL(totalEndividamento)}
-          sub={`Serviço restante safra ${safra}: ${fmtBRL(servicoAnual)}`}
+          sub={`Serviço restante 12 meses: ${fmtBRL(servicoAnual)}`}
           icon={CreditCard}
           color="text-blue-600"
         />
@@ -879,6 +892,11 @@ export function TabResumo({ clientId, clienteNome, clienteCidade }: {
                       </tr>
                     )
                   })}
+                  <tr className="border-t-2 border-gray-200 font-bold">
+                    <td className="py-1.5 text-gray-800" colSpan={3}>Total (bruto R$ {fmtN(receitaBruta, 0)} · custo R$ {fmtN(custoTotal, 0)})</td>
+                    <td className="text-right text-gray-500 font-normal">líquido</td>
+                    <td className={`text-right ${resultadoLiq >= 0 ? 'text-green-700' : 'text-red-700'}`}>{fmtBRL(resultadoLiq)}</td>
+                  </tr>
                 </tbody>
               </table>
             </div>
@@ -965,7 +983,7 @@ export function TabResumo({ clientId, clienteNome, clienteCidade }: {
                   </div>
                   <div className="flex justify-between text-xs">
                     <span className="text-gray-600">Parcelas restantes na safra {safra}</span>
-                    <span className="font-semibold text-blue-800">{fmtBRL(servicoAnual)}</span>
+                    <span className="font-semibold text-blue-800">{fmtBRL(parcelasAnoAtual.reduce((s, p) => s + p.valorParcela, 0))}</span>
                   </div>
                   <div className="flex justify-between text-xs text-gray-500">
                     <span>{parcelasAnoAtual.length} vencimentos restantes no ano</span>
@@ -1047,10 +1065,10 @@ export function TabResumo({ clientId, clienteNome, clienteCidade }: {
                 </div>
                 <div className="flex justify-between items-center py-1">
                   <div className="flex items-center gap-1.5">
-                    <span className="text-sm text-gray-600">(-) Serviço da dívida (safra {safra})</span>
+                    <span className="text-sm text-gray-600">(-) Serviço da dívida (próx. 12 meses)</span>
                     <span className="relative group cursor-default"><Info size={11} className="text-gray-400" />
                       <div className="absolute left-4 top-0 w-60 bg-gray-900 text-white text-xs rounded-lg px-3 py-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
-                        Total de parcelas bancárias com vencimento a partir de hoje até o fim da safra {safra} (30/06). Saudável: resultado operacional {'>'} 1,5× o serviço da dívida.
+                        Total de parcelas bancárias com vencimento nos próximos 360 dias a partir de hoje. Saudável: resultado operacional {'>'} 1,5× o serviço da dívida.
                       </div>
                     </span>
                   </div>
@@ -1374,8 +1392,8 @@ export function TabResumo({ clientId, clienteNome, clienteCidade }: {
                       ref: 'Margem > 20%',
                     },
                     {
-                      label: `Serviço da dívida — restante safra ${safra}`,
-                      tooltip: `Parcelas bancárias com vencimento a partir de hoje até o fim da safra ${safra} (30/06).`,
+                      label: `Serviço da dívida — próx. 12 meses`,
+                      tooltip: `Parcelas bancárias com vencimento nos próximos 360 dias a partir de hoje.`,
                       total: servicoAnual, cor: 'text-red-500',
                       ref: '< 30% do resultado operacional',
                     },

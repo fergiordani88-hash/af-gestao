@@ -261,6 +261,10 @@ export function TabProjecaoAnual({ clientId }: { clientId: string }) {
     margBruta: +(r.margBruta * 100).toFixed(1),
   }))
 
+  // Resultado líquido acumulado ano a ano (soma corrida)
+  let accRunning = 0
+  const acumulados = projecao.map(r => (accRunning += r.resultadoLiquido))
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-24 text-gray-400">
@@ -432,14 +436,14 @@ export function TabProjecaoAnual({ clientId }: { clientId: string }) {
                     'Ano', 'Culturas', 'Receita Bruta', 'Custo Atividade',
                     'Arrendamento', 'Lucro Bruto', 'Marg. Bruta',
                     'Desp. Recorrentes', 'Dívidas Bancárias', 'Desp. Não Bancárias',
-                    'Resultado do Ano', 'Prejuízo Financiado', 'Resultado Líquido', 'Marg. Líquida',
+                    'Resultado do Ano', 'Prejuízo Financiado', 'Resultado Líquido', 'Acumulado', 'Marg. Líquida',
                   ].map(h => (
                     <th key={h} className="px-2.5 py-2 text-left font-semibold text-gray-500 uppercase whitespace-nowrap">{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
-                {projecao.map(r => (
+                {projecao.map((r, i) => (
                   <tr key={r.ano} className={`hover:bg-gray-50/50 ${r.isReal ? 'bg-green-50/20' : ''}`}>
                     <td className="px-2.5 py-2.5 font-bold text-gray-900 whitespace-nowrap">
                       <span className="flex items-center gap-1.5">
@@ -468,6 +472,7 @@ export function TabProjecaoAnual({ clientId }: { clientId: string }) {
                     <td className={`px-2.5 py-2.5 font-semibold whitespace-nowrap ${r.receitaLiquida >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>{fmtBRL(r.receitaLiquida)}</td>
                     <td className="px-2.5 py-2.5 text-red-600 font-semibold whitespace-nowrap">{r.prejuizoAcumulado > 0 ? fmtBRL(r.prejuizoAcumulado) : '—'}</td>
                     <td className={`px-2.5 py-2.5 font-bold whitespace-nowrap rounded ${r.resultadoLiquido >= 0 ? 'text-emerald-800 bg-emerald-50' : 'text-red-700 bg-red-50'}`}>{fmtBRL(r.resultadoLiquido)}</td>
+                    <td className={`px-2.5 py-2.5 font-bold whitespace-nowrap ${acumulados[i] >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>{fmtBRL(acumulados[i])}</td>
                     <td className={`px-2.5 py-2.5 font-semibold whitespace-nowrap ${r.margLiquida >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>{fmtPct(r.margLiquida)}</td>
                   </tr>
                 ))}
@@ -505,6 +510,9 @@ export function TabProjecaoAnual({ clientId }: { clientId: string }) {
                       </td>
                     )
                   })()}
+                  <td className={`px-2.5 py-2.5 whitespace-nowrap font-bold ${(acumulados[acumulados.length - 1] ?? 0) >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>
+                    {fmtBRL(acumulados[acumulados.length - 1] ?? 0)}
+                  </td>
                   <td className={`px-2.5 py-2.5 whitespace-nowrap ${projecao.reduce((s,r)=>s+r.margLiquida,0)/projecao.length >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
                     {fmtPct(projecao.reduce((s,r)=>s+r.margLiquida,0)/projecao.length)}
                     <span className="ml-1 text-xs font-normal text-gray-400">média</span>

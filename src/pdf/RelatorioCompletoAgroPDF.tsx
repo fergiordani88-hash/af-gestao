@@ -38,7 +38,7 @@ export interface RelatorioCompletoAgroData {
   projecao10Anos: number; projecaoAnos: { ano: number; resultadoLiquido: number; recBruta: number; custoAtividade?: number; endividamento?: number; prejuizoFinanciado?: number }[]
   reestruturacaoIdeal?: {
     totalPassivo: number; resultadoLiquidoCapacidade: number; safraCapacidade: string
-    cenarios: { label: string; capacidadeAnual: number; inviavel: boolean; nAnos?: number; parcelaFixa?: number; totalJuros?: number }[]
+    cenarios: { label: string; capacidadeAnual: number; inviavel: boolean; nAnos?: number; parcelaFixa?: number; totalJuros?: number; jurosAnuaisSaldo?: number; deficitAnual?: number }[]
   }
   contextoMercado?: { cambio?: string; precoRef?: string; panorama?: string; comentario?: string }
   // Análise de crédito ampliada
@@ -448,6 +448,18 @@ export function RelatorioCompletoAgroPDF({ data }: { data: RelatorioCompletoAgro
                 <Text style={{ ...s.td, fontSize: 7 }}>{c.pe.toFixed(1)} sc</Text>
               </View>
             ))}
+            {/* Total — soma de todas as culturas (mesma área rotacionada, custo e receita se somam) */}
+            <View style={[s.tr, { borderTopWidth: 1, borderTopColor: C.border, backgroundColor: '#F0F3F0' }]}>
+              <Text style={{ ...s.tdB, flex: 1.3, fontSize: 7 }}>Total</Text>
+              <Text style={{ ...s.td, fontSize: 7 }}></Text>
+              <Text style={{ ...s.td, fontSize: 7 }}></Text>
+              <Text style={{ ...s.td, fontSize: 7 }}></Text>
+              <Text style={{ ...s.td, fontSize: 7, fontFamily: 'Helvetica-Bold', color: C.pos }}>{R(recBruta)}</Text>
+              <Text style={{ ...s.td, fontSize: 7, fontFamily: 'Helvetica-Bold', color: C.neg }}>{R(custoTotal)}</Text>
+              <Text style={{ ...s.td, fontSize: 7, fontFamily: 'Helvetica-Bold', color: resOp >= 0 ? C.pos : C.neg }}>{R(resOp)}</Text>
+              <Text style={{ ...s.td, fontSize: 7, fontFamily: 'Helvetica-Bold' }}>{recBruta > 0 ? pct(resOp / recBruta * 100) : ''}</Text>
+              <Text style={{ ...s.td, fontSize: 7 }}></Text>
+            </View>
           </View>
         </View>
         <Ftr client={data.clientName} date={data.dataGeracao} hora={h} />
@@ -861,12 +873,15 @@ export function RelatorioCompletoAgroPDF({ data }: { data: RelatorioCompletoAgro
             </>
           )}
 
-          {data.projecaoAnos.length > 0 && (
+          {data.projecaoAnos.length > 0 && (() => {
+            let acc = 0
+            const acumulados = data.projecaoAnos.map(r => (acc += r.resultadoLiquido))
+            return (
             <>
               <Sec title="Projeção Anual — Cenário Base" />
               <View style={s.tbl}>
                 <View style={s.thd}>
-                  {['Ano', 'Receita Bruta', 'Custos da Atividade', 'Endividamento', 'Prejuízo Financiado', 'Resultado Líquido', 'Situação'].map(h2 => (
+                  {['Ano', 'Receita Bruta', 'Custos da Atividade', 'Endividamento', 'Prejuízo Financiado', 'Resultado Líquido', 'Acumulado', 'Situação'].map(h2 => (
                     <Text key={h2} style={{ ...s.th, flex: h2 === 'Ano' ? 0.6 : 1 }}>{h2}</Text>
                   ))}
                 </View>
@@ -878,6 +893,7 @@ export function RelatorioCompletoAgroPDF({ data }: { data: RelatorioCompletoAgro
                     <Text style={{ ...s.td, color: C.neg }}>{r.endividamento != null ? R(r.endividamento) : '—'}</Text>
                     <Text style={{ ...s.td, color: C.neg }}>{r.prejuizoFinanciado ? R(r.prejuizoFinanciado) : '—'}</Text>
                     <Text style={{ ...s.td, fontFamily: 'Helvetica-Bold', color: r.resultadoLiquido >= 0 ? C.pos : C.neg }}>{R(r.resultadoLiquido)}</Text>
+                    <Text style={{ ...s.td, fontFamily: 'Helvetica-Bold', color: acumulados[i] >= 0 ? C.pos : C.neg }}>{R(acumulados[i])}</Text>
                     <Text style={{ ...s.td, color: r.resultadoLiquido >= 0 ? C.pos : C.neg }}>
                       {r.resultadoLiquido >= 0 ? '✓ Positivo' : '✗ Negativo'}
                     </Text>
@@ -890,14 +906,16 @@ export function RelatorioCompletoAgroPDF({ data }: { data: RelatorioCompletoAgro
                   <Text style={{ ...s.td, color: C.neg }}>{R(data.projecaoAnos.reduce((a, r) => a + (r.endividamento ?? 0), 0))}</Text>
                   <Text style={{ ...s.td, color: C.neg }}>{R(data.projecaoAnos.reduce((a, r) => a + (r.prejuizoFinanciado ?? 0), 0))}</Text>
                   <Text style={{ ...s.td, fontFamily: 'Helvetica-Bold', color: data.projecao10Anos >= 0 ? C.pos : C.neg }}>{R(data.projecao10Anos)}</Text>
+                  <Text style={{ ...s.td, fontFamily: 'Helvetica-Bold', color: (acumulados[acumulados.length - 1] ?? 0) >= 0 ? C.pos : C.neg }}>{R(acumulados[acumulados.length - 1] ?? 0)}</Text>
                   <Text style={{ ...s.td, color: C.muted }}>{data.projecaoAnos.filter(r => r.resultadoLiquido >= 0).length} de 10 positivos</Text>
                 </View>
               </View>
               <Text style={{ fontFamily: 'Helvetica', fontSize: 6, color: C.muted, marginTop: 4 }}>
-                Prejuízo Financiado: resultado negativo do ano anterior, capitalizado à taxa média dos contratos vigentes — representa o crédito necessário para cobrir o déficit.
+                Prejuízo Financiado: resultado negativo do ano anterior, capitalizado à taxa média dos contratos vigentes — representa o crédito necessário para cobrir o déficit. Acumulado: soma do Resultado Líquido do ano com todos os anos anteriores da projeção.
               </Text>
             </>
-          )}
+            )
+          })()}
 
           {/* Parecer — panel + text */}
           {(() => {
@@ -984,10 +1002,14 @@ export function RelatorioCompletoAgroPDF({ data }: { data: RelatorioCompletoAgro
                   <Text style={{ ...s.tdB, flex: 1.3 }}>{c.label}</Text>
                   <Text style={s.td}>{R(c.capacidadeAnual)}</Text>
                   <Text style={{ ...s.td, fontFamily: 'Helvetica-Bold', color: c.inviavel ? C.neg : C.pos }}>
-                    {c.inviavel ? '—' : R(c.parcelaFixa ?? 0)}
+                    {c.inviavel ? `${R(c.jurosAnuaisSaldo ?? 0)} (só juros)` : R(c.parcelaFixa ?? 0)}
                   </Text>
-                  <Text style={s.td}>{c.inviavel ? '—' : `${c.nAnos} ${(c.nAnos ?? 0) > 1 ? 'anos' : 'ano'}`}</Text>
-                  <Text style={{ ...s.td, color: C.neg }}>{c.inviavel ? '—' : R(c.totalJuros ?? 0)}</Text>
+                  <Text style={{ ...s.td, color: c.inviavel ? C.neg : C.body }}>
+                    {c.inviavel ? 'Nunca amortiza' : `${c.nAnos} ${(c.nAnos ?? 0) > 1 ? 'anos' : 'ano'}`}
+                  </Text>
+                  <Text style={{ ...s.td, color: C.neg }}>
+                    {c.inviavel ? `Déficit ${R(c.deficitAnual ?? 0)}/ano` : R(c.totalJuros ?? 0)}
+                  </Text>
                 </View>
               ))}
             </View>
