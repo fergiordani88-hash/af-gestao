@@ -541,7 +541,7 @@ export function TabResumo({ clientId, clienteNome, clienteCidade }: {
       }) : []
 
       // Juros em sacas
-      const jurosAnuaisExport = jurosPeriodoProrata(parcelas, safraInicio, safraFimExcl)
+      const jurosAnuaisExport = jurosPeriodoProrata(parcelas, hoje, dataCorte360)
       const sojaRowExp = prodSafra.find(p => p.cultura.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').includes('soja'))
       const cotacaoRefExp = sojaRowExp?.cotacao ?? prodSafra.find(p => p.ordem === 'principal')?.cotacao ?? 0
       const culturaRefExp = sojaRowExp?.cultura ?? prodSafra.find(p => p.ordem === 'principal')?.cultura ?? ''
@@ -1371,7 +1371,7 @@ export function TabResumo({ clientId, clienteNome, clienteCidade }: {
                 {(() => {
                   const resAfterDebt = resultadoLiq - servicoAnual
                   const pctReceitaDivida = receitaBruta > 0 ? (servicoAnual / receitaBruta) * 100 : 0
-                  const jurosAnuais = jurosPeriodoProrata(parcelas, safraInicio, safraFimExcl)
+                  const jurosAnuais = jurosPeriodoProrata(parcelas, hoje, dataCorte360)
                   const rows: { label: string; tooltip: string; total: number; cor: string; ref: string; isCurrency?: boolean; isPct?: boolean }[] = [
                     {
                       label: 'Receita bruta',
@@ -1410,7 +1410,7 @@ export function TabResumo({ clientId, clienteNome, clienteCidade }: {
                       ref: '< 1× receita bruta/ha',
                     },
                     {
-                      label: `Juros bancários (safra ${safra})`,
+                      label: `Juros bancários (próx. 12 meses)`,
                       tooltip: 'Componente de juros das parcelas do ano — exclui amortização de capital.',
                       total: jurosAnuais, cor: 'text-rose-600',
                       ref: '< 15% da receita bruta/ha',
@@ -1445,7 +1445,7 @@ export function TabResumo({ clientId, clienteNome, clienteCidade }: {
 
           {/* Juros em sacas de soja */}
           {(() => {
-            const jurosAnuais = jurosPeriodoProrata(parcelas, safraInicio, safraFimExcl)
+            const jurosAnuais = jurosPeriodoProrata(parcelas, hoje, dataCorte360)
             if (jurosAnuais <= 0 || areaTotal <= 0) return null
             const sojaRow = prodSafra.find(p => p.cultura.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').includes('soja'))
             const cotacaoRef = sojaRow?.cotacao ?? prodSafra.find(p => p.ordem === 'principal')?.cotacao ?? 0
@@ -1456,7 +1456,7 @@ export function TabResumo({ clientId, clienteNome, clienteCidade }: {
             return (
               <div className="mt-4 p-4 bg-rose-50 rounded-xl border border-rose-100">
                 <p className="text-xs font-bold text-rose-700 uppercase tracking-wide mb-3">
-                  Custo dos juros bancários em sacas — Safra {safra}
+                  Custo dos juros bancários em sacas — próx. 12 meses
                   {cotacaoRef > 0 && <span className="ml-2 font-normal text-rose-400 normal-case">({culturaRef} a {fmtBRL(cotacaoRef)}/sc)</span>}
                 </p>
                 <div className="grid grid-cols-2 gap-4">
@@ -1486,7 +1486,7 @@ export function TabResumo({ clientId, clienteNome, clienteCidade }: {
               <div className="mt-4 p-3 bg-gray-50 rounded-xl flex items-center justify-between">
                 <div>
                   <p className="text-xs font-semibold text-gray-700">Comprometimento da receita com banco</p>
-                  <p className="text-xs text-gray-500 mt-0.5">Parcelas restantes da safra {safra} ÷ Receita bruta — Saudável: &lt; 20% · Atenção: 20–35% · Risco: &gt; 35%</p>
+                  <p className="text-xs text-gray-500 mt-0.5">Parcelas dos próximos 12 meses ÷ Receita bruta — Saudável: &lt; 20% · Atenção: 20–35% · Risco: &gt; 35%</p>
                 </div>
                 <div className="text-right ml-4">
                   <p className={`text-2xl font-bold ${status === 'ok' ? 'text-emerald-600' : status === 'atencao' ? 'text-amber-600' : 'text-red-600'}`}>
