@@ -538,47 +538,6 @@ export function RelatorioCompletoAgroPDF({ data }: { data: RelatorioCompletoAgro
             ))}
           </View>
 
-          {/* Patrimônio table */}
-          {data.patrimonio.length > 0 && (
-            <>
-              {(() => {
-                const grupos: Record<string, { valor: number; onus: number }> = {}
-                for (const p of data.patrimonio) {
-                  if (!grupos[p.categoria]) grupos[p.categoria] = { valor: 0, onus: 0 }
-                  grupos[p.categoria].valor += p.valorAvaliado
-                  grupos[p.categoria].onus  += p.possuiOnus ? p.valorOnus : 0
-                }
-                const cats = Object.entries(grupos)
-                return (
-                  <View style={s.tbl}>
-                    <View wrap={false}>
-                      <Sec title="Patrimônio Rural" />
-                      <View style={s.thd}>
-                        <Text style={{ ...s.th, flex: 2 }}>Categoria</Text>
-                        <Text style={s.th}>Valor Total</Text>
-                        <Text style={s.th}>Ônus</Text>
-                        <Text style={s.th}>Patrimônio Líquido</Text>
-                      </View>
-                    </View>
-                    {cats.map(([cat, g], i) => (
-                      <View key={i} style={[s.tr, i % 2 === 0 ? s.trA : {}]}>
-                        <Text style={{ ...s.tdB, flex: 2 }}>{cat}</Text>
-                        <Text style={s.td}>{R(g.valor)}</Text>
-                        <Text style={{ ...s.td, color: g.onus > 0 ? C.neg : C.muted }}>{g.onus > 0 ? R(g.onus) : '—'}</Text>
-                        <Text style={{ ...s.td, color: C.pos }}>{R(g.valor - g.onus)}</Text>
-                      </View>
-                    ))}
-                    <View style={[s.tr, s.trT]}>
-                      <Text style={{ ...s.tdB, flex: 2 }}>Total</Text>
-                      <Text style={s.tdG}>{R(data.patrimonioGruto)}</Text>
-                      <Text style={{ ...s.td, color: data.totalOnus > 0 ? C.neg : C.muted }}>{data.totalOnus > 0 ? R(data.totalOnus) : '—'}</Text>
-                      <Text style={{ ...s.tdG }}>{R(data.patrimonioGruto - data.totalOnus)}</Text>
-                    </View>
-                  </View>
-                )
-              })()}
-            </>
-          )}
         </View>
         <Ftr client={data.clientName} date={data.dataGeracao} hora={h} />
       </Page>
@@ -588,124 +547,64 @@ export function RelatorioCompletoAgroPDF({ data }: { data: RelatorioCompletoAgro
         <Hdr section="Contratos de Crédito Rural" client={data.clientName} safra={data.safra} />
         <View style={s.body}>
 
-          {/* Carteira agrupada por tomador */}
+          {/* Resumo do endividamento — por tomador e por instituição, sem detalhar cada operação */}
           {(() => {
             const hasTomador = data.contratos.some(c => c.tomador)
-            const COL_HDR = ['Instituição', 'Modalidade', 'Valor Tomado', 'Parcela', 'Taxa a.a.', 'Vencimento']
 
-            if (!hasTomador) {
-              // Sem tomadores — tabela simples
-              return (
-                <>
-                  <Sec title="Carteira de Financiamentos" />
-                  <View style={s.tbl}>
-                    <View style={s.thd}>
-                      {COL_HDR.map((h2, i) => (
-                        <Text key={i} style={{ ...s.th, flex: h2 === 'Modalidade' ? 1.5 : 1 }}>{h2}</Text>
-                      ))}
-                    </View>
-                    {data.contratos.map((c, i) => (
-                      <View key={i} style={[s.tr, i % 2 === 0 ? s.trA : {}]}>
-                        <Text style={{ ...s.tdB, flex: 1 }}>{c.banco}</Text>
-                        <Text style={{ ...s.td, flex: 1.5, fontSize: 7 }}>{c.modalidade}</Text>
-                        <Text style={s.tdB}>{R(c.valorTomado)}</Text>
-                        <Text style={s.td}>{R(c.valorParcela)}</Text>
-                        <Text style={s.td}>{(c.taxa * (c.taxa < 1 ? 100 : 1)).toFixed(2)}%</Text>
-                        <Text style={s.td}>{c.vencimento ? new Date(c.vencimento).toLocaleDateString('pt-BR') : '—'}</Text>
-                      </View>
-                    ))}
-                    <View style={[s.tr, s.trT]}>
-                      <Text style={s.tdB}>Total Geral</Text>
-                      <Text style={{ ...s.td, flex: 1.5 }} />
-                      <Text style={s.tdG}>{R(data.totalEndividamento)}</Text>
-                      <Text style={s.tdR}>{R(data.servicoAnual)}/ano</Text>
-                      <Text style={s.td} /><Text style={s.td} />
-                    </View>
-                  </View>
-                </>
-              )
+            const porBanco: Record<string, { n: number; valor: number; servico: number }> = {}
+            for (const c of data.contratos) {
+              if (!porBanco[c.banco]) porBanco[c.banco] = { n: 0, valor: 0, servico: 0 }
+              porBanco[c.banco].n++
+              porBanco[c.banco].valor += c.valorTomado
+              porBanco[c.banco].servico += c.valorParcela
+            }
+            const bancos = Object.entries(porBanco).sort((a, b) => b[1].valor - a[1].valor)
+
+            let tomadoresResumo: [string, { n: number; valor: number; servico: number }][] = []
+            if (hasTomador) {
+              const porTomador: Record<string, { n: number; valor: number; servico: number }> = {}
+              for (const c of data.contratos) {
+                const nome = c.tomador ?? 'Sem tomador específico'
+                if (!porTomador[nome]) porTomador[nome] = { n: 0, valor: 0, servico: 0 }
+                porTomador[nome].n++
+                porTomador[nome].valor += c.valorTomado
+                porTomador[nome].servico += c.valorParcela
+              }
+              tomadoresResumo = Object.entries(porTomador).sort((a, b) => b[1].valor - a[1].valor)
             }
 
-            // Com tomadores — agrupa por tomador, sem tomador vai no final
-            const grupos: { nome: string; contratos: typeof data.contratos }[] = []
-            const semTomador = data.contratos.filter(c => !c.tomador)
-            const tomadores = [...new Set(data.contratos.filter(c => c.tomador).map(c => c.tomador!))]
-            for (const t of tomadores) grupos.push({ nome: t, contratos: data.contratos.filter(c => c.tomador === t) })
-            if (semTomador.length) grupos.push({ nome: 'Outros / Sem tomador específico', contratos: semTomador })
+            const resumoTabela = (titulo: string, colNome: string, linhas: [string, { n: number; valor: number; servico: number }][]) => (
+              <View style={{ marginBottom: 14 }}>
+                <Sec title={titulo} />
+                <View style={s.tbl}>
+                  <View style={s.thd}>
+                    <Text style={{ ...s.th, flex: 2.2 }}>{colNome}</Text>
+                    <Text style={s.th}>Operações</Text>
+                    <Text style={s.th}>Valor Total</Text>
+                    <Text style={s.th}>Serviço Anual</Text>
+                  </View>
+                  {linhas.map(([nome, g], i) => (
+                    <View key={i} style={[s.tr, i % 2 === 0 ? s.trA : {}]}>
+                      <Text style={{ ...s.tdB, flex: 2.2 }}>{nome}</Text>
+                      <Text style={s.td}>{g.n}</Text>
+                      <Text style={s.tdB}>{R(g.valor)}</Text>
+                      <Text style={{ ...s.td, color: C.neg }}>{R(g.servico)}/ano</Text>
+                    </View>
+                  ))}
+                  <View style={[s.tr, s.trT]}>
+                    <Text style={{ ...s.tdB, flex: 2.2 }}>Total Geral</Text>
+                    <Text style={s.tdB}>{data.contratos.length}</Text>
+                    <Text style={s.tdG}>{R(data.totalEndividamento)}</Text>
+                    <Text style={s.tdR}>{R(data.servicoAnual)}/ano</Text>
+                  </View>
+                </View>
+              </View>
+            )
 
             return (
               <>
-                <Sec title="Carteira de Financiamentos — por Tomador" />
-                <View style={s.tbl}>
-                  {/* cabeçalho fixo */}
-                  <View wrap={false}>
-                    <View style={s.thd}>
-                      <Text style={{ ...s.th, flex: 1.4 }}>Instituição</Text>
-                      <Text style={{ ...s.th, flex: 1.8 }}>Modalidade</Text>
-                      <Text style={s.th}>Valor Tomado</Text>
-                      <Text style={s.th}>Parcela</Text>
-                      <Text style={s.th}>Taxa a.a.</Text>
-                      <Text style={s.th}>Vencimento</Text>
-                    </View>
-                  </View>
-
-                  {grupos.map((g, gi) => {
-                    const subtotal = g.contratos.reduce((s, c) => s + c.valorTomado, 0)
-                    const servicoG = g.contratos.reduce((s, c) => s + c.valorParcela, 0)
-                    return (
-                      <View key={gi}>
-                        {/* Cabeçalho do tomador — nunca separa da 1ª linha */}
-                        <View wrap={false}>
-                          <View style={{ backgroundColor: C.greenLt, paddingHorizontal: 8, paddingVertical: 5, borderTopWidth: gi > 0 ? 1 : 0, borderTopColor: C.border }}>
-                            <Text style={{ fontFamily: 'Helvetica-Bold', fontSize: 7.5, color: C.green }}>
-                              Tomador: {g.nome}
-                            </Text>
-                          </View>
-                          {/* primeira linha junto para não orphan */}
-                          {g.contratos[0] && (() => {
-                            const c = g.contratos[0]
-                            return (
-                              <View style={[s.tr, s.trA]}>
-                                <Text style={{ ...s.tdB, flex: 1.4 }}>{c.banco}</Text>
-                                <Text style={{ ...s.td, flex: 1.8, fontSize: 7 }}>{c.modalidade}</Text>
-                                <Text style={s.tdB}>{R(c.valorTomado)}</Text>
-                                <Text style={s.td}>{R(c.valorParcela)}</Text>
-                                <Text style={s.td}>{(c.taxa * (c.taxa < 1 ? 100 : 1)).toFixed(2)}%</Text>
-                                <Text style={s.td}>{c.vencimento ? new Date(c.vencimento).toLocaleDateString('pt-BR') : '—'}</Text>
-                              </View>
-                            )
-                          })()}
-                        </View>
-                        {/* demais linhas */}
-                        {g.contratos.slice(1).map((c, i) => (
-                          <View key={i} style={[s.tr, (i + 1) % 2 === 0 ? s.trA : {}]}>
-                            <Text style={{ ...s.tdB, flex: 1.4 }}>{c.banco}</Text>
-                            <Text style={{ ...s.td, flex: 1.8, fontSize: 7 }}>{c.modalidade}</Text>
-                            <Text style={s.tdB}>{R(c.valorTomado)}</Text>
-                            <Text style={s.td}>{R(c.valorParcela)}</Text>
-                            <Text style={s.td}>{(c.taxa * (c.taxa < 1 ? 100 : 1)).toFixed(2)}%</Text>
-                            <Text style={s.td}>{c.vencimento ? new Date(c.vencimento).toLocaleDateString('pt-BR') : '—'}</Text>
-                          </View>
-                        ))}
-                        {/* subtotal do tomador */}
-                        <View style={{ flexDirection: 'row', backgroundColor: '#D6E8D6', paddingHorizontal: 6, paddingVertical: 4 }}>
-                          <Text style={{ fontFamily: 'Helvetica-Bold', fontSize: 7, color: C.green, flex: 3.2 }}>Subtotal — {g.nome}</Text>
-                          <Text style={{ fontFamily: 'Helvetica-Bold', fontSize: 7, color: C.pos, flex: 1 }}>{R(subtotal)}</Text>
-                          <Text style={{ fontFamily: 'Helvetica', fontSize: 7, color: C.neg, flex: 1 }}>{R(servicoG)}/ano</Text>
-                          <Text style={{ flex: 2 }} />
-                        </View>
-                      </View>
-                    )
-                  })}
-
-                  {/* Total geral */}
-                  <View style={[s.tr, s.trT]}>
-                    <Text style={{ ...s.tdB, flex: 3.2 }}>TOTAL GERAL DO GRUPO</Text>
-                    <Text style={s.tdG}>{R(data.totalEndividamento)}</Text>
-                    <Text style={s.tdR}>{R(data.servicoAnual)}/ano</Text>
-                    <Text style={{ flex: 2 }} />
-                  </View>
-                </View>
+                {hasTomador && resumoTabela('Resumo do Endividamento — por Tomador', 'Tomador', tomadoresResumo)}
+                {resumoTabela('Resumo do Endividamento — por Instituição', 'Instituição', bancos)}
               </>
             )
           })()}
