@@ -12,14 +12,17 @@ const fmtDate = (d: string | Date) => new Date(d).toLocaleDateString('pt-BR')
 const MODALIDADES = ['Capital de giro', 'Rotativo', 'Repactuação', 'Custeio', 'Investimento', 'Investimento CDI', 'BNDES Finame', 'BNDES', 'FCO', 'CPR', 'Moderfrota', 'Outros']
 const PERIODICIDADES = ['Mensal', 'Semestral', 'Anual', 'Trimestral', 'Único']
 
-const INDEXADORES = ['Pré-fixado', 'CDI', 'SELIC', 'IPCA', 'TR']
+const INDEXADORES = ['Pré-fixado', 'CDI', 'SELIC', 'IPCA', 'TR', 'USD (moeda estrangeira)']
 
 // Taxas de referência vigentes (% a.a.) — atualizar conforme divulgação oficial
+// Mantido em sincronia manual com TAXAS_REF de af-gestao-api/src/routes/agroCompleto.ts
+// (esse arquivo usa % inteiro, o backend usa decimal — mesma origem, escalas diferentes)
 const TAXAS_REF: Record<string, number> = {
   CDI:  14.25, // Meta SELIC/CDI — COPOM jul/2026
   SELIC: 14.25,
   IPCA:  5.48, // IPCA acumulado 12 meses jun/2025 — IBGE
   TR:    0.88, // TR estimada — BACEN jul/2025
+  'USD (moeda estrangeira)': 1.30, // Variação PTAX dólar venda, BCB SGS série 1, 16/jul a 12/ago/2026
 }
 const taxaRef = (idx?: string) => TAXAS_REF[idx ?? ''] ?? 0
 
@@ -60,10 +63,10 @@ function calcParcelaAtualSAC(c: AgroContrato): number {
 }
 
 // Taxa capitalizada anual: spread + índice (pós-fixado) ou taxa nominal (pré-fixado)
-// taxa e spread são armazenados em decimal (0.095 = 9,5%)
+// taxa e spread são armazenados em decimal (0.095 = 9,5%); taxaRef() retorna em % (14.25 = 14,25%)
 function calcCET(taxa: number, indexador: string | undefined, spread: number | undefined): number {
   if (indexador && indexador !== 'Pré-fixado')
-    return (taxaRef(indexador) + (spread ?? 0)) * 100  // retorna em %
+    return taxaRef(indexador) + (spread ?? 0) * 100  // taxaRef já em %, spread precisa escalar
   return taxa * 100  // retorna em %
 }
 
@@ -88,7 +91,7 @@ function amortLabel(c: { indexador?: string; sistemaAmortizacao?: string }) {
 function calcParcelaCorrigida(valorParcela: number, indexador: string | undefined, spread: number | undefined, periodicidade: string): number {
   if (!valorParcela || !indexador || indexador === 'Pré-fixado') return valorParcela
   const periodos = periodicidade === 'Mensal' ? 12 : periodicidade === 'Semestral' ? 2 : 1
-  const taxaAnual = taxaRef(indexador) + (spread ?? 0)  // ambos em decimal
+  const taxaAnual = taxaRef(indexador) / 100 + (spread ?? 0)  // taxaRef em %, spread em decimal — converte pra decimal
   const taxaPeriodo = Math.pow(1 + taxaAnual, 1 / periodos) - 1
   return valorParcela * (1 + taxaPeriodo)
 }

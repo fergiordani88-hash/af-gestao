@@ -35,7 +35,7 @@ export interface RelatorioCompletoAgroData {
   margem: number; alavancagem: number; solvencia: number
   endivReceita: number; capPagamento: number; ratingLabel: string; ratingColor: string
   cenarios: RelCenario[]
-  projecao10Anos: number; projecaoAnos: { ano: number; resultadoLiquido: number; recBruta: number; custoAtividade?: number; endividamento?: number; prejuizoFinanciado?: number }[]
+  projecao10Anos: number; projecaoAnos: { ano: number; resultadoLiquido: number; recBruta: number; custoAtividade?: number; custoArrendamento?: number; endividamento?: number; prejuizoFinanciado?: number }[]
   reestruturacaoIdeal?: {
     totalPassivo: number; resultadoLiquidoCapacidade: number; safraCapacidade: string
     cenarios: { label: string; capacidadeAnual: number; inviavel: boolean; nAnos?: number; parcelaFixa?: number; totalJuros?: number; jurosAnuaisSaldo?: number; deficitAnual?: number }[]
@@ -318,14 +318,18 @@ function Cover({ data, recBruta }: { data: RelatorioCompletoAgroData; recBruta: 
 export function RelatorioCompletoAgroPDF({ data }: { data: RelatorioCompletoAgroData }) {
   const cc = data.culturas.map(c => {
     const rb  = c.area * c.produtividade * c.cotacao
-    const cu  = c.area * c.custoPorHa * c.cotacao + c.areaArrendada * c.custoArrendHa * (c.cotacao || 1)
+    const cuProd    = c.area * c.custoPorHa * c.cotacao
+    const cuArrend  = c.areaArrendada * c.custoArrendHa * (c.cotacao || 1)
+    const cu  = cuProd + cuArrend
     const res = rb - cu
     const mg  = rb > 0 ? res / rb * 100 : 0
     const pe  = c.cotacao > 0 ? (c.custoPorHa + (c.area > 0 ? c.custoArrendHa * c.areaArrendada / c.area : 0)) : 0
-    return { ...c, rb, cu, res, mg, pe }
+    return { ...c, rb, cu, cuProd, cuArrend, res, mg, pe }
   })
-  const recBruta   = cc.reduce((a, c) => a + c.rb, 0)
-  const custoTotal = cc.reduce((a, c) => a + c.cu, 0)
+  const recBruta       = cc.reduce((a, c) => a + c.rb, 0)
+  const custoProdTotal = cc.reduce((a, c) => a + c.cuProd, 0)
+  const custoArrendTotal = cc.reduce((a, c) => a + c.cuArrend, 0)
+  const custoTotal     = custoProdTotal + custoArrendTotal
   const resOp      = recBruta - custoTotal
   const resPos     = resOp - data.servicoAnual
   const h          = data.horaGeracao
@@ -379,6 +383,10 @@ export function RelatorioCompletoAgroPDF({ data }: { data: RelatorioCompletoAgro
             <View style={data.alavancagem > 50 ? s.kpiR : s.kpi}><Text style={s.kpiLabel}>Endividamento Total</Text><Text style={data.alavancagem > 50 ? s.kpiValR : s.kpiVal}>{R(data.totalEndividamento)}</Text></View>
             <View style={s.kpiG}><Text style={s.kpiLabel}>Patrimônio Líquido</Text><Text style={s.kpiValG}>{R(pl)}</Text></View>
           </View>
+          <Text style={{ fontFamily: 'Helvetica', fontSize: 6, color: C.muted, marginTop: -2, marginBottom: 4, lineHeight: 1.5 }}>
+            Serviço da Dívida/ano é uma média anual do total das parcelas ({data.contratos.length} operações) — usada nos indicadores desta página. Já Endividamento Total é o saldo devedor
+            acumulado de todas as dívidas em aberto (não é um valor "por ano"). O quanto efetivamente vence em cada ano varia — ver cronograma real na página 5.
+          </Text>
 
           {/* Indicadores */}
           <Sec title="Indicadores Financeiros" />
@@ -478,7 +486,8 @@ export function RelatorioCompletoAgroPDF({ data }: { data: RelatorioCompletoAgro
               <View style={{ borderWidth: 0.5, borderColor: C.border, borderRadius: 3, overflow: 'hidden' }}>
                 {[
                   { l: 'Receita Bruta',             v: recBruta,           neg: false, total: false, sub: false },
-                  { l: '(-) Custo de Produção',      v: custoTotal,         neg: true,  total: false, sub: true  },
+                  { l: '(-) Custo de Produção',      v: custoProdTotal,     neg: true,  total: false, sub: true  },
+                  { l: '(-) Despesa de Arrendamento', v: custoArrendTotal,  neg: true,  total: false, sub: true  },
                   { l: '= Resultado Operacional',    v: resOp,              neg: false, total: true,  sub: false },
                   { l: '(-) Serviço da Dívida/ano',  v: data.servicoAnual,  neg: true,  total: false, sub: true  },
                   { l: '= Resultado após Endivid.',  v: resPos,             neg: false, total: true,  sub: false },
@@ -540,6 +549,7 @@ export function RelatorioCompletoAgroPDF({ data }: { data: RelatorioCompletoAgro
             {data.areaTotal > 0 && [
               { l: 'Receita Bruta',          tot: recBruta,                 ha: recBruta / data.areaTotal,                 ref: 'Benchmark regional',              ok: true },
               { l: 'Custo de Produção',       tot: custoTotal,               ha: custoTotal / data.areaTotal,               ref: '< 75% da receita bruta',          ok: recBruta > 0 && custoTotal <= 0.75 * recBruta },
+              { l: 'Despesa de Arrendamento', tot: custoArrendTotal,         ha: custoArrendTotal / data.areaTotal,         ref: 'Incluída acima, no Custo de Produção', ok: true },
               { l: 'Resultado Operacional',   tot: resOp,                    ha: resOp / data.areaTotal,                    ref: 'Margem > 20%',                    ok: recBruta > 0 && resOp / recBruta > 0.20 },
               { l: 'Serviço da Dívida',       tot: data.servicoAnual,        ha: data.servicoAnual / data.areaTotal,        ref: '< 30% do resultado operacional',  ok: resOp > 0 ? data.servicoAnual / resOp < 0.30 : data.servicoAnual === 0 },
               { l: 'Resultado após Endivid.', tot: resPos,                   ha: resPos / data.areaTotal,                   ref: 'Valor positivo',                  ok: resPos >= 0 },
@@ -791,6 +801,10 @@ export function RelatorioCompletoAgroPDF({ data }: { data: RelatorioCompletoAgro
                       <Text style={{ fontFamily: 'Helvetica', fontSize: 6.5, color: C.muted }}>Longo prazo (&gt; 360 dias)</Text>
                     </View>
                   </View>
+                  <Text style={{ fontFamily: 'Helvetica', fontSize: 6, color: C.muted, marginTop: 8, lineHeight: 1.5 }}>
+                    Cronograma real de vencimentos de cada contrato — por isso o valor de cada ano varia (parcelas concentradas, balões, prazos diferentes por operação).
+                    É diferente do Serviço Anual de {R(data.servicoAnual)} usado nos indicadores de risco, que é uma média fixa do total das {data.contratos.length} operações e não representa o valor efetivo de nenhum ano específico.
+                  </Text>
                 </View>
               </>
             )
@@ -881,36 +895,40 @@ export function RelatorioCompletoAgroPDF({ data }: { data: RelatorioCompletoAgro
               <Sec title="Projeção Anual — Cenário Base" />
               <View style={s.tbl}>
                 <View style={s.thd}>
-                  {['Ano', 'Receita Bruta', 'Custos da Atividade', 'Endividamento', 'Prejuízo Financiado', 'Resultado Líquido', 'Acumulado', 'Situação'].map(h2 => (
-                    <Text key={h2} style={{ ...s.th, flex: h2 === 'Ano' ? 0.6 : 1 }}>{h2}</Text>
+                  {['Ano', 'Receita Bruta', 'Custos da Atividade', 'Arrendamento', 'Endividamento', 'Prejuízo Financiado', 'Resultado Líquido', 'Acumulado', 'Situação'].map(h2 => (
+                    <Text key={h2} style={{ ...s.th, fontSize: 5.3, flex: h2 === 'Ano' ? 0.45 : h2 === 'Situação' ? 0.8 : 1 }}>{h2}</Text>
                   ))}
                 </View>
                 {data.projecaoAnos.map((r, i) => (
                   <View key={r.ano} style={[s.tr, i % 2 === 0 ? s.trA : {}]}>
-                    <Text style={{ ...s.tdB, flex: 0.6 }}>{r.ano}</Text>
-                    <Text style={{ ...s.td, color: C.pos }}>{R(r.recBruta)}</Text>
-                    <Text style={{ ...s.td, color: C.neg }}>{r.custoAtividade != null ? R(r.custoAtividade) : '—'}</Text>
-                    <Text style={{ ...s.td, color: C.neg }}>{r.endividamento != null ? R(r.endividamento) : '—'}</Text>
-                    <Text style={{ ...s.td, color: C.neg }}>{r.prejuizoFinanciado ? R(r.prejuizoFinanciado) : '—'}</Text>
-                    <Text style={{ ...s.td, fontFamily: 'Helvetica-Bold', color: r.resultadoLiquido >= 0 ? C.pos : C.neg }}>{R(r.resultadoLiquido)}</Text>
-                    <Text style={{ ...s.td, fontFamily: 'Helvetica-Bold', color: acumulados[i] >= 0 ? C.pos : C.neg }}>{R(acumulados[i])}</Text>
-                    <Text style={{ ...s.td, color: r.resultadoLiquido >= 0 ? C.pos : C.neg }}>
+                    <Text style={{ ...s.tdB, fontSize: 6.5, flex: 0.45 }}>{r.ano}</Text>
+                    <Text style={{ ...s.td, fontSize: 6.5, color: C.pos }}>{R(r.recBruta)}</Text>
+                    <Text style={{ ...s.td, fontSize: 6.5, color: C.neg }}>{r.custoAtividade != null ? R(r.custoAtividade) : '—'}</Text>
+                    <Text style={{ ...s.td, fontSize: 6.5, color: C.neg }}>{r.custoArrendamento ? R(r.custoArrendamento) : 'R$ 0'}</Text>
+                    <Text style={{ ...s.td, fontSize: 6.5, color: C.neg }}>{r.endividamento != null ? R(r.endividamento) : '—'}</Text>
+                    <Text style={{ ...s.td, fontSize: 6.5, color: C.neg }}>{r.prejuizoFinanciado ? R(r.prejuizoFinanciado) : '—'}</Text>
+                    <Text style={{ ...s.td, fontSize: 6.5, fontFamily: 'Helvetica-Bold', color: r.resultadoLiquido >= 0 ? C.pos : C.neg }}>{R(r.resultadoLiquido)}</Text>
+                    <Text style={{ ...s.td, fontSize: 6.5, fontFamily: 'Helvetica-Bold', color: acumulados[i] >= 0 ? C.pos : C.neg }}>{R(acumulados[i])}</Text>
+                    <Text style={{ ...s.td, fontSize: 6.5, flex: 0.8, color: r.resultadoLiquido >= 0 ? C.pos : C.neg }}>
                       {r.resultadoLiquido >= 0 ? '✓ Positivo' : '✗ Negativo'}
                     </Text>
                   </View>
                 ))}
                 <View style={[s.tr, s.trT]}>
-                  <Text style={{ ...s.tdB, flex: 0.6 }}>Total 10 Anos</Text>
-                  <Text style={s.tdG}>{R(data.projecaoAnos.reduce((a, r) => a + r.recBruta, 0))}</Text>
-                  <Text style={{ ...s.td, color: C.neg }}>{R(data.projecaoAnos.reduce((a, r) => a + (r.custoAtividade ?? 0), 0))}</Text>
-                  <Text style={{ ...s.td, color: C.neg }}>{R(data.projecaoAnos.reduce((a, r) => a + (r.endividamento ?? 0), 0))}</Text>
-                  <Text style={{ ...s.td, color: C.neg }}>{R(data.projecaoAnos.reduce((a, r) => a + (r.prejuizoFinanciado ?? 0), 0))}</Text>
-                  <Text style={{ ...s.td, fontFamily: 'Helvetica-Bold', color: data.projecao10Anos >= 0 ? C.pos : C.neg }}>{R(data.projecao10Anos)}</Text>
-                  <Text style={{ ...s.td, fontFamily: 'Helvetica-Bold', color: (acumulados[acumulados.length - 1] ?? 0) >= 0 ? C.pos : C.neg }}>{R(acumulados[acumulados.length - 1] ?? 0)}</Text>
-                  <Text style={{ ...s.td, color: C.muted }}>{data.projecaoAnos.filter(r => r.resultadoLiquido >= 0).length} de 10 positivos</Text>
+                  <Text style={{ ...s.tdB, fontSize: 6.5, flex: 0.45 }}>Total 10 Anos</Text>
+                  <Text style={{ ...s.tdG, fontSize: 6.5 }}>{R(data.projecaoAnos.reduce((a, r) => a + r.recBruta, 0))}</Text>
+                  <Text style={{ ...s.td, fontSize: 6.5, color: C.neg }}>{R(data.projecaoAnos.reduce((a, r) => a + (r.custoAtividade ?? 0), 0))}</Text>
+                  <Text style={{ ...s.td, fontSize: 6.5, color: C.neg }}>{R(data.projecaoAnos.reduce((a, r) => a + (r.custoArrendamento ?? 0), 0))}</Text>
+                  <Text style={{ ...s.td, fontSize: 6.5, color: C.neg }}>{R(data.projecaoAnos.reduce((a, r) => a + (r.endividamento ?? 0), 0))}</Text>
+                  <Text style={{ ...s.td, fontSize: 6.5, color: C.neg }}>{R(data.projecaoAnos.reduce((a, r) => a + (r.prejuizoFinanciado ?? 0), 0))}</Text>
+                  <Text style={{ ...s.td, fontSize: 6.5, fontFamily: 'Helvetica-Bold', color: data.projecao10Anos >= 0 ? C.pos : C.neg }}>{R(data.projecao10Anos)}</Text>
+                  <Text style={{ ...s.td, fontSize: 6.5, fontFamily: 'Helvetica-Bold', color: (acumulados[acumulados.length - 1] ?? 0) >= 0 ? C.pos : C.neg }}>{R(acumulados[acumulados.length - 1] ?? 0)}</Text>
+                  <Text style={{ ...s.td, fontSize: 6.5, flex: 0.8, color: C.muted }}>{data.projecaoAnos.filter(r => r.resultadoLiquido >= 0).length} de 10 positivos</Text>
                 </View>
               </View>
-              <Text style={{ fontFamily: 'Helvetica', fontSize: 6, color: C.muted, marginTop: 4 }}>
+              <Text style={{ fontFamily: 'Helvetica', fontSize: 6, color: C.muted, marginTop: 4, lineHeight: 1.5 }}>
+                Arrendamento: despesa de arrendamento de terras, cobrada apenas na safra de soja (sacas/ha convertidas em R$ pela cotação do ano) — por isso aparece zerada em anos em que a soja já foi colhida antes da data do relatório.{'\n'}
+                Endividamento: parcelas que efetivamente vencem naquele ano, segundo o cronograma real de cada contrato (mesma origem do gráfico de Concentração de Vencimentos, página anterior) — por isso varia ano a ano e não coincide com o Serviço da Dívida/ano de {R(data.servicoAnual)} usado nos indicadores, que é uma média fixa do total das operações.{'\n'}
                 Prejuízo Financiado: resultado negativo do ano anterior, capitalizado à taxa média dos contratos vigentes — representa o crédito necessário para cobrir o déficit. Acumulado: soma do Resultado Líquido do ano com todos os anos anteriores da projeção.
               </Text>
             </>

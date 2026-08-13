@@ -487,29 +487,39 @@ export function TabResumo({ clientId, clienteNome, clienteCidade }: {
         ? contratos.reduce((s: number, c: any) => s + (c.taxa || 0) * (c.valorTomado || 0), 0) / totalTomadoContratos
         : 0
 
-      const projecaoAnos: { ano: number; recBruta: number; custoAtividade: number; endividamento: number; prejuizoFinanciado: number; resultadoLiquido: number }[] = []
+      const projecaoAnos: { ano: number; recBruta: number; custoAtividade: number; custoArrendamento: number; endividamento: number; prejuizoFinanciado: number; resultadoLiquido: number }[] = []
       for (let i = 0; i < 10; i++) {
         const ano = 2026 + i
-        let recBruta = 0, custo = 0
+        let recBruta = 0, custo = 0, custoArrendamento = 0
         if (prodPorAno[ano]) {
           // No ano corrente (o que já está em curso hoje), só conta cultura cuja
           // colheita ainda não aconteceu — a já realizada (ex: soja em abril, com
           // hoje em agosto) já é passado, não é resultado ainda a vir a partir de agora.
+          // Isso também derruba o arrendamento pra R$0 em anos em que a única cultura
+          // que paga arrendamento (soja) já foi colhida antes da data do relatório.
           const prodsDoAno = ano === 2026
             ? prodPorAno[ano].filter(p => getColheitaDate(p, colheitaDatas) > hoje)
             : prodPorAno[ano]
-          for (const p of prodsDoAno) { recBruta += p.area * p.produtividade * p.cotacao; custo += p.area * p.custoPorHa * p.cotacao }
+          for (const p of prodsDoAno) {
+            recBruta += p.area * p.produtividade * p.cotacao
+            custo += p.area * p.custoPorHa * p.cotacao
+            custoArrendamento += (p.areaArrendada ?? 0) * (p.custoArrendHa ?? 0) * (p.cotacao || 1)
+          }
         } else {
           const g = Math.pow(1.02, i)
-          for (const p of baseProds) { recBruta += p.area * p.produtividade * p.cotacao * g; custo += p.area * p.custoPorHa * p.cotacao * g }
+          for (const p of baseProds) {
+            recBruta += p.area * p.produtividade * p.cotacao * g
+            custo += p.area * p.custoPorHa * p.cotacao * g
+            custoArrendamento += (p.areaArrendada ?? 0) * (p.custoArrendHa ?? 0) * (p.cotacao || 1) * g
+          }
         }
         const custoAtividade = custo + custosFixosAnuais
         const endividamento = dividasPorAno[String(ano)] ?? 0
         const prejuizoAnoAnterior = i > 0 && projecaoAnos[i - 1].resultadoLiquido < 0
           ? Math.abs(projecaoAnos[i - 1].resultadoLiquido) : 0
         const prejuizoFinanciado = prejuizoAnoAnterior * (1 + taxaMediaContratos)
-        const resultadoLiquido = recBruta - custoAtividade - endividamento - prejuizoFinanciado
-        projecaoAnos.push({ ano, recBruta, custoAtividade, endividamento, prejuizoFinanciado, resultadoLiquido })
+        const resultadoLiquido = recBruta - custoAtividade - custoArrendamento - endividamento - prejuizoFinanciado
+        projecaoAnos.push({ ano, recBruta, custoAtividade, custoArrendamento, endividamento, prejuizoFinanciado, resultadoLiquido })
       }
 
       // Cenários do localStorage
