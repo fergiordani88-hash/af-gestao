@@ -254,6 +254,11 @@ function Cover({ data, recBruta }: { data: RelatorioCompletoAgroData; recBruta: 
           <Text style={{ fontFamily: 'Helvetica', fontSize: 8.5, color: C.muted }}>
             Safra {data.safra} · {data.areaTotal.toLocaleString('pt-BR')} ha
           </Text>
+          {data.areaArrendada > 0 && (
+            <Text style={{ fontFamily: 'Helvetica', fontSize: 7.5, color: C.muted, marginTop: 3 }}>
+              {(data.areaTotal - data.areaArrendada).toLocaleString('pt-BR')} ha próprios · {data.areaArrendada.toLocaleString('pt-BR')} ha arrendados
+            </Text>
+          )}
 
           {/* Quote — bottom */}
           <View style={{ flex: 1, justifyContent: 'flex-end' }}>
