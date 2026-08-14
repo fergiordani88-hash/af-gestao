@@ -4,6 +4,7 @@ import {
   MapPin, BarChart2, AlertTriangle, CheckCircle, Info, Activity, FileDown, Target, Clock
 } from 'lucide-react'
 import { agroApi, type AgroProducao, type AgroPatrimonio, type AgroParcela } from '../../services/agroApi'
+import { calcularProjecao } from '../../services/pecuariaStorage'
 import { usePDF } from '../../pdf/usePDF'
 import { useStore } from '../../store/useStore'
 
@@ -457,10 +458,22 @@ export function TabResumo({ clientId, clienteNome, clienteCidade }: {
     setExportando(true)
     try {
       // Busca dados adicionais para o relatório (projeção e cenários)
-      const [custosFixos, despesas] = await Promise.all([
+      const [custosFixos, despesas, pecuariaData] = await Promise.all([
         agroApi.custosFixos.list(clientId).catch(() => [] as any[]),
         agroApi.despesas.list(clientId).catch(() => [] as any[]),
+        agroApi.pecuaria.get(clientId).catch(() => ({ lotes: [], config: null })),
       ])
+      // Projeção de pecuária (10 anos, alinhada com a projeção agro) — só roda se
+      // houver rebanho cadastrado. Usa os mesmos parâmetros/custos/manejo já salvos.
+      const pecProjecao = pecuariaData.lotes.length > 0
+        ? (() => {
+            const cfg = pecuariaData.config
+            const manejo = { sistema: cfg?.sistema ?? 'extensivo', areaTotal: cfg?.areaTotal ?? 0, forrageira: cfg?.forrageira ?? 'marandu', lotacaoReferencia: cfg?.lotacaoReferencia ?? 1.2, fatorSeca: cfg?.fatorSeca ?? 0.5, estadoPasto: cfg?.estadoPasto ?? 'bom', silagem: cfg?.silagem, rotacao: cfg?.rotacao ?? undefined, suplementos: cfg?.suplementos ?? [] } as any
+            const params = { ciclo: cfg?.ciclo ?? 'cria_recria_engorda', taxaPrenhez: cfg?.taxaPrenhez ?? 78, taxaNatalidade: cfg?.taxaNatalidade ?? 75, taxaMortalidadeBezerro: cfg?.taxaMortalidadeBezerro ?? 4, taxaDesmame: cfg?.taxaDesmame ?? 72, idadeDesmameMeses: cfg?.idadeDesmameMeses ?? 7, pesoDesmameKg: cfg?.pesoDesmameKg ?? 190, pesoAbateKg: cfg?.pesoAbateKg ?? 490, rendimentoCarcaca: cfg?.rendimentoCarcaca ?? 53, arrobasAbate: cfg?.arrobasAbate ?? 17, idadeAbateMeses: cfg?.idadeAbateMeses ?? 36, taxaDescarteAnual: cfg?.taxaDescarteAnual ?? 12, diasConfinamento: cfg?.diasConfinamento ?? 100, ganhoMedioDiario: cfg?.ganhoMedioDiario ?? 1.3, praca: cfg?.praca ?? 'Rondonópolis', precoBoiGordoArroba: cfg?.precoBoiGordoArroba ?? 320, precoBezerroCabeca: cfg?.precoBezerroCabeca ?? 2200, precoGarroteCabeca: cfg?.precoGarroteCabeca ?? 3500, precoVacaDescarteCabeca: cfg?.precoVacaDescarteCabeca ?? 2800, dataPrecos: cfg?.dataPrecos ?? '' } as any
+            const custosP = { vacinacaoAftosaAnoCab: cfg?.vacinacaoAftosaAnoCab ?? 12, vacinacaoBrucelaAnoCab: cfg?.vacinacaoBrucelaAnoCab ?? 4, vermifugacaoAnoCab: cfg?.vermifugacaoAnoCab ?? 8, outrosSanidadeAnoCab: cfg?.outrosSanidadeAnoCab ?? 6, manutencaoPastagemHaAno: cfg?.manutencaoPastagemHaAno ?? 80, reformaPastagemHa: cfg?.reformaPastagemHa ?? 1200, percentualReformaAno: cfg?.percentualReformaAno ?? 5, areaArrendadaHa: cfg?.areaArrendadaHa ?? 0, custoArrendamentoHaAno: cfg?.custoArrendamentoHaAno ?? 0, numFuncionarios: cfg?.numFuncionarios ?? 1, salarioMedioMensal: cfg?.salarioMedioMensal ?? 2400, encargosPct: cfg?.encargosPct ?? 33, combustivelMensal: cfg?.combustivelMensal ?? 800, manutencaoEquipMensal: cfg?.manutencaoEquipMensal ?? 400, outrosMensal: cfg?.outrosMensal ?? 300 } as any
+            return calcularProjecao(pecuariaData.lotes as any, params, custosP, manejo, 10)
+          })()
+        : []
       const custosFixosAnuais = custosFixos.reduce((s: number, cf: any) => s + cf.valorMensal, 0) * 12
       const agora = new Date(); agora.setHours(0, 0, 0, 0)
       const dividasPorAno: Record<string, number> = {}
@@ -513,6 +526,11 @@ export function TabResumo({ clientId, clienteNome, clienteCidade }: {
             custoArrendamento += (p.areaArrendada ?? 0) * (p.custoArrendHa ?? 0) * (p.cotacao || 1) * g
           }
         }
+        // Pecuária entra na receita/custo da atividade do mesmo ano (mesmo tratamento
+        // de arredondamento anual usado pela lavoura) — sem isso, clientes com rebanho
+        // ficavam com o resultado da pecuária inteiramente de fora da projeção.
+        const pec = pecProjecao[i]
+        if (pec) { recBruta += pec.receitaBruta; custo += pec.custoTotal }
         const custoAtividade = custo + custosFixosAnuais
         const endividamento = dividasPorAno[String(ano)] ?? 0
         const prejuizoAnoAnterior = i > 0 && projecaoAnos[i - 1].resultadoLiquido < 0
@@ -617,6 +635,13 @@ export function TabResumo({ clientId, clienteNome, clienteCidade }: {
         culturas:      prodSafra.map(p => ({ ...p, custoItens: p.custoItens })),
         areaTotal,
         areaArrendada,
+        pecuaria: pecProjecao[0] ? {
+          rebanhoTotal: pecProjecao[0].rebanhoTotal,
+          receitaBruta: pecProjecao[0].receitaBruta,
+          custoTotal: pecProjecao[0].custoTotal,
+          custoArrendamento: pecProjecao[0].custoArrendamento,
+          resultadoLiquido: pecProjecao[0].resultadoLiquido,
+        } : undefined,
         contratos:     (() => {
           // Saldo devedor real por contrato = soma da amortização das parcelas
           // futuras (mesmo critério do totalEndividamento do backend) — não o

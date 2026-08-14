@@ -81,6 +81,30 @@ export interface AgroPatrimonio {
   tipoOnus?: string; credor?: string; valorOnus: number; obs?: string
 }
 
+export interface AgroPecuariaLote {
+  id?: string; clientId: string; categoria: string; quantidade: number
+  idadeMediaMeses: number; pesoMedioKg: number; raca?: string; obs?: string
+}
+
+export interface AgroPecuariaConfig {
+  id?: string; clientId?: string
+  sistema: string; areaTotal: number; forrageira: string; lotacaoReferencia: number
+  fatorSeca: number; estadoPasto: string; silagem?: number
+  rotacao?: { numeroPiquetes: number; areaPorPiquete: number; diasOcupacaoChuva: number; diasOcupacaoSeca: number; diasDescansoChuva: number; diasDescansoSeca: number } | null
+  suplementos: { id: string; tipo: string; consumoGDiaCab: number; custoKg: number; mesesAplicacao: number[] }[]
+  ciclo: string; taxaPrenhez: number; taxaNatalidade: number; taxaMortalidadeBezerro: number
+  taxaDesmame: number; idadeDesmameMeses: number; pesoDesmameKg: number; pesoAbateKg: number
+  rendimentoCarcaca: number; arrobasAbate: number; idadeAbateMeses: number; taxaDescarteAnual: number
+  diasConfinamento: number; ganhoMedioDiario: number; praca: string
+  precoBoiGordoArroba: number; precoBezerroCabeca: number; precoGarroteCabeca: number
+  precoVacaDescarteCabeca: number; dataPrecos?: string
+  vacinacaoAftosaAnoCab: number; vacinacaoBrucelaAnoCab: number; vermifugacaoAnoCab: number
+  outrosSanidadeAnoCab: number; manutencaoPastagemHaAno: number; reformaPastagemHa: number
+  percentualReformaAno: number; areaArrendadaHa: number; custoArrendamentoHaAno: number
+  numFuncionarios: number; salarioMedioMensal: number; encargosPct: number
+  combustivelMensal: number; manutencaoEquipMensal: number; outrosMensal: number
+}
+
 export interface FluxoItem {
   data: string; mov: string; tipo: string; origem: string; descricao: string
   valor: number; saldoFinal: number; id?: string
@@ -142,6 +166,14 @@ export const agroApi = {
     create: (d: AgroPatrimonio) => req<AgroPatrimonio>('/patrimonio', { method: 'POST', body: JSON.stringify(d) }),
     update: (id: string, d: Partial<AgroPatrimonio>) => req<AgroPatrimonio>(`/patrimonio/${id}`, { method: 'PUT', body: JSON.stringify(d) }),
     delete: (id: string) => req<void>(`/patrimonio/${id}`, { method: 'DELETE' }),
+  },
+
+  pecuaria: {
+    get: (cid: string) => req<{ lotes: AgroPecuariaLote[]; config: AgroPecuariaConfig | null }>(`/pecuaria/${cid}`),
+    saveConfig: (cid: string, d: Partial<AgroPecuariaConfig>) => req<AgroPecuariaConfig>(`/pecuaria/${cid}/config`, { method: 'PUT', body: JSON.stringify(d) }),
+    createLote: (d: AgroPecuariaLote) => req<AgroPecuariaLote>('/pecuaria/lotes', { method: 'POST', body: JSON.stringify(d) }),
+    updateLote: (id: string, d: Partial<AgroPecuariaLote>) => req<AgroPecuariaLote>(`/pecuaria/lotes/${id}`, { method: 'PUT', body: JSON.stringify(d) }),
+    deleteLote: (id: string) => req<void>(`/pecuaria/lotes/${id}`, { method: 'DELETE' }),
   },
 
   // Fluxos

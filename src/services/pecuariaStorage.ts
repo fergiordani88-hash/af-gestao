@@ -217,31 +217,73 @@ export const DEFAULT_CUSTOS: CustosPecuaria = {
   combustivelMensal: 800, manutencaoEquipMensal: 400, outrosMensal: 300,
 }
 
-// ── localStorage CRUD ────────────────────────────────────────────────────────
+// ── Persistência via API (banco de dados — disponível em qualquer terminal) ───
+// Substituiu o localStorage: os dados agora ficam em AgroPecuariaLote/AgroPecuariaConfig,
+// acessíveis de qualquer navegador/computador logado, não só de onde foram cadastrados.
 
-const K = {
-  rebanho: (cid: string) => `pec-rebanho-v1-${cid}`,
-  manejo:  (cid: string) => `pec-manejo-v1-${cid}`,
-  params:  (cid: string) => `pec-params-v1-${cid}`,
-  custos:  (cid: string) => `pec-custos-v1-${cid}`,
+import { agroApi, type AgroPecuariaConfig } from './agroApi'
+
+function manejoFromConfig(cfg: AgroPecuariaConfig | null): ManejoForrageiro {
+  if (!cfg) return { ...DEFAULT_MANEJO }
+  return {
+    sistema: cfg.sistema as SistemaManejo,
+    areaTotal: cfg.areaTotal,
+    forrageira: cfg.forrageira,
+    lotacaoReferencia: cfg.lotacaoReferencia,
+    fatorSeca: cfg.fatorSeca,
+    estadoPasto: cfg.estadoPasto as ManejoForrageiro['estadoPasto'],
+    silagem: cfg.silagem,
+    rotacao: cfg.rotacao ?? undefined,
+    suplementos: (cfg.suplementos ?? []) as SuplementoItem[],
+  }
 }
 
-function ls<T>(key: string, def: T): T {
-  try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : def } catch { return def }
+function paramsFromConfig(cfg: AgroPecuariaConfig | null): ParametrosPecuaria {
+  if (!cfg) return { ...DEFAULT_PARAMS }
+  return {
+    ciclo: cfg.ciclo as TipoCiclo, taxaPrenhez: cfg.taxaPrenhez, taxaNatalidade: cfg.taxaNatalidade,
+    taxaMortalidadeBezerro: cfg.taxaMortalidadeBezerro, taxaDesmame: cfg.taxaDesmame,
+    idadeDesmameMeses: cfg.idadeDesmameMeses, pesoDesmameKg: cfg.pesoDesmameKg, pesoAbateKg: cfg.pesoAbateKg,
+    rendimentoCarcaca: cfg.rendimentoCarcaca, arrobasAbate: cfg.arrobasAbate, idadeAbateMeses: cfg.idadeAbateMeses,
+    taxaDescarteAnual: cfg.taxaDescarteAnual, diasConfinamento: cfg.diasConfinamento, ganhoMedioDiario: cfg.ganhoMedioDiario,
+    praca: cfg.praca, precoBoiGordoArroba: cfg.precoBoiGordoArroba, precoBezerroCabeca: cfg.precoBezerroCabeca,
+    precoGarroteCabeca: cfg.precoGarroteCabeca, precoVacaDescarteCabeca: cfg.precoVacaDescarteCabeca,
+    dataPrecos: cfg.dataPrecos ?? new Date().toISOString().slice(0, 10),
+  }
 }
-function save(key: string, val: unknown) {
-  localStorage.setItem(key, JSON.stringify(val))
+
+function custosFromConfig(cfg: AgroPecuariaConfig | null): CustosPecuaria {
+  if (!cfg) return { ...DEFAULT_CUSTOS }
+  return {
+    vacinacaoAftosaAnoCab: cfg.vacinacaoAftosaAnoCab, vacinacaoBrucelaAnoCab: cfg.vacinacaoBrucelaAnoCab,
+    vermifugacaoAnoCab: cfg.vermifugacaoAnoCab, outrosSanidadeAnoCab: cfg.outrosSanidadeAnoCab,
+    manutencaoPastagemHaAno: cfg.manutencaoPastagemHaAno, reformaPastagemHa: cfg.reformaPastagemHa,
+    percentualReformaAno: cfg.percentualReformaAno, areaArrendadaHa: cfg.areaArrendadaHa,
+    custoArrendamentoHaAno: cfg.custoArrendamentoHaAno, numFuncionarios: cfg.numFuncionarios,
+    salarioMedioMensal: cfg.salarioMedioMensal, encargosPct: cfg.encargosPct,
+    combustivelMensal: cfg.combustivelMensal, manutencaoEquipMensal: cfg.manutencaoEquipMensal, outrosMensal: cfg.outrosMensal,
+  }
+}
+
+export async function fetchPecuaria(clientId: string): Promise<{
+  lotes: LoteRebanho[]; manejo: ManejoForrageiro; params: ParametrosPecuaria; custos: CustosPecuaria
+}> {
+  const { lotes, config } = await agroApi.pecuaria.get(clientId)
+  return {
+    lotes: lotes as unknown as LoteRebanho[],
+    manejo: manejoFromConfig(config),
+    params: paramsFromConfig(config),
+    custos: custosFromConfig(config),
+  }
 }
 
 export const pecStorage = {
-  getRebanho:  (cid: string) => ls<LoteRebanho[]>(K.rebanho(cid), []),
-  saveRebanho: (cid: string, d: LoteRebanho[]) => save(K.rebanho(cid), d),
-  getManejo:   (cid: string) => ls<ManejoForrageiro>(K.manejo(cid), { ...DEFAULT_MANEJO }),
-  saveManejo:  (cid: string, d: ManejoForrageiro) => save(K.manejo(cid), d),
-  getParams:   (cid: string) => ls<ParametrosPecuaria>(K.params(cid), { ...DEFAULT_PARAMS }),
-  saveParams:  (cid: string, d: ParametrosPecuaria) => save(K.params(cid), d),
-  getCustos:   (cid: string) => ls<CustosPecuaria>(K.custos(cid), { ...DEFAULT_CUSTOS }),
-  saveCustos:  (cid: string, d: CustosPecuaria) => save(K.custos(cid), d),
+  saveManejo: (cid: string, d: ManejoForrageiro) => agroApi.pecuaria.saveConfig(cid, { ...d }),
+  saveParamsCustos: (cid: string, params: ParametrosPecuaria, custos: CustosPecuaria) =>
+    agroApi.pecuaria.saveConfig(cid, { ...params, ...custos }),
+  saveLote: (cid: string, lote: Omit<LoteRebanho, 'id'> & { id?: string }) =>
+    lote.id ? agroApi.pecuaria.updateLote(lote.id, lote) : agroApi.pecuaria.createLote({ ...lote, id: undefined, clientId: cid } as any),
+  deleteLote: (id: string) => agroApi.pecuaria.deleteLote(id),
 }
 
 // ── Cálculo de UA ────────────────────────────────────────────────────────────

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Plus, Trash2, Edit2, Check, X } from 'lucide-react'
 import {
-  pecStorage, LoteRebanho, CategoriaAnimal,
+  pecStorage, fetchPecuaria, LoteRebanho, CategoriaAnimal,
   CATEGORIA_LABELS, CATEGORIA_GRUPO, UA_EQUIV, calcUA,
 } from '../../services/pecuariaStorage'
 
@@ -27,26 +27,24 @@ export function TabPecuariaRebanho({ clientId }: Props) {
   const [editId, setEditId] = useState<string | null>(null)
   const [showForm, setShowForm] = useState(false)
 
-  useEffect(() => { setLotes(pecStorage.getRebanho(clientId)) }, [clientId])
+  useEffect(() => { fetchPecuaria(clientId).then(d => setLotes(d.lotes)) }, [clientId])
 
-  function salvar() {
-    let novos: LoteRebanho[]
+  async function salvar() {
     if (editId) {
-      novos = lotes.map(l => l.id === editId ? { ...form, id: editId } : l)
+      const atualizado = await pecStorage.saveLote(clientId, { ...form, id: editId })
+      setLotes(lotes.map(l => l.id === editId ? (atualizado as LoteRebanho) : l))
     } else {
-      novos = [...lotes, { ...form, id: crypto.randomUUID() }]
+      const criado = await pecStorage.saveLote(clientId, form)
+      setLotes([...lotes, criado as LoteRebanho])
     }
-    pecStorage.saveRebanho(clientId, novos)
-    setLotes(novos)
     setForm(novoLote())
     setEditId(null)
     setShowForm(false)
   }
 
-  function remover(id: string) {
-    const novos = lotes.filter(l => l.id !== id)
-    pecStorage.saveRebanho(clientId, novos)
-    setLotes(novos)
+  async function remover(id: string) {
+    await pecStorage.deleteLote(id)
+    setLotes(lotes.filter(l => l.id !== id))
   }
 
   function editar(l: LoteRebanho) {

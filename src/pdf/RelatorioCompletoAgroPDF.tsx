@@ -30,6 +30,7 @@ export interface RelatorioCompletoAgroData {
   clientName: string; clientCity?: string; consultorName: string
   safra: string; dataGeracao: string; horaGeracao?: string
   culturas: RelCultura[]; areaTotal: number; areaArrendada: number
+  pecuaria?: { rebanhoTotal: number; receitaBruta: number; custoTotal: number; custoArrendamento: number; resultadoLiquido: number }
   contratos: RelContrato[]; totalEndividamento: number; servicoAnual: number; saldoDevedor: number
   patrimonio: RelPatrimonio[]; patrimonioGruto: number; totalOnus: number
   margem: number; alavancagem: number; solvencia: number
@@ -331,10 +332,15 @@ export function RelatorioCompletoAgroPDF({ data }: { data: RelatorioCompletoAgro
     const pe  = c.cotacao > 0 ? (c.custoPorHa + (c.area > 0 ? c.custoArrendHa * c.areaArrendada / c.area : 0)) : 0
     return { ...c, rb, cu, cuProd, cuArrend, res, mg, pe }
   })
-  const recBruta       = cc.reduce((a, c) => a + c.rb, 0)
+  const recBrutaLavoura = cc.reduce((a, c) => a + c.rb, 0)
   const custoProdTotal = cc.reduce((a, c) => a + c.cuProd, 0)
-  const custoArrendTotal = cc.reduce((a, c) => a + c.cuArrend, 0)
-  const custoTotal     = custoProdTotal + custoArrendTotal
+  const custoArrendLavoura = cc.reduce((a, c) => a + c.cuArrend, 0)
+  const recBrutaPec = data.pecuaria?.receitaBruta ?? 0
+  const custoArrendPec = data.pecuaria?.custoArrendamento ?? 0
+  const custoPecOperacional = data.pecuaria ? data.pecuaria.custoTotal - data.pecuaria.custoArrendamento : 0
+  const recBruta       = recBrutaLavoura + recBrutaPec
+  const custoArrendTotal = custoArrendLavoura + custoArrendPec
+  const custoTotal     = custoProdTotal + custoArrendTotal + custoPecOperacional
   const resOp      = recBruta - custoTotal
   const resPos     = resOp - data.servicoAnual
   const h          = data.horaGeracao
@@ -461,19 +467,48 @@ export function RelatorioCompletoAgroPDF({ data }: { data: RelatorioCompletoAgro
                 <Text style={{ ...s.td, fontSize: 7 }}>{c.pe.toFixed(1)} sc</Text>
               </View>
             ))}
-            {/* Total — soma de todas as culturas (mesma área rotacionada, custo e receita se somam) */}
+            {/* Total — soma de todas as culturas (mesma área rotacionada, custo e receita se somam).
+                Não inclui pecuária (tabela própria abaixo) — por isso usa os totais só da lavoura. */}
             <View style={[s.tr, { borderTopWidth: 1, borderTopColor: C.border, backgroundColor: '#F0F3F0' }]}>
               <Text style={{ ...s.tdB, flex: 1.3, fontSize: 7 }}>Total</Text>
               <Text style={{ ...s.td, fontSize: 7 }}></Text>
               <Text style={{ ...s.td, fontSize: 7 }}></Text>
               <Text style={{ ...s.td, fontSize: 7 }}></Text>
-              <Text style={{ ...s.td, fontSize: 7, fontFamily: 'Helvetica-Bold', color: C.pos }}>{R(recBruta)}</Text>
-              <Text style={{ ...s.td, fontSize: 7, fontFamily: 'Helvetica-Bold', color: C.neg }}>{R(custoTotal)}</Text>
-              <Text style={{ ...s.td, fontSize: 7, fontFamily: 'Helvetica-Bold', color: resOp >= 0 ? C.pos : C.neg }}>{R(resOp)}</Text>
-              <Text style={{ ...s.td, fontSize: 7, fontFamily: 'Helvetica-Bold' }}>{recBruta > 0 ? pct(resOp / recBruta * 100) : ''}</Text>
+              <Text style={{ ...s.td, fontSize: 7, fontFamily: 'Helvetica-Bold', color: C.pos }}>{R(recBrutaLavoura)}</Text>
+              <Text style={{ ...s.td, fontSize: 7, fontFamily: 'Helvetica-Bold', color: C.neg }}>{R(custoProdTotal + custoArrendLavoura)}</Text>
+              <Text style={{ ...s.td, fontSize: 7, fontFamily: 'Helvetica-Bold', color: (recBrutaLavoura - custoProdTotal - custoArrendLavoura) >= 0 ? C.pos : C.neg }}>{R(recBrutaLavoura - custoProdTotal - custoArrendLavoura)}</Text>
+              <Text style={{ ...s.td, fontSize: 7, fontFamily: 'Helvetica-Bold' }}>{recBrutaLavoura > 0 ? pct((recBrutaLavoura - custoProdTotal - custoArrendLavoura) / recBrutaLavoura * 100) : ''}</Text>
               <Text style={{ ...s.td, fontSize: 7 }}></Text>
             </View>
           </View>
+
+          {/* Resultado da Pecuária — só aparece se o cliente tiver rebanho cadastrado */}
+          {data.pecuaria && (
+            <>
+              <Sec title="Resultado da Pecuária" />
+              <View style={s.tbl}>
+                <View style={s.thd}>
+                  <Text style={{ ...s.th, flex: 1.3 }}>Rebanho</Text>
+                  <Text style={s.th}>Receita Bruta</Text>
+                  <Text style={s.th}>Custo Operacional</Text>
+                  <Text style={s.th}>Arrendamento</Text>
+                  <Text style={s.th}>Resultado</Text>
+                  <Text style={s.th}>Margem</Text>
+                </View>
+                <View style={s.tr}>
+                  <Text style={{ ...s.tdB, flex: 1.3 }}>{data.pecuaria.rebanhoTotal.toLocaleString('pt-BR')} cab</Text>
+                  <Text style={{ ...s.td, color: C.pos }}>{R(data.pecuaria.receitaBruta)}</Text>
+                  <Text style={{ ...s.td, color: C.neg }}>{R(data.pecuaria.custoTotal - data.pecuaria.custoArrendamento)}</Text>
+                  <Text style={{ ...s.td, color: C.neg }}>{data.pecuaria.custoArrendamento > 0 ? R(data.pecuaria.custoArrendamento) : '—'}</Text>
+                  <Text style={{ ...s.td, fontFamily: 'Helvetica-Bold', color: data.pecuaria.resultadoLiquido >= 0 ? C.pos : C.neg }}>{R(data.pecuaria.resultadoLiquido)}</Text>
+                  <Text style={{ ...s.td, fontFamily: 'Helvetica-Bold' }}>{data.pecuaria.receitaBruta > 0 ? pct(data.pecuaria.resultadoLiquido / data.pecuaria.receitaBruta * 100) : '—'}</Text>
+                </View>
+              </View>
+              <Text style={{ fontFamily: 'Helvetica', fontSize: 6, color: C.muted, marginTop: 4 }}>
+                Projeção do ano corrente com base no rebanho, manejo e parâmetros zootécnicos cadastrados no módulo de Pecuária — já somada à Receita Bruta e ao Custo total do resumo financeiro desta página.
+              </Text>
+            </>
+          )}
         </View>
         <Ftr client={data.clientName} date={data.dataGeracao} hora={h} />
       </Page>
@@ -493,6 +528,7 @@ export function RelatorioCompletoAgroPDF({ data }: { data: RelatorioCompletoAgro
                   { l: 'Receita Bruta',             v: recBruta,           neg: false, total: false, sub: false },
                   { l: '(-) Custo de Produção',      v: custoProdTotal,     neg: true,  total: false, sub: true  },
                   { l: '(-) Despesa de Arrendamento', v: custoArrendTotal,  neg: true,  total: false, sub: true  },
+                  ...(data.pecuaria ? [{ l: '(-) Custo Operacional Pecuária', v: custoPecOperacional, neg: true, total: false, sub: true }] : []),
                   { l: '= Resultado Operacional',    v: resOp,              neg: false, total: true,  sub: false },
                   { l: '(-) Serviço da Dívida/ano',  v: data.servicoAnual,  neg: true,  total: false, sub: true  },
                   { l: '= Resultado após Endivid.',  v: resPos,             neg: false, total: true,  sub: false },
@@ -571,6 +607,50 @@ export function RelatorioCompletoAgroPDF({ data }: { data: RelatorioCompletoAgro
               )
             })}
           </View>
+
+          {/* Patrimônio — resumo por categoria */}
+          {data.patrimonio.length > 0 && (() => {
+            const porCategoria: Record<string, { n: number; valor: number; onus: number }> = {}
+            for (const p of data.patrimonio) {
+              if (!porCategoria[p.categoria]) porCategoria[p.categoria] = { n: 0, valor: 0, onus: 0 }
+              porCategoria[p.categoria].n++
+              porCategoria[p.categoria].valor += p.valorAvaliado
+              porCategoria[p.categoria].onus += p.possuiOnus ? p.valorOnus : 0
+            }
+            const linhas = Object.entries(porCategoria).sort((a, b) => b[1].valor - a[1].valor)
+            const totalValor = linhas.reduce((s, [, c]) => s + c.valor, 0)
+            const totalOnus = linhas.reduce((s, [, c]) => s + c.onus, 0)
+            return (
+              <>
+                <Sec title="Patrimônio — Resumo por Categoria" />
+                <View style={s.tbl}>
+                  <View style={s.thd}>
+                    <Text style={{ ...s.th, flex: 2 }}>Categoria</Text>
+                    <Text style={s.th}>Itens</Text>
+                    <Text style={s.th}>Valor Avaliado</Text>
+                    <Text style={s.th}>Ônus</Text>
+                    <Text style={s.th}>Valor Líquido</Text>
+                  </View>
+                  {linhas.map(([categoria, c], i) => (
+                    <View key={categoria} style={[s.tr, i % 2 === 0 ? s.trA : {}]}>
+                      <Text style={{ ...s.tdB, flex: 2 }}>{categoria}</Text>
+                      <Text style={s.td}>{c.n}</Text>
+                      <Text style={s.td}>{R(c.valor)}</Text>
+                      <Text style={{ ...s.td, color: c.onus > 0 ? C.neg : C.muted }}>{c.onus > 0 ? R(c.onus) : '—'}</Text>
+                      <Text style={{ ...s.td, fontFamily: 'Helvetica-Bold' }}>{R(c.valor - c.onus)}</Text>
+                    </View>
+                  ))}
+                  <View style={[s.tr, s.trT]}>
+                    <Text style={{ ...s.tdB, flex: 2 }}>Total</Text>
+                    <Text style={s.td}>{data.patrimonio.length}</Text>
+                    <Text style={s.tdG}>{R(totalValor)}</Text>
+                    <Text style={{ ...s.td, color: totalOnus > 0 ? C.neg : C.muted }}>{totalOnus > 0 ? R(totalOnus) : '—'}</Text>
+                    <Text style={{ ...s.td, fontFamily: 'Helvetica-Bold', color: C.pos }}>{R(totalValor - totalOnus)}</Text>
+                  </View>
+                </View>
+              </>
+            )
+          })()}
 
         </View>
         <Ftr client={data.clientName} date={data.dataGeracao} hora={h} />

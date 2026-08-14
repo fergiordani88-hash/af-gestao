@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Save, AlertTriangle, CheckCircle, Info } from 'lucide-react'
 import {
-  pecStorage, ManejoForrageiro, SuplementoItem,
+  pecStorage, fetchPecuaria, ManejoForrageiro, LoteRebanho, SuplementoItem,
   FORRAGEIRAS, SISTEMA_LABELS, ESTADO_PASTO_LABELS,
   calcCapacidade, calcUA, DEFAULT_MANEJO,
 } from '../../services/pecuariaStorage'
@@ -13,16 +13,18 @@ interface Props { clientId: string }
 
 export function TabPecuariaManejo({ clientId }: Props) {
   const [manejo, setManejo] = useState<ManejoForrageiro>({ ...DEFAULT_MANEJO })
+  const [rebanho, setRebanho] = useState<LoteRebanho[]>([])
   const [salvo, setSalvo] = useState(false)
 
-  useEffect(() => { setManejo(pecStorage.getManejo(clientId)) }, [clientId])
+  useEffect(() => {
+    fetchPecuaria(clientId).then(d => { setManejo(d.manejo); setRebanho(d.lotes) })
+  }, [clientId])
 
-  const rebanho = pecStorage.getRebanho(clientId)
   const uaAtual = calcUA(rebanho)
   const cap = calcCapacidade(manejo)
 
-  function salvar() {
-    pecStorage.saveManejo(clientId, manejo)
+  async function salvar() {
+    await pecStorage.saveManejo(clientId, manejo)
     setSalvo(true)
     setTimeout(() => setSalvo(false), 2000)
   }

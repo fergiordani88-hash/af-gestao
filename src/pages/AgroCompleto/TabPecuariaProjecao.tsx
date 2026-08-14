@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react'
 import { Save, CheckCircle, TrendingUp, TrendingDown, Minus, RefreshCw } from 'lucide-react'
 import {
-  pecStorage, ParametrosPecuaria, CustosPecuaria,
-  CICLO_LABELS, PRACAS_MT, DEFAULT_PARAMS, DEFAULT_CUSTOS,
+  pecStorage, fetchPecuaria, ParametrosPecuaria, CustosPecuaria, LoteRebanho, ManejoForrageiro,
+  CICLO_LABELS, PRACAS_MT, DEFAULT_PARAMS, DEFAULT_CUSTOS, DEFAULT_MANEJO,
   calcularProjecao, ProjecaoAnoPec,
 } from '../../services/pecuariaStorage'
 import { agroApi } from '../../services/agroApi'
@@ -17,6 +17,8 @@ type Secao = 'ciclo' | 'zoot' | 'precos' | 'custos'
 export function TabPecuariaProjecao({ clientId }: Props) {
   const [params, setParams] = useState<ParametrosPecuaria>({ ...DEFAULT_PARAMS })
   const [custos, setCustos] = useState<CustosPecuaria>({ ...DEFAULT_CUSTOS })
+  const [rebanho, setRebanho] = useState<LoteRebanho[]>([])
+  const [manejo, setManejo] = useState<ManejoForrageiro>({ ...DEFAULT_MANEJO })
   const [projecao, setProjecao] = useState<ProjecaoAnoPec[]>([])
   const [salvo, setSalvo] = useState(false)
   const [secao, setSecao] = useState<Secao>('ciclo')
@@ -24,22 +26,19 @@ export function TabPecuariaProjecao({ clientId }: Props) {
   const [sincronizado, setSincronizado] = useState(false)
 
   useEffect(() => {
-    setParams(pecStorage.getParams(clientId))
-    setCustos(pecStorage.getCustos(clientId))
+    fetchPecuaria(clientId).then(d => {
+      setParams(d.params); setCustos(d.custos); setRebanho(d.lotes); setManejo(d.manejo)
+    })
   }, [clientId])
-
-  const rebanho = pecStorage.getRebanho(clientId)
-  const manejo  = pecStorage.getManejo(clientId)
 
   useEffect(() => {
     if (rebanho.length > 0) {
-      setProjecao(calcularProjecao(rebanho, params, custos, manejo, 5))
+      setProjecao(calcularProjecao(rebanho, params, custos, manejo, 10))
     }
-  }, [params, custos, clientId])
+  }, [params, custos, rebanho, manejo])
 
-  function salvar() {
-    pecStorage.saveParams(clientId, params)
-    pecStorage.saveCustos(clientId, custos)
+  async function salvar() {
+    await pecStorage.saveParamsCustos(clientId, params, custos)
     setSalvo(true)
     setTimeout(() => setSalvo(false), 2000)
   }
@@ -272,7 +271,7 @@ export function TabPecuariaProjecao({ clientId }: Props) {
       {projecao.length > 0 && (
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
           <div className="px-5 py-3 border-b border-gray-100">
-            <h3 className="text-sm font-bold text-gray-900">Projeção 5 Anos — {CICLO_LABELS[params.ciclo]}</h3>
+            <h3 className="text-sm font-bold text-gray-900">Projeção 10 Anos — {CICLO_LABELS[params.ciclo]}</h3>
             <p className="text-xs text-gray-400 mt-0.5">Rebanho base: {totalCab.toLocaleString('pt-BR')} cab • Praça: {params.praca}</p>
           </div>
           <div className="overflow-x-auto">
@@ -318,10 +317,10 @@ export function TabPecuariaProjecao({ clientId }: Props) {
           {/* KPIs */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-0 border-t border-gray-100">
             {[
-              { label: 'Rec. Bruta Total 5a', val: R(projecao.reduce((s,p)=>s+p.receitaBruta,0)) },
-              { label: 'Resultado Total 5a',  val: R(projecao.reduce((s,p)=>s+p.resultadoLiquido,0)) },
+              { label: 'Rec. Bruta Total 10a', val: R(projecao.reduce((s,p)=>s+p.receitaBruta,0)) },
+              { label: 'Resultado Total 10a',  val: R(projecao.reduce((s,p)=>s+p.resultadoLiquido,0)) },
               { label: 'Taxa Desfrute Média', val: N(projecao.reduce((s,p)=>s+p.taxaDesfrute,0)/projecao.length) + '%' },
-              { label: 'Abates Totais 5a',    val: projecao.reduce((s,p)=>s+p.abates,0).toLocaleString('pt-BR') + ' cab' },
+              { label: 'Abates Totais 10a',    val: projecao.reduce((s,p)=>s+p.abates,0).toLocaleString('pt-BR') + ' cab' },
             ].map(k => (
               <div key={k.label} className="px-4 py-3 border-r border-gray-100 last:border-r-0">
                 <p className="text-xs text-gray-400">{k.label}</p>
