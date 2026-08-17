@@ -4,7 +4,7 @@ import {
   MapPin, BarChart2, AlertTriangle, CheckCircle, Info, Activity, FileDown, Target, Clock
 } from 'lucide-react'
 import { agroApi, type AgroProducao, type AgroPatrimonio, type AgroParcela } from '../../services/agroApi'
-import { calcularProjecao } from '../../services/pecuariaStorage'
+import { calcularProjecao, manejoFromConfig, paramsFromConfig, custosFromConfig } from '../../services/pecuariaStorage'
 import { usePDF } from '../../pdf/usePDF'
 import { useStore } from '../../store/useStore'
 
@@ -468,9 +468,9 @@ export function TabResumo({ clientId, clienteNome, clienteCidade }: {
       const pecProjecao = pecuariaData.lotes.length > 0
         ? (() => {
             const cfg = pecuariaData.config
-            const manejo = { sistema: cfg?.sistema ?? 'extensivo', areaTotal: cfg?.areaTotal ?? 0, forrageira: cfg?.forrageira ?? 'marandu', lotacaoReferencia: cfg?.lotacaoReferencia ?? 1.2, fatorSeca: cfg?.fatorSeca ?? 0.5, estadoPasto: cfg?.estadoPasto ?? 'bom', silagem: cfg?.silagem, rotacao: cfg?.rotacao ?? undefined, suplementos: cfg?.suplementos ?? [] } as any
-            const params = { ciclo: cfg?.ciclo ?? 'cria_recria_engorda', taxaPrenhez: cfg?.taxaPrenhez ?? 78, taxaNatalidade: cfg?.taxaNatalidade ?? 75, taxaMortalidadeBezerro: cfg?.taxaMortalidadeBezerro ?? 4, taxaDesmame: cfg?.taxaDesmame ?? 72, idadeDesmameMeses: cfg?.idadeDesmameMeses ?? 7, pesoDesmameKg: cfg?.pesoDesmameKg ?? 190, pesoAbateKg: cfg?.pesoAbateKg ?? 490, rendimentoCarcaca: cfg?.rendimentoCarcaca ?? 53, arrobasAbate: cfg?.arrobasAbate ?? 17, idadeAbateMeses: cfg?.idadeAbateMeses ?? 36, taxaDescarteAnual: cfg?.taxaDescarteAnual ?? 12, diasConfinamento: cfg?.diasConfinamento ?? 100, ganhoMedioDiario: cfg?.ganhoMedioDiario ?? 1.3, praca: cfg?.praca ?? 'Rondonópolis', precoBoiGordoArroba: cfg?.precoBoiGordoArroba ?? 320, precoBezerroCabeca: cfg?.precoBezerroCabeca ?? 2200, precoGarroteCabeca: cfg?.precoGarroteCabeca ?? 3500, precoVacaDescarteCabeca: cfg?.precoVacaDescarteCabeca ?? 2800, dataPrecos: cfg?.dataPrecos ?? '' } as any
-            const custosP = { vacinacaoAftosaAnoCab: cfg?.vacinacaoAftosaAnoCab ?? 12, vacinacaoBrucelaAnoCab: cfg?.vacinacaoBrucelaAnoCab ?? 4, vermifugacaoAnoCab: cfg?.vermifugacaoAnoCab ?? 8, outrosSanidadeAnoCab: cfg?.outrosSanidadeAnoCab ?? 6, manutencaoPastagemHaAno: cfg?.manutencaoPastagemHaAno ?? 80, reformaPastagemHa: cfg?.reformaPastagemHa ?? 1200, percentualReformaAno: cfg?.percentualReformaAno ?? 5, areaArrendadaHa: cfg?.areaArrendadaHa ?? 0, custoArrendamentoHaAno: cfg?.custoArrendamentoHaAno ?? 0, numFuncionarios: cfg?.numFuncionarios ?? 1, salarioMedioMensal: cfg?.salarioMedioMensal ?? 2400, encargosPct: cfg?.encargosPct ?? 33, combustivelMensal: cfg?.combustivelMensal ?? 800, manutencaoEquipMensal: cfg?.manutencaoEquipMensal ?? 400, outrosMensal: cfg?.outrosMensal ?? 300 } as any
+            const manejo = manejoFromConfig(cfg)
+            const params = paramsFromConfig(cfg)
+            const custosP = custosFromConfig(cfg)
             return calcularProjecao(pecuariaData.lotes as any, params, custosP, manejo, 10)
           })()
         : []

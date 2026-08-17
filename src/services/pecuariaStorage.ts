@@ -234,7 +234,7 @@ export const DEFAULT_CUSTOS: CustosPecuaria = {
 
 import { agroApi, type AgroPecuariaConfig } from './agroApi'
 
-function manejoFromConfig(cfg: AgroPecuariaConfig | null): ManejoForrageiro {
+export function manejoFromConfig(cfg: AgroPecuariaConfig | null): ManejoForrageiro {
   if (!cfg) return { ...DEFAULT_MANEJO }
   return {
     sistema: cfg.sistema as SistemaManejo,
@@ -249,7 +249,7 @@ function manejoFromConfig(cfg: AgroPecuariaConfig | null): ManejoForrageiro {
   }
 }
 
-function paramsFromConfig(cfg: AgroPecuariaConfig | null): ParametrosPecuaria {
+export function paramsFromConfig(cfg: AgroPecuariaConfig | null): ParametrosPecuaria {
   if (!cfg) return { ...DEFAULT_PARAMS }
   return {
     ciclo: cfg.ciclo as TipoCiclo, taxaPrenhez: cfg.taxaPrenhez, taxaNatalidade: cfg.taxaNatalidade,
@@ -268,7 +268,7 @@ function paramsFromConfig(cfg: AgroPecuariaConfig | null): ParametrosPecuaria {
   }
 }
 
-function custosFromConfig(cfg: AgroPecuariaConfig | null): CustosPecuaria {
+export function custosFromConfig(cfg: AgroPecuariaConfig | null): CustosPecuaria {
   if (!cfg) return { ...DEFAULT_CUSTOS }
   return {
     vacinacaoAftosaAnoCab: cfg.vacinacaoAftosaAnoCab, vacinacaoBrucelaAnoCab: cfg.vacinacaoBrucelaAnoCab,
