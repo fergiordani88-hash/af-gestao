@@ -102,6 +102,7 @@ export interface ProjecaoAnoPec {
   descartes: number
   receitaAbate: number
   receitaDescarte: number
+  receitaGarrote: number
   receitaBezerros: number
   receitaBruta: number
   custoArrendamento: number
@@ -321,7 +322,7 @@ export function calcularProjecao(
 
   const { taxaPrenhez, taxaNatalidade, taxaMortalidadeBezerro, taxaDesmame,
           taxaDescarteAnual, arrobasAbate, precoBoiGordoArroba,
-          precoBezerroCabeca, precoVacaDescarteCabeca, ciclo } = params
+          precoBezerroCabeca, precoGarroteCabeca, precoVacaDescarteCabeca, ciclo } = params
 
   const ehCria    = ['cria', 'cria_recria', 'cria_recria_engorda'].includes(ciclo)
   const ehEngorda = ['engorda', 'confinamento', 'recria_engorda', 'cria_recria_engorda'].includes(ciclo)
@@ -346,19 +347,25 @@ export function calcularProjecao(
 
     // ABATE: ano 0 usa boi_gordo já existente; anos seguintes = pipeline
     const abates = i === 0 ? prontoAbate : (ehEngorda ? Math.round(emRecria * 0.85) : 0)
-    emRecria = ehSoCria ? 0 : machos + (ehEngorda && i > 0 ? Math.round(emRecria * 0.15) : 0)
+    // Recria pura (cria_recria, sem engorda): os machos recriados são vendidos como garrote
+    // no próprio ciclo anual, não ficam acumulados indefinidamente no rebanho.
+    const ehRecriaPura = ehCria && !ehEngorda && !ehSoCria
+    const recriaHeadcountAno = ehSoCria ? 0 : machos + (ehEngorda && i > 0 ? Math.round(emRecria * 0.15) : 0)
+    const garrotesVendidos = ehRecriaPura ? machos : 0
+    emRecria = ehRecriaPura ? 0 : recriaHeadcountAno
     if (i === 0) prontoAbate = 0
 
     // RECEITA
     const receitaAbate    = abates * arrobasAbate * precoBoiGordoArroba
     const receitaDescarte = descartes * precoVacaDescarteCabeca
+    const receitaGarrote  = garrotesVendidos * precoGarroteCabeca
     const receitaBezerros = ehSoCria
       ? machos * precoBezerroCabeca + bezeirasVendidas * precoBezerroCabeca * 0.8
       : bezeirasVendidas * precoBezerroCabeca * 0.8
-    const receitaBruta = receitaAbate + receitaDescarte + receitaBezerros
+    const receitaBruta = receitaAbate + receitaDescarte + receitaGarrote + receitaBezerros
 
-    // CUSTO
-    const rebanhoTotal = vacas + touros + emRecria + abates
+    // CUSTO — usa o efetivo em recria durante o ano (mesmo os vendidos consumiram pasto/sanidade)
+    const rebanhoTotal = vacas + touros + recriaHeadcountAno + abates
     const sanidadeCab = custos.vacinacaoAftosaAnoCab + custos.vacinacaoBrucelaAnoCab +
       custos.vermifugacaoAnoCab + custos.outrosSanidadeAnoCab
     const custoSanidade    = rebanhoTotal * sanidadeCab
@@ -373,12 +380,12 @@ export function calcularProjecao(
     const custoTotal = custoSanidade + custoPastagem + custoMO + custoOutros + custoSuplem + custoArrendamento
 
     const uaTotal = calcUA(rebanho) // simplificado — usa rebanho inicial como proxy da UA média
-    const taxaDesfrute = rebanhoTotal > 0 ? ((abates + descartes) / rebanhoTotal) * 100 : 0
+    const taxaDesfrute = rebanhoTotal > 0 ? ((abates + descartes + garrotesVendidos) / rebanhoTotal) * 100 : 0
 
     resultado.push({
       ano, rebanhoTotal, uaTotal: Math.round(uaTotal * 10) / 10,
       nascimentos, desmamados, abates, descartes,
-      receitaAbate, receitaDescarte, receitaBezerros, receitaBruta,
+      receitaAbate, receitaDescarte, receitaGarrote, receitaBezerros, receitaBruta,
       custoArrendamento, custoTotal, resultadoLiquido: receitaBruta - custoTotal,
       taxaDesfrute: Math.round(taxaDesfrute * 10) / 10,
     })
