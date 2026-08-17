@@ -173,6 +173,8 @@ export function TabPecuariaProjecao({ clientId }: Props) {
               {numInput('Taxa de Prenhez', params.taxaPrenhez, v => setP('taxaPrenhez', v), { suffix: '%', step: 1 })}
               {numInput('Taxa de Natalidade', params.taxaNatalidade, v => setP('taxaNatalidade', v), { suffix: '%', step: 1 })}
               {numInput('Mortalidade Bezerro', params.taxaMortalidadeBezerro, v => setP('taxaMortalidadeBezerro', v), { suffix: '%', step: 0.5 })}
+              {numInput('Mortalidade Adulta (vaca/touro)', params.taxaMortalidadeAdulta, v => setP('taxaMortalidadeAdulta', v), { suffix: '%', step: 0.5 })}
+              {numInput('Mortalidade na Recria', params.taxaMortalidadeRecria, v => setP('taxaMortalidadeRecria', v), { suffix: '%', step: 0.5 })}
               {numInput('Taxa de Desmame', params.taxaDesmame, v => setP('taxaDesmame', v), { suffix: '%', step: 1 })}
               {numInput('Idade ao Desmame', params.idadeDesmameMeses, v => setP('idadeDesmameMeses', v), { suffix: 'meses' })}
               {numInput('Peso ao Desmame', params.pesoDesmameKg, v => setP('pesoDesmameKg', v), { suffix: 'kg' })}
@@ -181,6 +183,7 @@ export function TabPecuariaProjecao({ clientId }: Props) {
               {numInput('@s ao Abate', params.arrobasAbate, v => setP('arrobasAbate', v), { suffix: '@', step: 0.5 })}
               {numInput('Idade ao Abate', params.idadeAbateMeses, v => setP('idadeAbateMeses', v), { suffix: 'meses' })}
               {numInput('Descarte Anual', params.taxaDescarteAnual, v => setP('taxaDescarteAnual', v), { suffix: '%', step: 1 })}
+              {numInput('Meta de Crescimento do Rebanho', params.metaCrescimentoRebanhoPct, v => setP('metaCrescimentoRebanhoPct', v), { suffix: '%/ano', step: 1 })}
               {numInput('GMD Engorda', params.ganhoMedioDiario, v => setP('ganhoMedioDiario', v), { suffix: 'kg/dia', step: 0.05 })}
               {numInput('Dias de Confinamento', params.diasConfinamento, v => setP('diasConfinamento', v), { suffix: 'dias' })}
             </div>
@@ -197,6 +200,7 @@ export function TabPecuariaProjecao({ clientId }: Props) {
               {numInput('Bezerro (desmamado)', params.precoBezerroCabeca, v => setP('precoBezerroCabeca', v), { suffix: 'R$/cab', step: 50 })}
               {numInput('Garrote (12-18m)', params.precoGarroteCabeca, v => setP('precoGarroteCabeca', v), { suffix: 'R$/cab', step: 50 })}
               {numInput('Vaca de Descarte', params.precoVacaDescarteCabeca, v => setP('precoVacaDescarteCabeca', v), { suffix: 'R$/cab', step: 50 })}
+              {numInput('Novilha (compra p/ reposição/crescimento)', params.precoNovilhaCompraCabeca, v => setP('precoNovilhaCompraCabeca', v), { suffix: 'R$/cab', step: 50 })}
             </div>
             <div className="bg-gray-50 rounded-xl p-3 text-xs text-gray-500 mt-2">
               <strong>Referência de mercado:</strong> O boi gordo em {params.praca} é consultado no boletim semanal Scott Consultoria.

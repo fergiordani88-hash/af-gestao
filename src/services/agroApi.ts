@@ -93,11 +93,13 @@ export interface AgroPecuariaConfig {
   rotacao?: { numeroPiquetes: number; areaPorPiquete: number; diasOcupacaoChuva: number; diasOcupacaoSeca: number; diasDescansoChuva: number; diasDescansoSeca: number } | null
   suplementos: { id: string; tipo: string; consumoGDiaCab: number; custoKg: number; mesesAplicacao: number[] }[]
   ciclo: string; taxaPrenhez: number; taxaNatalidade: number; taxaMortalidadeBezerro: number
+  taxaMortalidadeAdulta: number; taxaMortalidadeRecria: number
   taxaDesmame: number; idadeDesmameMeses: number; pesoDesmameKg: number; pesoAbateKg: number
   rendimentoCarcaca: number; arrobasAbate: number; idadeAbateMeses: number; taxaDescarteAnual: number
+  metaCrescimentoRebanhoPct: number
   diasConfinamento: number; ganhoMedioDiario: number; praca: string
   precoBoiGordoArroba: number; precoBezerroCabeca: number; precoGarroteCabeca: number
-  precoVacaDescarteCabeca: number; dataPrecos?: string
+  precoVacaDescarteCabeca: number; precoNovilhaCompraCabeca: number; dataPrecos?: string
   vacinacaoAftosaAnoCab: number; vacinacaoBrucelaAnoCab: number; vermifugacaoAnoCab: number
   outrosSanidadeAnoCab: number; manutencaoPastagemHaAno: number; reformaPastagemHa: number
   percentualReformaAno: number; areaArrendadaHa: number; custoArrendamentoHaAno: number

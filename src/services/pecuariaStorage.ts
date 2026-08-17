@@ -56,6 +56,8 @@ export interface ParametrosPecuaria {
   taxaPrenhez: number
   taxaNatalidade: number
   taxaMortalidadeBezerro: number
+  taxaMortalidadeAdulta: number
+  taxaMortalidadeRecria: number
   taxaDesmame: number
   idadeDesmameMeses: number
   pesoDesmameKg: number
@@ -64,6 +66,7 @@ export interface ParametrosPecuaria {
   arrobasAbate: number
   idadeAbateMeses: number
   taxaDescarteAnual: number
+  metaCrescimentoRebanhoPct: number
   diasConfinamento: number
   ganhoMedioDiario: number
   praca: string
@@ -71,6 +74,7 @@ export interface ParametrosPecuaria {
   precoBezerroCabeca: number
   precoGarroteCabeca: number
   precoVacaDescarteCabeca: number
+  precoNovilhaCompraCabeca: number
   dataPrecos: string
 }
 
@@ -106,9 +110,13 @@ export interface ProjecaoAnoPec {
   receitaBezerros: number
   receitaBruta: number
   custoArrendamento: number
+  custoAquisicao: number
   custoTotal: number
   resultadoLiquido: number
   taxaDesfrute: number
+  mortesVacas: number
+  mortesTouros: number
+  mortesRecria: number
 }
 
 // ── Constantes ───────────────────────────────────────────────────────────────
@@ -193,13 +201,15 @@ export const SISTEMA_LABELS: Record<SistemaManejo, string> = {
 export const DEFAULT_PARAMS: ParametrosPecuaria = {
   ciclo: 'cria_recria_engorda',
   taxaPrenhez: 78, taxaNatalidade: 75, taxaMortalidadeBezerro: 4,
+  taxaMortalidadeAdulta: 2, taxaMortalidadeRecria: 1.5,
   taxaDesmame: 72, idadeDesmameMeses: 7, pesoDesmameKg: 190,
   pesoAbateKg: 490, rendimentoCarcaca: 53, arrobasAbate: 17,
-  idadeAbateMeses: 36, taxaDescarteAnual: 12,
+  idadeAbateMeses: 36, taxaDescarteAnual: 12, metaCrescimentoRebanhoPct: 0,
   diasConfinamento: 100, ganhoMedioDiario: 1.3,
   praca: 'Rondonópolis',
   precoBoiGordoArroba: 320, precoBezerroCabeca: 2200,
   precoGarroteCabeca: 3500, precoVacaDescarteCabeca: 2800,
+  precoNovilhaCompraCabeca: 3800,
   dataPrecos: new Date().toISOString().slice(0, 10),
 }
 
@@ -244,11 +254,16 @@ function paramsFromConfig(cfg: AgroPecuariaConfig | null): ParametrosPecuaria {
   return {
     ciclo: cfg.ciclo as TipoCiclo, taxaPrenhez: cfg.taxaPrenhez, taxaNatalidade: cfg.taxaNatalidade,
     taxaMortalidadeBezerro: cfg.taxaMortalidadeBezerro, taxaDesmame: cfg.taxaDesmame,
+    taxaMortalidadeAdulta: cfg.taxaMortalidadeAdulta ?? DEFAULT_PARAMS.taxaMortalidadeAdulta,
+    taxaMortalidadeRecria: cfg.taxaMortalidadeRecria ?? DEFAULT_PARAMS.taxaMortalidadeRecria,
     idadeDesmameMeses: cfg.idadeDesmameMeses, pesoDesmameKg: cfg.pesoDesmameKg, pesoAbateKg: cfg.pesoAbateKg,
     rendimentoCarcaca: cfg.rendimentoCarcaca, arrobasAbate: cfg.arrobasAbate, idadeAbateMeses: cfg.idadeAbateMeses,
-    taxaDescarteAnual: cfg.taxaDescarteAnual, diasConfinamento: cfg.diasConfinamento, ganhoMedioDiario: cfg.ganhoMedioDiario,
+    taxaDescarteAnual: cfg.taxaDescarteAnual,
+    metaCrescimentoRebanhoPct: cfg.metaCrescimentoRebanhoPct ?? DEFAULT_PARAMS.metaCrescimentoRebanhoPct,
+    diasConfinamento: cfg.diasConfinamento, ganhoMedioDiario: cfg.ganhoMedioDiario,
     praca: cfg.praca, precoBoiGordoArroba: cfg.precoBoiGordoArroba, precoBezerroCabeca: cfg.precoBezerroCabeca,
     precoGarroteCabeca: cfg.precoGarroteCabeca, precoVacaDescarteCabeca: cfg.precoVacaDescarteCabeca,
+    precoNovilhaCompraCabeca: cfg.precoNovilhaCompraCabeca ?? DEFAULT_PARAMS.precoNovilhaCompraCabeca,
     dataPrecos: cfg.dataPrecos ?? new Date().toISOString().slice(0, 10),
   }
 }
@@ -322,7 +337,9 @@ export function calcularProjecao(
 
   const { taxaPrenhez, taxaNatalidade, taxaMortalidadeBezerro, taxaDesmame,
           taxaDescarteAnual, arrobasAbate, precoBoiGordoArroba,
-          precoBezerroCabeca, precoGarroteCabeca, precoVacaDescarteCabeca, ciclo } = params
+          precoBezerroCabeca, precoGarroteCabeca, precoVacaDescarteCabeca, ciclo,
+          taxaMortalidadeAdulta, taxaMortalidadeRecria, metaCrescimentoRebanhoPct,
+          precoNovilhaCompraCabeca } = params
 
   const ehCria    = ['cria', 'cria_recria', 'cria_recria_engorda'].includes(ciclo)
   const ehEngorda = ['engorda', 'confinamento', 'recria_engorda', 'cria_recria_engorda'].includes(ciclo)
@@ -330,28 +347,48 @@ export function calcularProjecao(
 
   for (let i = 0; i < anos; i++) {
     const ano = anoBase + i
+    const vacasAbertura = vacas
 
     // CRIA
-    const nascimentos = ehCria ? Math.round(vacas * taxaPrenhez / 100 * taxaNatalidade / 100) : 0
+    const nascimentos = ehCria ? Math.round(vacasAbertura * taxaPrenhez / 100 * taxaNatalidade / 100) : 0
     const desmamados  = nascimentos > 0
       ? Math.round(nascimentos * (1 - taxaMortalidadeBezerro / 100) * taxaDesmame / 100)
       : 0
     const machos  = Math.round(desmamados * 0.5)
     const femeas  = desmamados - machos
 
-    // DESCARTE / REPOSIÇÃO
-    const descartes  = Math.round(vacas * taxaDescarteAnual / 100)
-    const reposicao  = Math.min(femeas, descartes)
-    const bezeirasVendidas = femeas - reposicao
-    vacas = Math.max(0, vacas - descartes + reposicao)
+    // MORTALIDADE ADULTA — perda natural de vaca/touro, distinta do descarte por decisão
+    const mortesVacas  = Math.round(vacasAbertura * taxaMortalidadeAdulta / 100)
+    const mortesTouros = Math.round(touros * taxaMortalidadeAdulta / 100)
+    touros = Math.max(0, touros - mortesTouros)
+
+    // DESCARTE / REPOSIÇÃO / CRESCIMENTO DO REBANHO
+    const descartes = Math.round(vacasAbertura * taxaDescarteAnual / 100)
+    // reposição normal (repor descarte + morte) — limitada à oferta própria de novilhas;
+    // se faltar fêmea, o plantel simplesmente encolhe (comportamento já existente)
+    const necessidadeReposicao = Math.min(femeas, descartes + mortesVacas)
+    // crescimento (meta acima da manutenção): usa fêmea excedente própria primeiro;
+    // o que faltar é comprado no mercado, e entra como custo de aquisição
+    const femeasExcedentes  = Math.max(0, femeas - necessidadeReposicao)
+    const cresterAlvo       = Math.round(vacasAbertura * metaCrescimentoRebanhoPct / 100)
+    const crescimentoProprio  = Math.min(femeasExcedentes, cresterAlvo)
+    const crescimentoComprado = Math.max(0, cresterAlvo - crescimentoProprio)
+    const custoAquisicao = crescimentoComprado * precoNovilhaCompraCabeca
+    const reposicao = necessidadeReposicao + crescimentoProprio + crescimentoComprado
+    const bezeirasVendidas = femeas - necessidadeReposicao - crescimentoProprio
+    vacas = Math.max(0, vacasAbertura - descartes - mortesVacas + reposicao)
+
+    // RECRIA — mortalidade natural entre o desmame e a venda do garrote
+    const machosRecriados = Math.round(machos * (1 - taxaMortalidadeRecria / 100))
+    const mortesRecria = machos - machosRecriados
 
     // ABATE: ano 0 usa boi_gordo já existente; anos seguintes = pipeline
     const abates = i === 0 ? prontoAbate : (ehEngorda ? Math.round(emRecria * 0.85) : 0)
     // Recria pura (cria_recria, sem engorda): os machos recriados são vendidos como garrote
     // no próprio ciclo anual, não ficam acumulados indefinidamente no rebanho.
     const ehRecriaPura = ehCria && !ehEngorda && !ehSoCria
-    const recriaHeadcountAno = ehSoCria ? 0 : machos + (ehEngorda && i > 0 ? Math.round(emRecria * 0.15) : 0)
-    const garrotesVendidos = ehRecriaPura ? machos : 0
+    const recriaHeadcountAno = ehSoCria ? 0 : machosRecriados + (ehEngorda && i > 0 ? Math.round(emRecria * 0.15) : 0)
+    const garrotesVendidos = ehRecriaPura ? machosRecriados : 0
     emRecria = ehRecriaPura ? 0 : recriaHeadcountAno
     if (i === 0) prontoAbate = 0
 
@@ -377,7 +414,7 @@ export function calcularProjecao(
       return s + rebanhoTotal * (sup.consumoGDiaCab / 1000) * 30 * meses * sup.custoKg
     }, 0)
     const custoArrendamento = custos.areaArrendadaHa * custos.custoArrendamentoHaAno
-    const custoTotal = custoSanidade + custoPastagem + custoMO + custoOutros + custoSuplem + custoArrendamento
+    const custoTotal = custoSanidade + custoPastagem + custoMO + custoOutros + custoSuplem + custoArrendamento + custoAquisicao
 
     const uaTotal = calcUA(rebanho) // simplificado — usa rebanho inicial como proxy da UA média
     const taxaDesfrute = rebanhoTotal > 0 ? ((abates + descartes + garrotesVendidos) / rebanhoTotal) * 100 : 0
@@ -386,8 +423,9 @@ export function calcularProjecao(
       ano, rebanhoTotal, uaTotal: Math.round(uaTotal * 10) / 10,
       nascimentos, desmamados, abates, descartes,
       receitaAbate, receitaDescarte, receitaGarrote, receitaBezerros, receitaBruta,
-      custoArrendamento, custoTotal, resultadoLiquido: receitaBruta - custoTotal,
+      custoArrendamento, custoAquisicao, custoTotal, resultadoLiquido: receitaBruta - custoTotal,
       taxaDesfrute: Math.round(taxaDesfrute * 10) / 10,
+      mortesVacas, mortesTouros, mortesRecria,
     })
   }
   return resultado
