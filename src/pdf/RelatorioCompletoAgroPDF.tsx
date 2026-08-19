@@ -809,8 +809,8 @@ export function RelatorioCompletoAgroPDF({ data }: { data: RelatorioCompletoAgro
               <Sec title="Capacidade de Pagamento por Horizonte" />
               <View style={{ flexDirection: 'row', gap: 8, marginBottom: 16 }}>
                 {[
-                  { label: 'Curto Prazo', sub: '≤ 360 dias', h: data.cpHorizonte },
                   { label: `Até 31/12`, sub: String(data.anoHorizonte?.anoRef ?? ''), h: data.anoHorizonte },
+                  { label: 'Curto Prazo', sub: '≤ 360 dias', h: data.cpHorizonte },
                   { label: 'Longo Prazo', sub: '> 360 dias · serviço médio anual', h: data.lpHorizonte },
                 ].filter(item => item.h).map((item, i) => {
                   const h2 = item.h!
