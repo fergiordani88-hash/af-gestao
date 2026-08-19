@@ -52,7 +52,15 @@ function jurosProrataPeriodo(p: AgroParcela, periodoInicio: Date, periodoFimExcl
   const overlapEnd = fim < periodoFimExcl ? fim : periodoFimExcl
   const overlapMs = overlapEnd.getTime() - overlapStart.getTime()
   if (overlapMs <= 0) return 0
-  return (p.juros ?? 0) * (overlapMs / totalMs)
+  // Quando o juro não está decomposto (maioria dos contratos rurais não-SAC/Price),
+  // estima usando: saldo × taxa_proporcional_ao_período
+  let juros = p.juros
+  if (juros == null && p.taxa > 0) {
+    const saldo = p.saldoDevedor ?? p.valorTomado
+    const perFator = p.periodicidade === 'Mensal' ? 12 : p.periodicidade === 'Semestral' ? 2 : p.periodicidade === 'Trimestral' ? 4 : 1
+    juros = saldo * (p.taxa / perFator)
+  }
+  return (juros ?? 0) * (overlapMs / totalMs)
 }
 
 // periodoInicio/periodoFimExcl: janela de referência (normalmente a safra selecionada,
@@ -396,8 +404,8 @@ export function TabResumo({ clientId, clienteNome, clienteCidade }: {
   const peSaudavelLp = resultadoLp * (limSaudavel / 100)
   const peCriticoLp  = resultadoLp * (limCritico  / 100)
 
-  const comprCp: Status = receitaCp === 0 ? 'ok' : resultadoCp <= 0 ? 'risco' : (servicoCompromCp / resultadoCp) * 100 <= limSaudavel ? 'ok' : (servicoCompromCp / resultadoCp) * 100 <= limCritico ? 'atencao' : 'risco'
-  const comprLp: Status = receitaLp === 0 ? 'ok' : resultadoLp <= 0 ? 'risco' : (servicoCompromLp / resultadoLp) * 100 <= limSaudavel ? 'ok' : (servicoCompromLp / resultadoLp) * 100 <= limCritico ? 'atencao' : 'risco'
+  const comprCp: Status = (receitaCp === 0 && servicoCompromCp === 0) ? 'ok' : (receitaCp === 0 && servicoCompromCp > 0) ? 'risco' : resultadoCp <= 0 ? 'risco' : (servicoCompromCp / resultadoCp) * 100 <= limSaudavel ? 'ok' : (servicoCompromCp / resultadoCp) * 100 <= limCritico ? 'atencao' : 'risco'
+  const comprLp: Status = (receitaLp === 0 && servicoCompromLp === 0) ? 'ok' : (receitaLp === 0 && servicoCompromLp > 0) ? 'risco' : resultadoLp <= 0 ? 'risco' : (servicoCompromLp / resultadoLp) * 100 <= limSaudavel ? 'ok' : (servicoCompromLp / resultadoLp) * 100 <= limCritico ? 'atencao' : 'risco'
 
   // Dentro do Ano (até 31/12 do ano civil corrente)
   const fimDoAno = new Date(anoAtual, 11, 31)
@@ -423,7 +431,7 @@ export function TabResumo({ clientId, clienteNome, clienteCidade }: {
   const saldoDispDentroAno       = resultadoDentroAno - servicoCompromDentroAno
   const peSaudavelAno = resultadoDentroAno * (limSaudavel / 100)
   const peCriticoAno  = resultadoDentroAno * (limCritico  / 100)
-  const comprDentroAno: Status = receitaDentroAno === 0 ? 'ok' : resultadoDentroAno <= 0 ? 'risco' : (servicoCompromDentroAno / resultadoDentroAno) * 100 <= limSaudavel ? 'ok' : (servicoCompromDentroAno / resultadoDentroAno) * 100 <= limCritico ? 'atencao' : 'risco'
+  const comprDentroAno: Status = (receitaDentroAno === 0 && servicoCompromDentroAno === 0) ? 'ok' : (receitaDentroAno === 0 && servicoCompromDentroAno > 0) ? 'risco' : resultadoDentroAno <= 0 ? 'risco' : (servicoCompromDentroAno / resultadoDentroAno) * 100 <= limSaudavel ? 'ok' : (servicoCompromDentroAno / resultadoDentroAno) * 100 <= limCritico ? 'atencao' : 'risco'
 
   // Aliases para a tabela (mantém nomes antigos onde a UI usa exceto-custeio puro)
   const servicoExcCusteioCp        = servicoCp - servicoCusteioCp
