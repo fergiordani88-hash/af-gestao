@@ -277,7 +277,7 @@ function ContratoModal({ contrato, clientId, onClose, onSaved, prefill }: {
             <input
               type="number" className={inp}
               value={form.saldoAtual ?? ''}
-              onChange={e => set('saldoAtual', e.target.value === '' ? undefined : Number(e.target.value))}
+              onChange={e => set('saldoAtual', e.target.value === '' ? (undefined as any) : Number(e.target.value))}
               placeholder="Deixe em branco para usar valor tomado"
             />
             {form.saldoAtual && form.valorTomado && form.saldoAtual !== form.valorTomado && (
