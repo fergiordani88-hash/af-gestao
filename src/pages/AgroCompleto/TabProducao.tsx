@@ -28,7 +28,7 @@ function custoItensPadrao(custoPorHa: number): CustoItem[] {
 
 const fmtBRL = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
-const SAFRAS_HISTORICAS = ['2022/23', '2023/24', '2024/25', '2025/26']
+const SAFRAS_HISTORICAS = ['2022/23', '2023/24', '2024/25', '2025/26', '2026/27']
 
 const SAFRAS_FUTURAS: string[] = Array.from({ length: 10 }, (_, i) => {
   const a = 2026 + i
@@ -457,9 +457,17 @@ function SafraBlock({ safra, tipo, rows, clientId, onDeleteRows, onAddRows, onRe
         <table className="w-full text-xs">
           <thead>
             <tr className="bg-gray-50 border-b border-gray-100">
-              {['Cultura', 'Cotação (R$/sc)', 'Área (ha)', 'Produt. (sc/ha)', 'Custo/ha (sc) 🔍', 'Custo/ha (R$)', 'Área Arren. (ha)', 'Custo Arren/ha', 'Data Colheita ⚙', 'Data Pgto Custo', 'Prod. Total (sc)', 'Rec. Bruta', 'Custo Total', 'Resultado', 'R$/ha', 'Custo/saca', 'PE (sc/ha)', 'Supráv./Déf.', 'Queda máx.', 'Margem', ''].map(h => (
+              {[
+                'Cultura', 'Cotação (R$/sc)', 'Área (ha)', 'Produt. (sc/ha)',
+                'Custo/ha (sc) 🔍', 'Custo/ha (R$)',
+                'Área Arren. (ha)', 'Arren. (sc/ha) ¹',
+                'Data Colheita ⚙', 'Data Pgto Custo',
+                'Prod. Total (sc)', 'Rec. Bruta', 'Custo Total', 'Resultado',
+                'R$/ha', 'Custo/saca', 'PE (sc/ha)', 'Supráv./Déf.', 'Queda máx.', 'Margem', '',
+              ].map(h => (
                 <th key={h} className="px-3 py-2 text-left font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">{h}</th>
               ))}
+
             </tr>
           </thead>
           <tbody>
@@ -476,6 +484,14 @@ function SafraBlock({ safra, tipo, rows, clientId, onDeleteRows, onAddRows, onRe
             ))}
           </tbody>
         </table>
+      </div>
+
+      {/* Nota arrendamento */}
+      <div className="px-4 pt-2 pb-0">
+        <p className="text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-3 py-1.5">
+          <strong>¹ Arrendamento (sc/ha):</strong> informe o valor em <strong>sacas por hectare</strong> (ex: 10 sc/ha). O sistema converte para R$ usando a cotação informada.
+          {' '}<span className="text-amber-600">Para 2ª e 3ª safra, deixe arrendamento zerado — o custo da terra já está contabilizado na cultura principal.</span>
+        </p>
       </div>
 
       <div className="px-4 py-2 border-t border-gray-50 flex flex-wrap gap-2 items-center">
@@ -686,7 +702,7 @@ export function TabProducao({ clientId }: { clientId: string }) {
   }
 
   const handleAddSafra = async (safra: string, tipo: string) => {
-    const jaExiste = producoes.some(p => p.safra === safra)
+    const jaExiste = producoes.some(p => p.safra === safra && p.tipo === tipo)
     if (!jaExiste) {
       const criados: AgroProducao[] = []
       for (const c of CULTURAS) {
