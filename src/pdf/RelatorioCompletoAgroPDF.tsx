@@ -932,9 +932,6 @@ export function RelatorioCompletoAgroPDF({ data }: { data: RelatorioCompletoAgro
                   {data.contextoMercado.comentario}
                 </Text>
               )}
-              <Text style={{ fontFamily: 'Helvetica', fontSize: 6, color: C.muted, marginBottom: 14 }}>
-                Contexto preenchido manualmente pelo consultor no momento da análise — não é atualizado automaticamente.
-              </Text>
             </>
           )}
 
