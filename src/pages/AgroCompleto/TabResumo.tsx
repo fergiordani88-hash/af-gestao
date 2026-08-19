@@ -69,6 +69,29 @@ function jurosPeriodoProrata(todasParcelas: AgroParcela[], periodoInicio: Date, 
   return todasParcelas.reduce((s, p) => s + jurosProrataPeriodo(p, periodoInicio, periodoFimExcl), 0)
 }
 
+// Custo anual de juros da carteira: para cada contrato, pega a próxima parcela futura
+// e calcula saldo_antes × taxa_anual. A proração por dias subestima muito contratos
+// anuais (captura só a fração do período que cai na janela de 360 dias).
+function jurosAnuaisCarteira(todasParcelas: AgroParcela[], hoje: Date): number {
+  // Por contrato: parcela futura com menor vencimento
+  const nextPorContrato = new Map<string, AgroParcela>()
+  todasParcelas.forEach(p => {
+    if (new Date(p.vencimento) < hoje) return
+    const atual = nextPorContrato.get(p.contratoId)
+    if (!atual || new Date(p.vencimento) < new Date(atual.vencimento)) {
+      nextPorContrato.set(p.contratoId, p)
+    }
+  })
+  let total = 0
+  nextPorContrato.forEach(next => {
+    // saldo antes do pagamento = saldoDevedor (após) + amortização = dívida atual do contrato
+    const saldoAntes = (next.saldoDevedor ?? 0) + (next.amortizacao ?? 0)
+    // taxa = taxa anual em decimal; saldoAntes × taxa = juro anual para este contrato
+    total += saldoAntes * next.taxa
+  })
+  return total
+}
+
 function culturaKey(cultura: string): string | null {
   const s = cultura.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
   if (s.includes('soja'))  return 'soja'
@@ -584,7 +607,7 @@ export function TabResumo({ clientId, clienteNome, clienteCidade }: {
       }) : []
 
       // Juros em sacas
-      const jurosAnuaisExport = jurosPeriodoProrata(parcelas, hoje, dataCorte360)
+      const jurosAnuaisExport = jurosAnuaisCarteira(parcelas, hoje)
       const sojaRowExp = prodSafra.find(p => p.cultura.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').includes('soja'))
       const cotacaoRefExp = sojaRowExp?.cotacao ?? prodSafra.find(p => p.ordem === 'principal')?.cotacao ?? 0
       const culturaRefExp = sojaRowExp?.cultura ?? prodSafra.find(p => p.ordem === 'principal')?.cultura ?? ''
@@ -1431,7 +1454,7 @@ export function TabResumo({ clientId, clienteNome, clienteCidade }: {
                 {(() => {
                   const resAfterDebt = resultadoLiq - servicoAnual
                   const pctReceitaDivida = receitaBruta > 0 ? (servicoAnual / receitaBruta) * 100 : 0
-                  const jurosAnuais = jurosPeriodoProrata(parcelas, hoje, dataCorte360)
+                  const jurosAnuais = jurosAnuaisCarteira(parcelas, hoje)
                   const rows: { label: string; tooltip: string; total: number; cor: string; ref: string; isCurrency?: boolean; isPct?: boolean }[] = [
                     {
                       label: 'Receita bruta',
@@ -1505,7 +1528,7 @@ export function TabResumo({ clientId, clienteNome, clienteCidade }: {
 
           {/* Juros em sacas de soja */}
           {(() => {
-            const jurosAnuais = jurosPeriodoProrata(parcelas, hoje, dataCorte360)
+            const jurosAnuais = jurosAnuaisCarteira(parcelas, hoje)
             if (jurosAnuais <= 0 || areaTotal <= 0) return null
             const sojaRow = prodSafra.find(p => p.cultura.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').includes('soja'))
             const cotacaoRef = sojaRow?.cotacao ?? prodSafra.find(p => p.ordem === 'principal')?.cotacao ?? 0
