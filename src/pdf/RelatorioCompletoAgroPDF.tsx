@@ -29,7 +29,7 @@ export interface RelHorizonte {
 export interface RelatorioCompletoAgroData {
   clientName: string; clientCity?: string; consultorName: string
   safra: string; dataGeracao: string; horaGeracao?: string
-  culturas: RelCultura[]; areaTotal: number; areaArrendada: number
+  culturas: RelCultura[]; todasAtividades?: string[]; areaTotal: number; areaArrendada: number
   pecuaria?: { rebanhoTotal: number; receitaBruta: number; custoTotal: number; custoArrendamento: number; resultadoLiquido: number }
   contratos: RelContrato[]; totalEndividamento: number; servicoAnual: number; saldoDevedor: number
   patrimonio: RelPatrimonio[]; patrimonioGruto: number; totalOnus: number
@@ -259,6 +259,17 @@ function Cover({ data, recBruta }: { data: RelatorioCompletoAgroData; recBruta: 
             <Text style={{ fontFamily: 'Helvetica', fontSize: 7.5, color: C.muted, marginTop: 3 }}>
               {(data.areaTotal - data.areaArrendada).toLocaleString('pt-BR')} ha próprios · {data.areaArrendada.toLocaleString('pt-BR')} ha arrendados
             </Text>
+          )}
+
+          {/* Badges de atividades */}
+          {(data.todasAtividades ?? data.culturas.map(c => c.cultura)).length > 0 && (
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 8 }}>
+              {(data.todasAtividades ?? data.culturas.map(c => c.cultura)).map(at => (
+                <View key={at} style={{ backgroundColor: C.greenLt, borderRadius: 10, paddingHorizontal: 8, paddingVertical: 3 }}>
+                  <Text style={{ fontFamily: 'Helvetica', fontSize: 7, color: C.green }}>{at}</Text>
+                </View>
+              ))}
+            </View>
           )}
 
           {/* Quote — bottom */}

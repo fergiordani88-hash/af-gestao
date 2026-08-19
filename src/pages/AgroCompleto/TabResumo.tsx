@@ -270,7 +270,8 @@ export function TabResumo({ clientId, clienteNome, clienteCidade }: {
   const areaPropria   = areaTotal - areaArrendada
   const pctArrendada  = areaTotal > 0 ? (areaArrendada / areaTotal) * 100 : 0
 
-  const culturas = [...new Set(prodSafra.map(p => p.cultura))]
+  // Badges mostram TODAS as atividades do produtor (todas as safras), não só a selecionada
+  const culturas = [...new Set(producao.map(p => p.cultura))]
 
   const receitaBruta  = prodSafra.reduce((s, p) => s + calcRow(p).recBruta,   0)
   const custoTotal    = prodSafra.reduce((s, p) => s + calcRow(p).custoTotal + calcRow(p).custoArrendTotal, 0)
@@ -633,6 +634,7 @@ export function TabResumo({ clientId, clienteNome, clienteCidade }: {
         dataGeracao:   new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' }),
         horaGeracao:   new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
         culturas:      prodSafra.map(p => ({ ...p, custoItens: p.custoItens })),
+        todasAtividades: [...new Set(producao.map(p => p.cultura))],
         areaTotal,
         areaArrendada,
         pecuaria: pecProjecao[0] ? {
