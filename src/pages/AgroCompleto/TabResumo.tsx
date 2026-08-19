@@ -16,7 +16,7 @@ const fmtPct = (v: number) => `${fmtN(v, 1)}%`
 interface HarvestDate { month: number; day: number }
 const HARVEST_DEFAULTS: Record<string, HarvestDate> = {
   soja:   { month: 4,  day: 15 },
-  milho:  { month: 8,  day: 15 },
+  milho:  { month: 9,  day: 15 },
   feijao: { month: 11, day: 15 },
 }
 const HARVEST_LABELS: Record<string, string> = {
