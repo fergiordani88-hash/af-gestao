@@ -51,6 +51,7 @@ export interface AgroContrato {
   spreadIndexador?: number
   sistemaAmortizacao?: string
   tomador?: string
+  saldoAtual?: number  // Saldo real atual conforme extrato do banco (opcional)
   cronograma?: { numeroParcela: number; dataVencimento: string; valor: number; pago?: boolean }[]
 }
 

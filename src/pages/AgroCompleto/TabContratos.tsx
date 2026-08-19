@@ -266,8 +266,26 @@ function ContratoModal({ contrato, clientId, onClose, onSaved, prefill }: {
             <input type="date" className={inp} value={form.dataContratacao?.toString().split('T')[0] ?? ''} onChange={e => set('dataContratacao', e.target.value)} />
           </div>
           <div>
-            <label className={lbl}>Valor Tomado (R$) *</label>
+            <label className={lbl}>Valor Tomado Original (R$) *</label>
             <input type="number" className={inp} value={form.valorTomado || ''} onChange={e => set('valorTomado', Number(e.target.value))} />
+          </div>
+          <div>
+            <label className={lbl}>
+              Saldo Atual (R$)
+              <span className="ml-1 text-xs font-normal text-amber-600">— conforme extrato do banco</span>
+            </label>
+            <input
+              type="number" className={inp}
+              value={form.saldoAtual ?? ''}
+              onChange={e => set('saldoAtual', e.target.value === '' ? undefined : Number(e.target.value))}
+              placeholder="Deixe em branco para usar valor tomado"
+            />
+            {form.saldoAtual && form.valorTomado && form.saldoAtual !== form.valorTomado && (
+              <p className="mt-1 text-xs text-amber-600">
+                Diferença de {fmtBRL(Math.abs(form.saldoAtual - form.valorTomado))} em relação ao valor original
+                {form.saldoAtual > form.valorTomado ? ' (juros capitalizados)' : ' (amortizações realizadas)'}
+              </p>
+            )}
           </div>
           <div>
             <label className={lbl}>Total de Parcelas</label>
@@ -813,7 +831,7 @@ export function TabContratos({ clientId }: { clientId: string }) {
               <table className="w-full text-xs">
                 <thead>
                   <tr className="bg-gray-50 border-b border-gray-100">
-                    {['Modalidade', 'Banco', 'Contrato', 'Valor Original', 'Parc. Atual / Total', 'Parc. Rest.', 'Saldo Devedor (principal)', 'Total Futuro (c/ juros)', 'Juros Futuros'].map(h => (
+                    {['Modalidade', 'Banco', 'Contrato', 'Valor Original', 'Saldo Atual (banco)', 'Parc. Atual / Total', 'Parc. Rest.', 'Saldo Devedor (principal)', 'Total Futuro (c/ juros)', 'Juros Futuros'].map(h => (
                       <th key={h} className="px-3 py-2 text-left font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">{h}</th>
                     ))}
                   </tr>
@@ -828,6 +846,11 @@ export function TabContratos({ clientId }: { clientId: string }) {
                         <td className="px-3 py-2.5 text-gray-600 whitespace-nowrap">{c.banco}</td>
                         <td className="px-3 py-2.5 text-gray-500 font-mono">{c.numeroContrato ?? '—'}</td>
                         <td className="px-3 py-2.5 text-right text-gray-500">{fmtBRL(c.valorTomado)}</td>
+                        <td className="px-3 py-2.5 text-right">
+                          {c.saldoAtual
+                            ? <span className={c.saldoAtual > c.valorTomado ? 'text-amber-600 font-semibold' : 'text-green-600 font-semibold'}>{fmtBRL(c.saldoAtual)}</span>
+                            : <span className="text-gray-400 text-xs italic">não informado</span>}
+                        </td>
                         <td className="px-3 py-2.5 text-center text-gray-600">{c.parcelaAtual} / {c.totalParcelas}</td>
                         <td className="px-3 py-2.5 text-center text-gray-500">{g.parcelas}</td>
                         <td className="px-3 py-2.5 text-right font-bold text-purple-700">{fmtBRL(g.saldo)}</td>
@@ -955,7 +978,16 @@ export function TabContratos({ clientId }: { clientId: string }) {
                     </td>
                     <td className="px-3 py-2.5 text-gray-500">{c.numeroContrato ?? '—'}</td>
                     <td className="px-3 py-2.5 text-gray-600 whitespace-nowrap">{fmtDate(c.dataContratacao)}</td>
-                    <td className="px-3 py-2.5 font-semibold text-gray-900">{fmtBRL(c.valorTomado)}</td>
+                    <td className="px-3 py-2.5">
+                      <div className="flex flex-col gap-0.5">
+                        <span className="font-semibold text-gray-900">{fmtBRL(c.valorTomado)}</span>
+                        {c.saldoAtual && c.saldoAtual !== c.valorTomado && (
+                          <span className={`text-xs font-medium ${c.saldoAtual > c.valorTomado ? 'text-amber-600' : 'text-green-600'}`}>
+                            Atual: {fmtBRL(c.saldoAtual)}
+                          </span>
+                        )}
+                      </div>
+                    </td>
                     <td className="px-3 py-2.5 text-center text-gray-700">{c.totalParcelas}</td>
                     <td className="px-3 py-2.5 text-center text-gray-700">{c.parcelaAtual}</td>
                     <td className="px-3 py-2.5 text-gray-600">{c.periodicidade}</td>
