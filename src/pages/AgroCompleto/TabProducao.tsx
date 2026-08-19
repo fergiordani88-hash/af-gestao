@@ -35,7 +35,7 @@ const SAFRAS_FUTURAS: string[] = Array.from({ length: 10 }, (_, i) => {
   return `${a}/${String(a + 1).slice(-2)}`
 })
 
-const CULTURAS_PRINCIPAL = ['Soja', 'Algodão', 'Milho verão', 'Sorgo verão', 'Girassol verão']
+const CULTURAS_PRINCIPAL = ['Soja', 'Algodão', 'Milho verão', 'Sorgo verão', 'Girassol verão', 'Pecuária de corte', 'Pecuária leiteira']
 const CULTURAS_SEGUNDA   = ['Milho 2ª', 'Sorgo 2ª', 'Milheto', 'Girassol 2ª', 'Algodão 2ª', 'Braquiária']
 const CULTURAS_TERCEIRA  = ['Feijão', 'Feijão Carioca', 'Feijão Preto', 'Milho irrigado', 'Arroz irrigado', 'Tomate', 'Hortaliças']
 

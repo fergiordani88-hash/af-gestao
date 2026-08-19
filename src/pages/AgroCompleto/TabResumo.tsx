@@ -259,10 +259,10 @@ export function TabResumo({ clientId, clienteNome, clienteCidade }: {
   // Filtra entradas com área > 0 (exclui registros vazios/duplicados)
   const prodSafra = producao.filter(p => p.safra === safra && p.area > 0)
 
-  // Soja + Milho 2ª + Feijão são cultivados na MESMA terra em rotação.
-  // A área física é a da cultura principal (ordem = 'principal').
-  // Se não houver principal, usa a de maior área. Não somar entre culturas.
-  const principal = prodSafra.find(p => p.ordem === 'principal') ?? prodSafra.reduce<AgroProducao | undefined>(
+  // Usa a cultura com MAIOR área como referência da propriedade.
+  // Para produtor com múltiplas atividades (soja + milho em áreas separadas + pecuária),
+  // a maior área indica a escala real da operação.
+  const principal = prodSafra.reduce<AgroProducao | undefined>(
     (m, p) => (!m || p.area > m.area) ? p : m, undefined
   )
   const areaTotal     = principal?.area ?? 0
