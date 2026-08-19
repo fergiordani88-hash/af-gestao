@@ -1058,7 +1058,7 @@ export function RelatorioCompletoAgroPDF({ data }: { data: RelatorioCompletoAgro
             const pStyle = { fontFamily: 'Helvetica' as const, fontSize: 8, color: C.body, lineHeight: 1.6, marginBottom: 6 }
 
             return (
-              <View style={{ flexDirection: 'row', gap: 14, marginTop: 10 }}>
+              <View wrap={false} style={{ flexDirection: 'row', gap: 14, marginTop: 10 }}>
                 <View style={{ width: 170, alignItems: 'center', justifyContent: 'center' }}>
                   <Image src={logoAF} style={{ width: 220 }} />
                 </View>
