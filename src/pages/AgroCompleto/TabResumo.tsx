@@ -110,7 +110,7 @@ function getColheitaDate(p: AgroProducao, datas: Record<string, HarvestDate>): D
   return new Date(ano2, hd.month - 1, hd.day)
 }
 
-const LS_KEY = 'af-colheita-datas'
+const LS_KEY = 'af-colheita-datas-v2'
 
 function loadColheitaDatas(): Record<string, HarvestDate> {
   try {
