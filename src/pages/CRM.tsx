@@ -77,6 +77,95 @@ function ClientModal({ client, onClose }: { client: Client; onClose: () => void 
   )
 }
 
+function EditClientModal({ client, onClose }: { client: Client; onClose: () => void }) {
+  const { updateClient } = useStore()
+  const { user }         = useAuthStore()
+  const [saving, setSaving] = useState(false)
+  const [erro,   setErro]   = useState('')
+  const [users,  setUsers]  = useState<{ id: string; name: string }[]>([])
+  const formRef = useRef<HTMLFormElement>(null)
+
+  useEffect(() => {
+    usersApi.list().then((list: any[]) => setUsers(list.filter((u: any) => ['ADMIN','CONSULTOR'].includes(u.role)))).catch(() => {})
+  }, [])
+
+  const save = async () => {
+    if (!formRef.current) return
+    const data = new FormData(formRef.current)
+    const nome = (data.get('name') as string || '').trim()
+    if (!nome) { setErro('Informe o nome do cliente.'); return }
+    setSaving(true); setErro('')
+    try {
+      await updateClient(client.id, {
+        name:        nome,
+        document:    (data.get('document') as string) || client.document,
+        phone:       (data.get('phone')    as string) || client.phone,
+        email:       (data.get('email')    as string) || client.email,
+        city:        (data.get('city')     as string) || client.city,
+        segment:     ((data.get('segment') as string || 'AGRO').toUpperCase() as ClientSegment),
+        revenue:     Number(((data.get('revenue') as string) || '0').replace(/\D/g, '')) || client.revenue,
+        responsible: (data.get('responsibleId') as string) || client.responsible,
+        status:      (data.get('status') as any) || client.status,
+      })
+      onClose()
+    } catch (e: any) {
+      setErro(`Erro ao salvar: ${e?.message ?? 'verifique sua conexão e tente novamente.'}`)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const inp = 'w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-af-green/30 focus:border-af-green'
+
+  return (
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg">
+        <div className="flex items-center justify-between p-6 border-b">
+          <h2 className="text-lg font-bold">Editar Cliente</h2>
+          <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-lg">✕</button>
+        </div>
+        <form ref={formRef} onSubmit={e => { e.preventDefault(); save() }}>
+          <div className="p-6 space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="col-span-2">
+                <label className="text-xs font-medium text-gray-600 mb-1 block">Nome / Razão Social *</label>
+                <input name="name" className={inp} defaultValue={client.name} autoComplete="off" />
+              </div>
+              <div><label className="text-xs font-medium text-gray-600 mb-1 block">CPF / CNPJ</label><input name="document" className={inp} defaultValue={client.document} /></div>
+              <div><label className="text-xs font-medium text-gray-600 mb-1 block">Telefone</label><input name="phone" className={inp} defaultValue={client.phone} /></div>
+              <div className="col-span-2"><label className="text-xs font-medium text-gray-600 mb-1 block">E-mail</label><input name="email" type="email" className={inp} defaultValue={client.email} /></div>
+              <div><label className="text-xs font-medium text-gray-600 mb-1 block">Cidade</label><input name="city" className={inp} defaultValue={client.city} /></div>
+              <div><label className="text-xs font-medium text-gray-600 mb-1 block">Segmento</label>
+                <select name="segment" className={inp} defaultValue={client.segment?.toUpperCase()}>
+                  <option value="AGRO">Agro</option><option value="COMERCIO">Comércio</option><option value="SERVICOS">Serviços</option><option value="INDUSTRIA">Indústria</option>
+                </select>
+              </div>
+              <div><label className="text-xs font-medium text-gray-600 mb-1 block">Status</label>
+                <select name="status" className={inp} defaultValue={client.status?.toUpperCase()}>
+                  <option value="LEAD">Lead</option><option value="PROPOSTA">Proposta</option><option value="NEGOCIACAO">Negociação</option><option value="ATIVO">Ativo</option><option value="INATIVO">Inativo</option>
+                </select>
+              </div>
+              <div><label className="text-xs font-medium text-gray-600 mb-1 block">Faturamento Anual (R$)</label><input name="revenue" className={inp} defaultValue={client.revenue || ''} /></div>
+              <div className="col-span-2">
+                <label className="text-xs font-medium text-gray-600 mb-1 block">Responsável</label>
+                <select name="responsibleId" className={inp} defaultValue={user?.id ?? ''}>
+                  {users.length === 0 && user && <option value={user.id}>{user.name}</option>}
+                  {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+                </select>
+              </div>
+            </div>
+            {erro && <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-xl px-3 py-2">{erro}</p>}
+          </div>
+          <div className="px-6 pb-6 flex gap-3">
+            <Button type="submit" className="flex-1" disabled={saving}>{saving ? 'Salvando...' : 'Salvar Alterações'}</Button>
+            <Button type="button" variant="secondary" onClick={onClose}>Cancelar</Button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
 function NewClientModal({ onClose }: { onClose: () => void }) {
   const { addClient }  = useStore()
   const { user }       = useAuthStore()
@@ -171,6 +260,7 @@ export function CRM() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('todos')
   const [segFilter, setSegFilter] = useState<SegmentFilter>('todos')
   const [selected, setSelected] = useState<Client | null>(null)
+  const [editing, setEditing]   = useState<Client | null>(null)
   const [showNew, setShowNew] = useState(false)
 
   const filtered = clients.filter(c => {
@@ -242,7 +332,7 @@ export function CRM() {
                   <td className="px-4 py-3.5">
                     <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                       <button onClick={() => setSelected(c)} className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-500"><Eye size={14} /></button>
-                      <button className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-500"><Edit2 size={14} /></button>
+                      <button onClick={() => setEditing(c)} className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-500"><Edit2 size={14} /></button>
                       <button className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-500"><MoreVertical size={14} /></button>
                     </div>
                   </td>
@@ -263,6 +353,7 @@ export function CRM() {
       </Card>
 
       {selected && <ClientModal client={selected} onClose={() => setSelected(null)} />}
+      {editing && <EditClientModal client={editing} onClose={() => setEditing(null)} />}
       {showNew && <NewClientModal onClose={() => setShowNew(false)} />}
     </AppLayout>
   )
