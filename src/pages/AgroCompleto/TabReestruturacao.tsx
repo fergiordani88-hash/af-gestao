@@ -230,6 +230,7 @@ export function TabReestruturacao({ clientId }: { clientId: string }) {
   })
   const [mostrarCronograma,     setMostrarCronograma]     = useState(false)
   const [customPcts,            setCustomPcts]            = useState<number[] | null>(null)
+  const [entradaStr,            setEntradaStr]            = useState('')
 
   const TAXAS_REF: Record<string, number> = { CDI: 0.1425, TR: 0.0088, IPCA: 0.0548 }
 
@@ -323,9 +324,23 @@ export function TabReestruturacao({ clientId }: { clientId: string }) {
 
   const selecionados = contratos.filter(c => c.selected)
 
+  const entrada = Math.max(0, parseFloat(entradaStr) || 0)
+
+  const abatimento = useMemo(() => {
+    const sorted = [...selecionados].sort((a, b) => b.taxa - a.taxa)
+    let restante = entrada
+    return sorted.map(ct => {
+      if (restante <= 0) return { ...ct, abatido: 0, saldoRestante: ct.saldoDevedor }
+      const abatido = Math.min(restante, ct.saldoDevedor)
+      restante -= abatido
+      return { ...ct, abatido, saldoRestante: ct.saldoDevedor - abatido }
+    })
+  }, [selecionados, entrada])
+
   const sim = useMemo(() => {
     if (selecionados.length === 0) return null
-    const totalSaldo   = selecionados.reduce((s, c) => s + c.saldoDevedor, 0)
+    const totalSaldoBruto = selecionados.reduce((s, c) => s + c.saldoDevedor, 0)
+    const totalSaldo = Math.max(0, totalSaldoBruto - entrada)
     const servicoAtual = selecionados.reduce((s, c) => s + c.servicoAnual, 0)
 
     if (!taxaAnualEfetiva || !nParcelas) return { totalSaldo, servicoAtual, cronograma: [] as ParcelaSimulada[], novoServicoAnual: null }
@@ -513,6 +528,50 @@ export function TabReestruturacao({ clientId }: { clientId: string }) {
           </div>
 
           <div className="p-5 space-y-5">
+            {/* Campo de entrada */}
+            <div className="bg-amber-50 border border-amber-300 rounded-xl p-4 space-y-3">
+              <div className="flex items-center gap-2">
+                <span className="text-base">💵</span>
+                <p className="font-bold text-sm text-amber-900">Entrada (abatimento antecipado — maior taxa primeiro)</p>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="flex-1">
+                  <input
+                    type="number" min={0} step={1000} value={entradaStr}
+                    onChange={e => setEntradaStr(e.target.value)}
+                    placeholder="R$ 0,00 — deixe vazio para sem entrada"
+                    className="w-full border border-amber-300 bg-white rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-300"
+                  />
+                </div>
+                {entrada > 0 && sim && (
+                  <div className="text-right shrink-0">
+                    <p className="text-xs text-amber-600">Saldo a refinanciar</p>
+                    <p className="text-lg font-bold text-amber-900">{fmtBRL(sim.totalSaldo)}</p>
+                  </div>
+                )}
+              </div>
+              {entrada > 0 && abatimento.some(a => a.abatido > 0) && (
+                <div className="space-y-1.5 pt-2 border-t border-amber-200">
+                  <p className="text-xs font-bold text-amber-800 uppercase tracking-wide">Contratos abatidos</p>
+                  {abatimento.filter(a => a.abatido > 0).map((ct, i) => (
+                    <div key={ct.id + i} className="flex items-center justify-between text-xs bg-white rounded-lg px-3 py-1.5 border border-amber-200">
+                      <div>
+                        <span className="font-semibold text-gray-800">{ct.banco} — {ct.modalidade}</span>
+                        {ct.numeroContrato !== '—' && <span className="text-gray-400 ml-1">Nº {ct.numeroContrato}</span>}
+                        <span className="ml-2 text-amber-700 font-bold">{fmtPct(ct.taxa)}</span>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-red-500 font-semibold">−{fmtBRL(ct.abatido)}</span>
+                        {ct.saldoRestante > 0
+                          ? <span className="text-gray-400 ml-2">resto: {fmtBRL(ct.saldoRestante)}</span>
+                          : <span className="ml-2 text-emerald-600 font-bold">quitado ✓</span>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
             {/* Inputs — linha 1 */}
             <div className="grid grid-cols-2 gap-4">
               {/* Taxa */}
