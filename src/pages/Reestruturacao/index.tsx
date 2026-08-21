@@ -319,6 +319,7 @@ export function Reestruturacao() {
   const [cenarioA, setCenarioA] = useState<Cenario>({ ...CENARIO_DEFAULT, id: 'A' })
   const [cenarioB, setCenarioB] = useState<Cenario>({ ...CENARIO_DEFAULT, id: 'B', taxaAnual: 8, prazoMeses: 84, sistema: 'sac' })
   const [comparar, setComparar] = useState(false)
+  const [entradaStr, setEntradaStr] = useState('')
 
   const client = clients.find(c => c.id === clientId)
 
@@ -353,6 +354,26 @@ export function Reestruturacao() {
     .filter(c => c.id && selecionados.has(c.id))
     .reduce((s, c) => s + saldoDevedorContrato(c), 0)
 
+  const entrada = Math.max(0, parseFloat(entradaStr.replace(/[^\d,.]/g, '').replace(',', '.')) || 0)
+
+  // Abatimento: contratos ordenados por taxa desc → entrada abate os mais caros primeiro
+  const abatimento = useMemo(() => {
+    const selecionadosList = contratos
+      .filter(c => c.id && selecionados.has(c.id))
+      .map(c => ({ ...c, saldo: saldoDevedorContrato(c) }))
+      .sort((a, b) => b.taxa - a.taxa)
+
+    let restante = entrada
+    return selecionadosList.map(ct => {
+      if (restante <= 0) return { ...ct, abatido: 0, saldoRestante: ct.saldo }
+      const abatido = Math.min(restante, ct.saldo)
+      restante -= abatido
+      return { ...ct, abatido, saldoRestante: ct.saldo - abatido }
+    })
+  }, [contratos, selecionados, entrada])
+
+  const saldoAposEntrada = Math.max(0, saldoTotal - entrada)
+
   const contratosAgrupados = useMemo(() => {
     const grupos: Record<string, AgroContrato[]> = {}
     contratos.forEach(c => {
@@ -365,19 +386,19 @@ export function Reestruturacao() {
 
   // Dados para gráfico comparativo
   const chartData = useMemo(() => {
-    if (!comparar || saldoTotal <= 0) return []
-    const crA = gerarCronograma(saldoTotal, cenarioA)
-    const crB = gerarCronograma(saldoTotal, cenarioB)
+    if (!comparar || saldoAposEntrada <= 0) return []
+    const crA = gerarCronograma(saldoAposEntrada, cenarioA)
+    const crB = gerarCronograma(saldoAposEntrada, cenarioB)
     const maxN = Math.max(crA.length, crB.length)
     return Array.from({ length: maxN }, (_, i) => ({
       periodo: i + 1,
       'Cenário A': crA[i]?.parcela ?? 0,
       'Cenário B': crB[i]?.parcela ?? 0,
     })).filter((_, i) => i % Math.max(1, Math.floor(maxN / 24)) === 0) // subsample para legibilidade
-  }, [comparar, saldoTotal, cenarioA, cenarioB])
+  }, [comparar, saldoAposEntrada, cenarioA, cenarioB])
 
-  const totalA = gerarCronograma(saldoTotal, cenarioA).reduce((s, r) => s + r.parcela, 0)
-  const totalB = gerarCronograma(saldoTotal, cenarioB).reduce((s, r) => s + r.parcela, 0)
+  const totalA = gerarCronograma(saldoAposEntrada, cenarioA).reduce((s, r) => s + r.parcela, 0)
+  const totalB = gerarCronograma(saldoAposEntrada, cenarioB).reduce((s, r) => s + r.parcela, 0)
   const economia = totalA - totalB
 
   return (
@@ -476,13 +497,71 @@ export function Reestruturacao() {
                   </div>
                 ))}
 
-                {/* Totalizador */}
-                <div className="flex items-center justify-between bg-gray-900 text-white rounded-2xl px-5 py-3">
-                  <div>
-                    <p className="text-xs text-white/60">{selecionados.size} operação(ões) selecionada(s)</p>
-                    <p className="font-bold text-lg">Saldo total a renegociar</p>
+                {/* Totalizador + Entrada */}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between bg-gray-900 text-white rounded-2xl px-5 py-3">
+                    <div>
+                      <p className="text-xs text-white/60">{selecionados.size} operação(ões) selecionada(s)</p>
+                      <p className="font-bold text-lg">Saldo total a renegociar</p>
+                    </div>
+                    <p className="text-2xl font-bold text-green-400">{fmtBRL(saldoTotal)}</p>
                   </div>
-                  <p className="text-2xl font-bold text-green-400">{fmtBRL(saldoTotal)}</p>
+
+                  {/* Campo de entrada */}
+                  <div className="bg-amber-50 border-2 border-amber-300 rounded-2xl p-4 space-y-3">
+                    <div className="flex items-center gap-2">
+                      <span className="text-base">💵</span>
+                      <p className="font-bold text-amber-900">Entrada (abatimento antecipado)</p>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="flex-1">
+                        <label className="text-xs font-semibold text-amber-700 mb-1 block">Valor da entrada (R$)</label>
+                        <input
+                          type="number" min={0} step={1000}
+                          value={entradaStr}
+                          onChange={e => setEntradaStr(e.target.value)}
+                          placeholder="0,00 — deixe em branco para sem entrada"
+                          className="w-full border border-amber-300 bg-white rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-300"
+                        />
+                      </div>
+                      {entrada > 0 && (
+                        <div className="text-right">
+                          <p className="text-xs text-amber-600">Saldo a refinanciar</p>
+                          <p className="text-xl font-bold text-amber-900">{fmtBRL(saldoAposEntrada)}</p>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Breakdown do abatimento */}
+                    {entrada > 0 && abatimento.some(a => a.abatido > 0) && (
+                      <div className="space-y-1.5 pt-1 border-t border-amber-200">
+                        <p className="text-xs font-bold text-amber-800 uppercase tracking-wide">Abatimento — maior taxa primeiro</p>
+                        {abatimento.map((ct, i) => ct.abatido > 0 ? (
+                          <div key={ct.id ?? i} className="flex items-center justify-between text-xs bg-white rounded-xl px-3 py-2 border border-amber-200">
+                            <div>
+                              <span className="font-semibold text-gray-800">{ct.banco} — {ct.modalidade}</span>
+                              {ct.numeroContrato && <span className="text-gray-400 ml-1">Nº {ct.numeroContrato}</span>}
+                              <span className="ml-2 text-amber-700 font-bold">{(ct.taxa * 100).toFixed(2)}% a.a.</span>
+                            </div>
+                            <div className="text-right">
+                              <span className="text-red-500 font-semibold">−{fmtBRL(ct.abatido)}</span>
+                              {ct.saldoRestante > 0 && (
+                                <span className="text-gray-400 ml-2">resto: {fmtBRL(ct.saldoRestante)}</span>
+                              )}
+                              {ct.saldoRestante === 0 && (
+                                <span className="ml-2 text-emerald-600 font-bold">quitado</span>
+                              )}
+                            </div>
+                          </div>
+                        ) : null)}
+                        {entrada > saldoTotal && (
+                          <p className="text-xs text-emerald-700 font-semibold bg-emerald-50 rounded-xl px-3 py-2 border border-emerald-200">
+                            A entrada ({fmtBRL(entrada)}) cobre todo o saldo — não há valor a refinanciar.
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             )}
@@ -490,7 +569,7 @@ export function Reestruturacao() {
         )}
 
         {/* Simulação */}
-        {clientId && saldoTotal > 0 && (
+        {clientId && saldoTotal > 0 && saldoAposEntrada > 0 && (
           <>
             <div className="flex items-center justify-between">
               <h3 className="font-bold text-gray-900">3. Simulação de renegociação</h3>
@@ -501,9 +580,9 @@ export function Reestruturacao() {
             </div>
 
             <div className={`grid gap-5 ${comparar ? 'grid-cols-1 lg:grid-cols-2' : 'grid-cols-1 max-w-2xl'}`}>
-              <CenarioPanel cenario={cenarioA} saldoTotal={saldoTotal} onChange={setCenarioA} />
+              <CenarioPanel cenario={cenarioA} saldoTotal={saldoAposEntrada} onChange={setCenarioA} />
               {comparar && (
-                <CenarioPanel cenario={cenarioB} saldoTotal={saldoTotal} onChange={setCenarioB} />
+                <CenarioPanel cenario={cenarioB} saldoTotal={saldoAposEntrada} onChange={setCenarioB} />
               )}
             </div>
 
@@ -513,8 +592,8 @@ export function Reestruturacao() {
                 <h4 className="font-bold text-gray-900">Comparativo A × B</h4>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                   {[
-                    { l: 'Total pago — Cenário A', v: fmtBRL(totalA), cor: 'text-blue-700' },
-                    { l: 'Total pago — Cenário B', v: fmtBRL(totalB), cor: 'text-violet-700' },
+                    { l: 'Total pago — Cenário A', v: fmtBRL(totalA + entrada), cor: 'text-blue-700' },
+                    { l: 'Total pago — Cenário B', v: fmtBRL(totalB + entrada), cor: 'text-violet-700' },
                     { l: 'Diferença total', v: fmtBRL(Math.abs(economia)), cor: economia > 0 ? 'text-emerald-700' : 'text-red-600' },
                     { l: economia > 0 ? 'O Cenário B economiza' : 'O Cenário A economiza', v: `${((Math.abs(economia) / Math.max(totalA, totalB)) * 100).toFixed(1)}%`, cor: 'text-gray-900' },
                   ].map(k => (
