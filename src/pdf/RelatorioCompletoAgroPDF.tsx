@@ -40,6 +40,7 @@ export interface RelatorioCompletoAgroData {
   reestruturacaoIdeal?: {
     totalPassivo: number; resultadoLiquidoCapacidade: number; safraCapacidade: string
     cenarios: { label: string; capacidadeAnual: number; inviavel: boolean; nAnos?: number; parcelaFixa?: number; totalJuros?: number; jurosAnuaisSaldo?: number; deficitAnual?: number }[]
+    cenario100pct?: { label: string; capacidadeAnual: number; inviavel: boolean; nAnos?: number; parcelaFixa?: number; totalJuros?: number; jurosAnuaisSaldo?: number; deficitAnual?: number }
   }
   contextoMercado?: { cambio?: string; precoRef?: string; panorama?: string; comentario?: string }
   // Análise de crédito ampliada
@@ -1134,6 +1135,61 @@ export function RelatorioCompletoAgroPDF({ data }: { data: RelatorioCompletoAgro
             <Text style={{ fontFamily: 'Helvetica', fontSize: 6.5, color: C.muted, marginTop: 10, lineHeight: 1.6 }}>
               Simulação de caráter indicativo — parcela fixa (sistema Price) sobre o saldo total, taxa de 1% a.m. (12,68% a.a. efetivo) sem indexador, prazo arredondado para o número inteiro de anos seguinte. Não substitui a negociação formal das condições com cada instituição credora.
             </Text>
+
+            {/* ── Cenário 100% da Receita ── */}
+            {data.reestruturacaoIdeal?.cenario100pct && (() => {
+              const c100 = data.reestruturacaoIdeal!.cenario100pct!
+              const juros100 = c100.jurosAnuaisSaldo ?? (data.reestruturacaoIdeal!.totalPassivo * (Math.pow(1.01, 12) - 1))
+              return (
+                <View style={{ marginTop: 18, backgroundColor: '#1C3A2A', borderRadius: 6, padding: 14 }}>
+                  <Text style={{ fontFamily: 'Helvetica-Bold', fontSize: 9, color: '#FFFFFF', marginBottom: 4, letterSpacing: 0.5, textTransform: 'uppercase' }}>
+                    Cenário Extremo — Comprometendo 100% da Receita Operacional
+                  </Text>
+                  <Text style={{ fontFamily: 'Helvetica', fontSize: 7.5, color: '#C8D9C8', lineHeight: 1.7, marginBottom: 12 }}>
+                    Este cenário considera a aplicação de <Text style={{ fontFamily: 'Helvetica-Bold', color: '#FFFFFF' }}>100% do Resultado Operacional</Text> (Receita Bruta − Custo de Produção − Arrendamento) ao serviço da dívida reestruturada, sem nenhuma reserva para despesas familiares, imprevistos ou reinvestimento — representa o limite absoluto de comprometimento da propriedade.
+                  </Text>
+
+                  <View style={{ flexDirection: 'row', gap: 8 }}>
+                    {/* Capacidade */}
+                    <View style={{ flex: 1, backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 4, padding: 10 }}>
+                      <Text style={{ fontFamily: 'Helvetica', fontSize: 6.5, color: '#A0C0A0', marginBottom: 2 }}>Capacidade anual disponível</Text>
+                      <Text style={{ fontFamily: 'Helvetica-Bold', fontSize: 12, color: '#FFFFFF' }}>{R(c100.capacidadeAnual)}</Text>
+                      <Text style={{ fontFamily: 'Helvetica', fontSize: 6, color: '#A0C0A0', marginTop: 1 }}>100% do Resultado Operacional</Text>
+                    </View>
+                    {/* Juros */}
+                    <View style={{ flex: 1, backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 4, padding: 10 }}>
+                      <Text style={{ fontFamily: 'Helvetica', fontSize: 6.5, color: '#A0C0A0', marginBottom: 2 }}>Juros anuais sobre o saldo</Text>
+                      <Text style={{ fontFamily: 'Helvetica-Bold', fontSize: 12, color: '#FFD580' }}>{R(juros100)}</Text>
+                      <Text style={{ fontFamily: 'Helvetica', fontSize: 6, color: '#A0C0A0', marginTop: 1 }}>a 1% a.m. (12,68% a.a.) sobre {R(data.reestruturacaoIdeal!.totalPassivo)}</Text>
+                    </View>
+                    {/* Resultado */}
+                    <View style={{ flex: 1.4, backgroundColor: c100.inviavel ? 'rgba(200,50,50,0.25)' : 'rgba(50,180,100,0.20)', borderRadius: 4, padding: 10, borderWidth: 1, borderColor: c100.inviavel ? '#CC4444' : '#44CC88' }}>
+                      {c100.inviavel ? (
+                        <>
+                          <Text style={{ fontFamily: 'Helvetica', fontSize: 6.5, color: '#FFA0A0', marginBottom: 2 }}>Resultado</Text>
+                          <Text style={{ fontFamily: 'Helvetica-Bold', fontSize: 10, color: '#FF8888' }}>Ainda insuficiente</Text>
+                          <Text style={{ fontFamily: 'Helvetica', fontSize: 6.5, color: '#FFA0A0', marginTop: 3, lineHeight: 1.5 }}>
+                            Mesmo comprometendo toda a receita, a capacidade ({R(c100.capacidadeAnual)}/ano) não cobre os juros de {R(juros100)}/ano. A dívida cresceria indefinidamente.
+                          </Text>
+                        </>
+                      ) : (
+                        <>
+                          <Text style={{ fontFamily: 'Helvetica', fontSize: 6.5, color: '#A0F0C0', marginBottom: 2 }}>Prazo para quitar o passivo</Text>
+                          <Text style={{ fontFamily: 'Helvetica-Bold', fontSize: 18, color: '#FFFFFF' }}>{c100.nAnos} {(c100.nAnos ?? 0) === 1 ? 'ano' : 'anos'}</Text>
+                          <Text style={{ fontFamily: 'Helvetica', fontSize: 7, color: '#A0F0C0', marginTop: 2 }}>
+                            Parcela anual: {R(c100.parcelaFixa ?? 0)} · Total de juros: {R(c100.totalJuros ?? 0)}
+                          </Text>
+                        </>
+                      )}
+                    </View>
+                  </View>
+
+                  <Text style={{ fontFamily: 'Helvetica', fontSize: 6.5, color: '#C8D9C8', marginTop: 10, lineHeight: 1.6, fontStyle: 'italic' }}>
+                    ⚠ Este seria o cenário comprometendo toda a receita anual — sem margem para reinvestimento, manutenção ou despesas familiares. Representa o prazo mínimo possível de quitação dada a geração de caixa atual da propriedade, e não uma recomendação operacional.
+                  </Text>
+                </View>
+              )
+            })()}
           </View>
           <Ftr client={data.clientName} date={data.dataGeracao} hora={h} />
         </Page>

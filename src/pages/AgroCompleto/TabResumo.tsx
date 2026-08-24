@@ -655,6 +655,7 @@ export function TabResumo({ clientId, clienteNome, clienteCidade }: {
           calcCenarioReestruturacao('50% do Resultado (agressivo)', resultadoLiquidoCapacidade * 0.50),
           calcCenarioReestruturacao('30% do Resultado (saudável)', resultadoLiquidoCapacidade * 0.30),
         ],
+        cenario100pct: calcCenarioReestruturacao('100% do Resultado Operacional', resultadoLiquidoCapacidade),
       }
 
       await pdf.exportRelatorioAgro({
