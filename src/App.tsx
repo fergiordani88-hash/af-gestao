@@ -14,6 +14,7 @@ import { ControleRelatorios }  from './afcontrole/pages/ControleRelatorios'
 import { ControleSaude }       from './afcontrole/pages/ControleSaude'
 import { Dashboard }         from './pages/Dashboard'
 import { CRM }               from './pages/CRM'
+import { Agenda }            from './pages/Agenda'
 import { DiagnosticoPJ }     from './pages/DiagnosticoPJ'
 import { DiagnosticoAgro }   from './pages/DiagnosticoAgro'
 import { AgroCompleto }      from './pages/AgroCompleto'
@@ -62,6 +63,11 @@ export default function App() {
       <Route path="/crm" element={
         <ProtectedRoute allowedRoles={['admin', 'consultor']}>
           <CRM />
+        </ProtectedRoute>
+      } />
+      <Route path="/agenda" element={
+        <ProtectedRoute allowedRoles={['admin', 'consultor']}>
+          <Agenda />
         </ProtectedRoute>
       } />
 

@@ -59,6 +59,9 @@ export const dashboardApi = {
     byStatus:  Record<string, number>
     recentClients: unknown[]
     actionsByStatus: Record<string, number>
+    today: { events: unknown[]; reminders: unknown[] }
+    recentActivity: unknown[]
+    statusSuggestions: unknown[]
   }>('/dashboard'),
 }
 
@@ -107,6 +110,30 @@ export const financeiroApi = {
   getCredito:  (clientId: string) => request<unknown[]>(`/financeiro/credito/${clientId}`),
   addCredito:  (data: unknown) => request<unknown>('/financeiro/credito', { method: 'POST', body: JSON.stringify(data) }),
   updateCredito: (id: string, data: unknown) => request<unknown>(`/financeiro/credito/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+}
+
+// ── Agenda ────────────────────────────────────────────────────
+export const eventsApi = {
+  list:   (params?: { from?: string; to?: string; assignedToId?: string; clientId?: string }) => {
+    const qs = params ? '?' + new URLSearchParams(params as Record<string, string>).toString() : ''
+    return request<unknown[]>(`/events${qs}`)
+  },
+  create: (data: unknown) => request<unknown>('/events', { method: 'POST', body: JSON.stringify(data) }),
+  update: (id: string, data: unknown) => request<unknown>(`/events/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+  setStatus: (id: string, status: string) => request<unknown>(`/events/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status }) }),
+  delete: (id: string) => request<void>(`/events/${id}`, { method: 'DELETE' }),
+}
+
+// ── Lembretes ─────────────────────────────────────────────────
+export const remindersApi = {
+  list:   (params?: { status?: string; assignedToId?: string; clientId?: string; dueBefore?: string }) => {
+    const qs = params ? '?' + new URLSearchParams(params as Record<string, string>).toString() : ''
+    return request<unknown[]>(`/reminders${qs}`)
+  },
+  create:   (data: unknown) => request<unknown>('/reminders', { method: 'POST', body: JSON.stringify(data) }),
+  update:   (id: string, data: unknown) => request<unknown>(`/reminders/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+  complete: (id: string) => request<unknown>(`/reminders/${id}/complete`, { method: 'PATCH' }),
+  delete:   (id: string) => request<void>(`/reminders/${id}`, { method: 'DELETE' }),
 }
 
 // ── Planos de ação ────────────────────────────────────────────

@@ -3,6 +3,10 @@ export type ClientStatus = 'lead' | 'proposta' | 'negociacao' | 'ativo' | 'inati
 export type ClientSegment = 'agro' | 'comercio' | 'servicos' | 'industria'
 export type Priority = 'imediata' | 'alta' | 'media' | 'baixa'
 export type ActionStatus = 'nao_iniciado' | 'em_andamento' | 'concluido' | 'pendente' | 'reavaliar'
+export type EventType = 'reuniao' | 'ligacao' | 'visita' | 'tarefa' | 'outro'
+export type EventStatus = 'agendado' | 'concluido' | 'cancelado'
+export type ReminderPriority = 'baixa' | 'media' | 'alta'
+export type ReminderStatus = 'pendente' | 'concluido'
 
 export interface User {
   id: string
@@ -84,6 +88,54 @@ export interface CashFlow {
   inflow: number
   outflow: number
   balance: number
+}
+
+export interface CalendarEvent {
+  id: string
+  title: string
+  description?: string
+  type: EventType
+  startAt: string
+  endAt?: string
+  allDay: boolean
+  location?: string
+  status: EventStatus
+  clientId?: string
+  client?: { id: string; name: string }
+  createdById: string
+  createdBy?: { id: string; name: string }
+  assignedToId?: string
+  assignedTo?: { id: string; name: string }
+}
+
+export interface Reminder {
+  id: string
+  title: string
+  description?: string
+  dueDate: string
+  priority: ReminderPriority
+  status: ReminderStatus
+  completedAt?: string
+  clientId?: string
+  client?: { id: string; name: string }
+  createdById: string
+  assignedToId?: string
+  assignedTo?: { id: string; name: string }
+}
+
+export interface StatusSuggestion {
+  clientId: string
+  clientName: string
+  currentStatus: ClientStatus
+  suggestedStatus?: ClientStatus
+  reason: string
+}
+
+export interface ActivityItem {
+  type: 'attendance' | 'document' | 'contract'
+  label: string
+  detail?: string
+  date: string
 }
 
 export interface AgroProduction {

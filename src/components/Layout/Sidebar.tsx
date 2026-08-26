@@ -61,6 +61,7 @@ const MODULE_NAV: Record<AppModule, NavItem[]> = {
   ],
   consultoria: [
     { label: 'Dashboard',            icon: LayoutDashboard, path: '/',               roles: ['admin','consultor'], end: true },
+    { label: 'Agenda',               icon: Calendar,        path: '/agenda',         roles: ['admin','consultor'] },
     { label: 'CRM Clientes',         icon: Users,           path: '/crm',            roles: ['admin','consultor'] },
     { label: 'Usuários',             icon: UserCog,         path: '/usuarios',       roles: ['admin'] },
     { label: 'Empresarial Completo', icon: Building2,       path: '/pj-completo',    roles: ['admin','consultor'] },
