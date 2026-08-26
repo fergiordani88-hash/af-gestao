@@ -131,6 +131,27 @@ export interface StatusSuggestion {
   reason: string
 }
 
+export interface EmailAccountStatus {
+  id: string
+  emailAddress: string
+  imapHost: string
+  imapPort: number
+  imapSecure: boolean
+  lastSyncedAt?: string
+  lastSyncError?: string
+}
+
+export interface EmailMessageItem {
+  id: string
+  clientId?: string
+  fromAddress: string
+  fromName?: string
+  toAddresses: string[]
+  subject: string
+  receivedAt: string
+  direction: 'recebido' | 'enviado'
+}
+
 export interface ActivityItem {
   type: 'attendance' | 'document' | 'contract'
   label: string

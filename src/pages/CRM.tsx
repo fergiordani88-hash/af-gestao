@@ -1,19 +1,49 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Search, Plus, Filter, Phone, Mail, MapPin, Eye, Edit2, MoreVertical, Users } from 'lucide-react'
+import { Search, Plus, Filter, Phone, Mail, MapPin, Eye, Edit2, MoreVertical, Users, Inbox, Send } from 'lucide-react'
 import { AppLayout } from '../components/Layout/AppLayout'
 import { Card } from '../components/ui/Card'
 import { Badge } from '../components/ui/Badge'
 import { Button } from '../components/ui/Button'
 import { useStore } from '../store/useStore'
 import { useAuthStore } from '../store/useAuthStore'
-import { usersApi } from '../services/api'
-import type { Client, ClientStatus, ClientSegment } from '../types'
+import { usersApi, emailApi } from '../services/api'
+import type { Client, ClientStatus, ClientSegment, EmailMessageItem } from '../types'
 
 type StatusFilter = 'todos' | ClientStatus
 type SegmentFilter = 'todos' | ClientSegment
 
 const fmtBRL = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 })
+
+function ClientEmails({ clientId }: { clientId: string }) {
+  const [messages, setMessages] = useState<EmailMessageItem[] | null>(null)
+
+  useEffect(() => {
+    emailApi.listMessages(clientId)
+      .then((list) => setMessages(list as EmailMessageItem[]))
+      .catch(() => setMessages([]))
+  }, [clientId])
+
+  if (messages === null) return <p className="text-xs text-gray-400">Carregando e-mails...</p>
+  if (messages.length === 0) return <p className="text-xs text-gray-400">Nenhum e-mail vinculado a este cliente ainda.</p>
+
+  return (
+    <div className="space-y-1.5 max-h-56 overflow-y-auto">
+      {messages.map(m => (
+        <div key={m.id} className="flex items-start gap-2 p-2.5 rounded-xl bg-gray-50 text-xs">
+          {m.direction === 'enviado' ? <Send size={13} className="text-blue-500 mt-0.5 shrink-0" /> : <Inbox size={13} className="text-af-green mt-0.5 shrink-0" />}
+          <div className="min-w-0 flex-1">
+            <p className="font-medium text-gray-900 truncate">{m.subject}</p>
+            <p className="text-gray-500 mt-0.5">
+              {m.direction === 'enviado' ? `Para: ${m.toAddresses.join(', ')}` : `De: ${m.fromName || m.fromAddress}`}
+              {' · '}{new Date(m.receivedAt).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+            </p>
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
 
 function ClientModal({ client, onClose }: { client: Client; onClose: () => void }) {
   const navigate = useNavigate()
@@ -57,6 +87,10 @@ function ClientModal({ client, onClose }: { client: Client; onClose: () => void 
               <p className="text-sm text-gray-600 bg-gray-50 rounded-xl p-3">{client.notes}</p>
             </div>
           )}
+          <div className="col-span-2">
+            <h3 className="font-semibold text-gray-700 text-sm uppercase tracking-wide mb-2">E-mails</h3>
+            <ClientEmails clientId={client.id} />
+          </div>
         </div>
         <div className="px-6 pb-6 flex gap-3">
           <Button
@@ -262,6 +296,8 @@ export function CRM() {
   const [selected, setSelected] = useState<Client | null>(null)
   const [editing, setEditing]   = useState<Client | null>(null)
   const [showNew, setShowNew] = useState(false)
+
+  useEffect(() => { emailApi.sync().catch(() => {}) }, [])
 
   const filtered = clients.filter(c => {
     const matchSearch = c.name.toLowerCase().includes(search.toLowerCase()) || c.email.toLowerCase().includes(search.toLowerCase())

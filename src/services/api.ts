@@ -136,6 +136,20 @@ export const remindersApi = {
   delete:   (id: string) => request<void>(`/reminders/${id}`, { method: 'DELETE' }),
 }
 
+// ── Integração de e-mail (IMAP) ──────────────────────────────
+export const emailApi = {
+  getAccount: () => request<unknown | null>('/email/account'),
+  connect: (data: { emailAddress: string; imapHost: string; imapPort: number; imapSecure: boolean; password: string }) =>
+    request<{ account: unknown; sync: { ok: boolean; fetched: number; matched: number; error?: string } }>(
+      '/email/account', { method: 'POST', body: JSON.stringify(data) }
+    ),
+  disconnect: () => request<void>('/email/account', { method: 'DELETE' }),
+  sync: (force = false) => request<{ ok: boolean; fetched?: number; matched?: number; skipped?: boolean; error?: string }>(
+    `/email/sync${force ? '?force=1' : ''}`, { method: 'POST' }
+  ),
+  listMessages: (clientId: string) => request<unknown[]>(`/email/messages?clientId=${clientId}`),
+}
+
 // ── Planos de ação ────────────────────────────────────────────
 export const actionPlansApi = {
   list:   (params?: { clientId?: string; status?: string }) => {
