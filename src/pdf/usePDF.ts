@@ -4,6 +4,7 @@ import { DiagnosticoPJPDF,  type DiagPJData   } from './DiagnosticoPJPDF'
 import { DiagnosticoAgroPDF, type DiagAgroData } from './DiagnosticoAgroPDF'
 import { PropostaComercialPDF, type PropostaData } from './PropostaComercialPDF'
 import { RelatorioCompletoAgroPDF, type RelatorioCompletoAgroData } from './RelatorioCompletoAgroPDF'
+import { ProducaoPDF, type ProducaoPDFData } from './ProducaoPDF'
 
 function slugify(s: string) {
   return s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
@@ -41,5 +42,10 @@ export const usePDF = () => ({
   exportRelatorioAgro: async (data: RelatorioCompletoAgroData) => {
     const el = createElement(RelatorioCompletoAgroPDF, { data })
     await downloadPDF(el, `relatorio-agro-${slugify(data.clientName)}-${data.safra.replace('/', '-')}.pdf`)
+  },
+
+  exportProducao: async (data: ProducaoPDFData) => {
+    const el = createElement(ProducaoPDF, { data })
+    await downloadPDF(el, `produtividade-${slugify(data.clientName)}.pdf`)
   },
 })

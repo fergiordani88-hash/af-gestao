@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react'
-import { Plus, Trash2, Save, Sprout, Info, Copy, CheckSquare, ChevronDown, ChevronUp, PieChart } from 'lucide-react'
+import { Plus, Trash2, Save, Sprout, Info, Copy, CheckSquare, ChevronDown, ChevronUp, PieChart, FileDown } from 'lucide-react'
 import { agroApi, type AgroProducao, type CustoItem } from '../../services/agroApi'
 import { pjBenchmarkApi } from '../../services/benchmarkApi'
 import { Card } from '../../components/ui/Card'
+import { usePDF } from '../../pdf/usePDF'
 
 // ── Categorias de custo padrão ────────────────────────────────────────────────
 const CATEGORIAS_CUSTO = [
@@ -538,7 +539,11 @@ function SafraBlock({ safra, tipo, rows, clientId, onDeleteRows, onAddRows, onRe
   )
 }
 
-export function TabProducao({ clientId }: { clientId: string }) {
+export function TabProducao({ clientId, clienteNome, clienteCidade }: {
+  clientId: string; clienteNome?: string; clienteCidade?: string
+}) {
+  const pdf = usePDF()
+  const [exportando, setExportando] = useState(false)
   const [producoes, setProducoes] = useState<AgroProducao[]>([])
   const [initialLoading, setInitialLoading] = useState(true)
   // Versão por safra — só o SafraBlock que recebeu a cópia remonta
@@ -718,15 +723,46 @@ export function TabProducao({ clientId }: { clientId: string }) {
     }
   }
 
+  const handleExportPDF = async () => {
+    setExportando(true)
+    try {
+      const safras = [...safrasHistoricas, ...safrasFuturasCadastradas]
+        .filter(s => s.rows.length > 0)
+        .map(s => ({
+          safra: s.safra, tipo: s.tipo,
+          rows: s.rows.map(r => ({
+            cultura: r.cultura, area: r.area, produtividade: r.produtividade,
+            cotacao: r.cotacao, custoPorHa: r.custoPorHa,
+            areaArrendada: r.areaArrendada, custoArrendHa: r.custoArrendHa,
+          })),
+        }))
+      await pdf.exportProducao({
+        clientName: clienteNome ?? 'Produtor',
+        location: clienteCidade,
+        safras,
+      })
+    } finally {
+      setExportando(false)
+    }
+  }
+
   if (initialLoading) return <div className="text-center py-16 text-gray-400 text-sm">Carregando produção...</div>
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex items-center justify-between mb-4 gap-3">
         <div>
           <h2 className="font-bold text-gray-900">Produção Rural — Histórico + Planejamento</h2>
           <p className="text-xs text-gray-500 mt-0.5">Registre safras históricas e planeje até 10 safras futuras</p>
         </div>
+        <button
+          onClick={handleExportPDF}
+          disabled={exportando || producoes.length === 0}
+          className="flex items-center gap-1.5 text-xs font-semibold bg-af-green text-white px-3 py-2 rounded-lg hover:bg-af-green/90 disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
+          title="Gera um PDF com o nome do cliente e a produtividade de cada cultura por safra"
+        >
+          <FileDown size={13} /> {exportando ? 'Gerando PDF...' : 'Imprimir Produtividade'}
+        </button>
         <div className="flex flex-wrap gap-2 justify-end max-w-2xl">
           {safrasHistoricas.filter(s => s.rows.length === 0).map(s => (
             <button key={s.safra} onClick={() => handleAddSafra(s.safra, 'historico')} className="flex items-center gap-1 text-xs bg-blue-50 text-blue-700 border border-blue-200 px-3 py-1.5 rounded-lg hover:bg-blue-100">

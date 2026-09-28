@@ -74,7 +74,7 @@ export function AgroCompleto() {
       case 'hedge':           return <TabHedge clientId={clientId} />
       case 'alertas':         return <TabAlertas clientId={clientId} />
       case 'importacao':      return <TabImportacao clientId={clientId} />
-      case 'producao':     return <TabProducao clientId={clientId} />
+      case 'producao':     return <TabProducao clientId={clientId} clienteNome={client?.name} clienteCidade={client ? `${client.city}/${client.state}` : undefined} />
       case 'dre-rural':    return <TabDRERural clientId={clientId} />
       case 'questionario':   return <TabQuestionarioAgro clientId={clientId} nomeCliente={client?.name} />
       case 'projecao-anual': return <TabProjecaoAnual clientId={clientId} />
