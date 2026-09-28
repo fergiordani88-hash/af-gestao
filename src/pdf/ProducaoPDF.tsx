@@ -30,12 +30,54 @@ export interface ProducaoPDFData {
 
 function calc(r: ProducaoPDFRow) {
   const custoPorHaReais  = r.custoPorHa * r.cotacao
-  const recBruta         = r.area * r.produtividade * r.cotacao
-  const custoTotal       = r.area * custoPorHaReais
+  const prodTotal        = r.area * r.produtividade
+  const recBruta         = prodTotal * r.cotacao
+  const custoProducao    = r.area * custoPorHaReais
   const custoArrendTotal = r.areaArrendada * r.custoArrendHa * (r.cotacao || 1)
-  const resultado        = recBruta - custoTotal - custoArrendTotal
+  const custoTotal       = custoProducao + custoArrendTotal
+  const resultado        = recBruta - custoTotal
   const margem           = recBruta > 0 ? (resultado / recBruta) * 100 : 0
-  return { recBruta, custoTotal: custoTotal + custoArrendTotal, resultado, margem }
+  return { prodTotal, recBruta, custoPorHaReais, custoProducao, custoArrendTotal, custoTotal, resultado, margem }
+}
+
+// ── Tabela de resumo por safra ────────────────────────────────────────────
+const RESUMO_COLS: { key: string; label: string; flex: number }[] = [
+  { key: 'safra',       label: 'Safra',               flex: 0.7 },
+  { key: 'tipo',        label: 'Tipo',                 flex: 0.7 },
+  { key: 'area',        label: 'Área (ha)',            flex: 0.8 },
+  { key: 'recBruta',    label: 'Receita Bruta',        flex: 1.1 },
+  { key: 'custoProd',   label: 'Custo Produção',       flex: 1.1 },
+  { key: 'custoArrend', label: 'Custo Arrendamento',   flex: 1.1 },
+  { key: 'custoTotal',  label: 'Custo Total',          flex: 1.1 },
+  { key: 'resultado',   label: 'Resultado',            flex: 1.1 },
+  { key: 'margem',      label: 'Margem',               flex: 0.7 },
+]
+
+// ── Tabela detalhada por cultura, dentro de cada safra ────────────────────
+const DETALHE_COLS: { key: string; label: string; flex: number }[] = [
+  { key: 'cultura',     label: 'Cultura',              flex: 1.3 },
+  { key: 'area',        label: 'Área (ha)',            flex: 0.8 },
+  { key: 'produt',      label: 'Produt. (sc/ha)',      flex: 0.9 },
+  { key: 'cotacao',     label: 'Cotação (R$/sc)',      flex: 0.8 },
+  { key: 'prodTotal',   label: 'Prod. Total (sc)',     flex: 0.9 },
+  { key: 'recBruta',    label: 'Receita Bruta',        flex: 1.1 },
+  { key: 'custoHa',     label: 'Custo/ha (R$)',        flex: 0.9 },
+  { key: 'custoProd',   label: 'Custo Produção',       flex: 1.1 },
+  { key: 'areaArrend',  label: 'Área Arrend. (ha)',    flex: 0.8 },
+  { key: 'custoArrend', label: 'Custo Arrendamento',   flex: 1.1 },
+  { key: 'custoTotal',  label: 'Custo Total',          flex: 1.1 },
+  { key: 'resultado',   label: 'Resultado',            flex: 1.1 },
+  { key: 'margem',      label: 'Margem',               flex: 0.7 },
+]
+
+function TableHeader({ cols }: { cols: { key: string; label: string; flex: number }[] }) {
+  return (
+    <View style={base.tableHeader}>
+      {cols.map(c => (
+        <Text key={c.key} style={{ ...base.tableHeaderCell, flex: c.flex, fontSize: 6.5 }}>{c.label}</Text>
+      ))}
+    </View>
+  )
 }
 
 export function ProducaoPDF({ data }: { data: ProducaoPDFData }) {
@@ -47,9 +89,11 @@ export function ProducaoPDF({ data }: { data: ProducaoPDFData }) {
     const totais = s.rows.reduce((acc, r) => {
       const c = calc(r)
       acc.recBruta += c.recBruta
+      acc.custoProducao += c.custoProducao
+      acc.custoArrendTotal += c.custoArrendTotal
       acc.custoTotal += c.custoTotal
       return acc
-    }, { recBruta: 0, custoTotal: 0 })
+    }, { recBruta: 0, custoProducao: 0, custoArrendTotal: 0, custoTotal: 0 })
     const resultado = totais.recBruta - totais.custoTotal
     const margem = totais.recBruta > 0 ? (resultado / totais.recBruta) * 100 : 0
     return { safra: s.safra, tipo: s.tipo, area, ...totais, resultado, margem }
@@ -57,7 +101,7 @@ export function ProducaoPDF({ data }: { data: ProducaoPDFData }) {
 
   return (
     <Document title={`Produtividade por Safra — ${data.clientName}`} author="AF Gestão & Consultoria">
-      <Page size="A4" style={base.page}>
+      <Page size="A4" orientation="landscape" style={base.page}>
         <PDFHeader
           title="Produtividade por Safra"
           subtitle={data.location || 'Produção Rural'}
@@ -71,27 +115,25 @@ export function ProducaoPDF({ data }: { data: ProducaoPDFData }) {
             <View style={base.section}>
               <Text style={base.sectionTitle}>Resumo por Safra</Text>
               <View style={base.table}>
-                <View style={base.tableHeader}>
-                  {['Safra', 'Tipo', 'Área (ha)', 'Receita Bruta', 'Custo Total', 'Resultado', 'Margem'].map(h => (
-                    <Text key={h} style={{ ...base.tableHeaderCell, flex: h === 'Safra' ? 0.8 : 1, fontSize: 6.5 }}>{h}</Text>
-                  ))}
-                </View>
+                <TableHeader cols={RESUMO_COLS} />
                 {resumoSafras.map((r, i) => (
                   <View key={r.safra} style={{ ...base.tableRow, ...(i % 2 === 0 ? base.tableRowAlt : {}) }}>
-                    <Text style={{ ...base.tableCell, flex: 0.8, fontWeight: 700 }}>{r.safra}</Text>
-                    <Text style={base.tableCell}>{r.tipo === 'historico' ? 'Histórico' : 'Previsão'}</Text>
-                    <Text style={base.tableCell}>{r.area.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}</Text>
-                    <Text style={base.tableCell}>{fmtBRL(r.recBruta)}</Text>
-                    <Text style={{ ...base.tableCell, color: colors.red }}>{fmtBRL(r.custoTotal)}</Text>
-                    <Text style={{ ...base.tableCell, fontWeight: 700, color: r.resultado >= 0 ? colors.green : colors.red }}>{fmtBRL(r.resultado)}</Text>
-                    <Text style={{ ...base.tableCell, color: r.margem >= 15 ? colors.green : colors.red }}>{fmtPct(r.margem)}</Text>
+                    <Text style={{ ...base.tableCell, flex: 0.7, fontWeight: 700 }}>{r.safra}</Text>
+                    <Text style={{ ...base.tableCell, flex: 0.7 }}>{r.tipo === 'historico' ? 'Histórico' : 'Previsão'}</Text>
+                    <Text style={{ ...base.tableCell, flex: 0.8 }}>{r.area.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}</Text>
+                    <Text style={{ ...base.tableCell, flex: 1.1 }}>{fmtBRL(r.recBruta)}</Text>
+                    <Text style={{ ...base.tableCell, flex: 1.1, color: colors.red }}>{fmtBRL(r.custoProducao)}</Text>
+                    <Text style={{ ...base.tableCell, flex: 1.1, color: colors.red }}>{fmtBRL(r.custoArrendTotal)}</Text>
+                    <Text style={{ ...base.tableCell, flex: 1.1, color: colors.red }}>{fmtBRL(r.custoTotal)}</Text>
+                    <Text style={{ ...base.tableCell, flex: 1.1, fontWeight: 700, color: r.resultado >= 0 ? colors.green : colors.red }}>{fmtBRL(r.resultado)}</Text>
+                    <Text style={{ ...base.tableCell, flex: 0.7, color: r.margem >= 15 ? colors.green : colors.red }}>{fmtPct(r.margem)}</Text>
                   </View>
                 ))}
               </View>
             </View>
           )}
 
-          {/* Produtividade e resultado por cultura, detalhado por safra */}
+          {/* Produtividade, receita e custo por cultura, detalhado por safra */}
           {safrasComDados.map(s => (
             <View key={s.safra} style={base.section} wrap={false}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 }}>
@@ -106,23 +148,24 @@ export function ProducaoPDF({ data }: { data: ProducaoPDFData }) {
                 </View>
               </View>
               <View style={{ ...base.table, marginTop: 0 }}>
-                <View style={base.tableHeader}>
-                  {['Cultura', 'Área (ha)', 'Produtividade (sc/ha)', 'Cotação (R$/sc)', 'Receita Bruta', 'Custo Total', 'Resultado', 'Margem'].map(h => (
-                    <Text key={h} style={{ ...base.tableHeaderCell, flex: h === 'Cultura' ? 1.3 : 1, fontSize: 6.5 }}>{h}</Text>
-                  ))}
-                </View>
+                <TableHeader cols={DETALHE_COLS} />
                 {s.rows.map((r, i) => {
                   const c = calc(r)
                   return (
                     <View key={`${r.cultura}-${i}`} style={{ ...base.tableRow, ...(i % 2 === 0 ? base.tableRowAlt : {}) }}>
                       <Text style={{ ...base.tableCell, flex: 1.3, fontWeight: 700 }}>{r.cultura}</Text>
-                      <Text style={base.tableCell}>{r.area.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}</Text>
-                      <Text style={{ ...base.tableCell, fontWeight: 700, color: colors.green }}>{fmtN(r.produtividade)}</Text>
-                      <Text style={base.tableCell}>R$ {fmtN(r.cotacao, 2)}</Text>
-                      <Text style={base.tableCell}>{fmtBRL(c.recBruta)}</Text>
-                      <Text style={{ ...base.tableCell, color: colors.red }}>{fmtBRL(c.custoTotal)}</Text>
-                      <Text style={{ ...base.tableCell, fontWeight: 700, color: c.resultado >= 0 ? colors.green : colors.red }}>{fmtBRL(c.resultado)}</Text>
-                      <Text style={{ ...base.tableCell, color: c.margem >= 15 ? colors.green : colors.red }}>{fmtPct(c.margem)}</Text>
+                      <Text style={{ ...base.tableCell, flex: 0.8 }}>{r.area.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}</Text>
+                      <Text style={{ ...base.tableCell, flex: 0.9, fontWeight: 700, color: colors.green }}>{fmtN(r.produtividade)}</Text>
+                      <Text style={{ ...base.tableCell, flex: 0.8 }}>R$ {fmtN(r.cotacao, 2)}</Text>
+                      <Text style={{ ...base.tableCell, flex: 0.9 }}>{fmtN(c.prodTotal, 0)}</Text>
+                      <Text style={{ ...base.tableCell, flex: 1.1 }}>{fmtBRL(c.recBruta)}</Text>
+                      <Text style={{ ...base.tableCell, flex: 0.9 }}>{fmtBRL(c.custoPorHaReais)}</Text>
+                      <Text style={{ ...base.tableCell, flex: 1.1, color: colors.red }}>{fmtBRL(c.custoProducao)}</Text>
+                      <Text style={{ ...base.tableCell, flex: 0.8 }}>{r.areaArrendada.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}</Text>
+                      <Text style={{ ...base.tableCell, flex: 1.1, color: colors.red }}>{fmtBRL(c.custoArrendTotal)}</Text>
+                      <Text style={{ ...base.tableCell, flex: 1.1, color: colors.red }}>{fmtBRL(c.custoTotal)}</Text>
+                      <Text style={{ ...base.tableCell, flex: 1.1, fontWeight: 700, color: c.resultado >= 0 ? colors.green : colors.red }}>{fmtBRL(c.resultado)}</Text>
+                      <Text style={{ ...base.tableCell, flex: 0.7, color: c.margem >= 15 ? colors.green : colors.red }}>{fmtPct(c.margem)}</Text>
                     </View>
                   )
                 })}
